@@ -1,0 +1,199 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "autobiz.scaffold.module.board.v1",
+  "title": "AutoBiz 看板模块配置 v1（modules/board.json）",
+  "description": "看板模块：目标平台、展示设置、可选能力（知识沉淀入口、产物同步）。不引用此文件时全部取默认值。语义校验见 input-config.md §7。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "target": { "$ref": "#/definitions/target" },
+    "display": { "$ref": "#/definitions/display" },
+    "capabilities": { "$ref": "#/definitions/capabilities" }
+  },
+  "definitions": {
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
+    "artifactId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "skillName": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 64 },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "目标平台。",
+      "properties": {
+        "platforms": {
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 1,
+          "items": { "enum": ["darwin", "linux", "win32"] },
+          "default": ["darwin", "linux", "win32"]
+        },
+        "python": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "posix": { "type": "string", "default": "python3" },
+            "win32": { "type": "string", "default": "python" }
+          }
+        },
+        "utf8Mode": {
+          "type": "boolean",
+          "default": true,
+          "description": "宿主命令是否加 -X utf8。新插件建议保持 true；lite 复刻样例为 false。"
+        }
+      }
+    },
+    "display": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "展示设置。",
+      "properties": {
+        "workflowLabel": { "type": "string", "description": "workflow.templates.standard.label，缺省取 plugin.name。" },
+        "workflowDescription": { "type": "string", "description": "缺省为节点 name 以“ → ”连接加“。”。" },
+        "dialogTips": { "type": "string", "description": "缺省：当前为{workflowLabel}插件：{节点链}。请描述目标与验收标准。" },
+        "systemPromptInject": { "type": "string", "description": "缺省模板包含 FEATURE_DIR 与 PLUGIN_ROOT；覆写时应保留 FEATURE_DIR。" },
+        "stateLabels": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "not_started": { "type": "string", "default": "未开始" },
+            "in_progress": { "type": "string", "default": "进行中" },
+            "done": { "type": "string", "default": "已完成" }
+          }
+        },
+        "artifacts": {
+          "type": "object",
+          "description": "产物 id → 看板显示名；缺省取该产物的第一个路径。",
+          "propertyNames": { "$ref": "#/definitions/artifactId" },
+          "additionalProperties": { "$ref": "#/definitions/nonEmpty" }
+        },
+        "nodes": {
+          "type": "object",
+          "description": "按节点 id 覆写看板描述和提示文案；key 必须是 workflow.json 中的节点。",
+          "propertyNames": { "$ref": "#/definitions/nodeId" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "description": { "type": "string", "description": "缺省：{name}；产物：{输出路径以、连接}。" },
+              "nextAction": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "局部覆写。active 作用于 not_started 与 in_progress；done 作用于本节点完成后（默认指向下一节点技能）。",
+                "properties": {
+                  "active": { "$ref": "#/definitions/actionText" },
+                  "done": { "$ref": "#/definitions/actionText" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "actionText": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "slashSkill": { "type": "string" },
+        "userMessage": { "type": "string" },
+        "dialogTips": { "type": "string" }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "看板可选能力。",
+      "properties": {
+        "knowledgeSedimentation": { "$ref": "#/definitions/knowledgeSedimentation" },
+        "artifactSync": { "$ref": "#/definitions/artifactSync" }
+      }
+    },
+    "knowledgeSedimentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "description": "知识沉淀入口（DevClaw 提供 knowledge-sync 能力），生成 board_config 顶层 knowledge_config；不依赖知识模块。",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "syncType": { "type": "string", "default": "invoke_session" },
+        "slashSkill": { "type": "string", "default": "knowledge-sync" },
+        "userMessage": { "type": "string", "default": "请针对${projectCode}项目发起知识沉淀，这个是 token：${leanToken}" },
+        "dialogTips": { "type": "string", "default": "发起知识沉淀" }
+      }
+    },
+    "artifactSync": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "skillName": { "$ref": "#/definitions/skillName", "default": "autobizdevops-artifact-sync" },
+        "allowedFrom": {
+          "type": "string",
+          "pattern": "^([a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*:(in_progress|done)|[a-z][a-z0-9_]*)$",
+          "description": "<nodeId>:<in_progress|done> 或 checkpoint 名；从该点到流程末尾都允许同步。"
+        },
+        "excludeCheckpoints": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "allowedCheckpoints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "显式列表，与 allowedFrom 二选一。"
+        },
+        "exclude": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/artifactId" },
+          "default": [],
+          "description": "不上传的产物 id。"
+        },
+        "descriptions": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/definitions/artifactId" },
+          "additionalProperties": { "$ref": "#/definitions/nonEmpty" },
+          "default": {},
+          "description": "产物 id → 同步目录中的简述，缺省为产物显示名 + “。”。"
+        },
+        "entry": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "看板上的产物同步入口，生成 board_config 顶层 artifact_sync（slashSkill 固定为 skillName）。",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "syncType": { "type": "string", "default": "invoke_session" },
+            "userMessage": { "type": "string", "default": "请针对${projectCode}项目的${feature}特性发起产物同步" },
+            "dialogTips": { "type": "string", "default": "发起产物同步" }
+          }
+        },
+        "uploadUrl": { "type": "string", "format": "uri" },
+        "maxFileSizeMiB": { "type": "number", "exclusiveMinimum": 0, "default": 5 },
+        "apiDetail": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled"],
+          "description": "按实际代码生成 FEATURE_API_DETAIL.md；仅对含编码节点的插件有意义。",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "node": { "$ref": "#/definitions/nodeId", "description": "FEATURE_API_DETAIL.md 归属的节点 id。" }
+          }
+        },
+        "extraPaths": {
+          "type": "object",
+          "description": "不属于节点输出但需要同步的路径：{ nodeId: { pathPattern: 简述 } }。",
+          "propertyNames": { "$ref": "#/definitions/nodeId" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/definitions/nonEmpty" }
+          }
+        }
+      },
+      "if": { "properties": { "enabled": { "const": true } } },
+      "then": {
+        "oneOf": [
+          { "required": ["allowedFrom"], "not": { "required": ["allowedCheckpoints"] } },
+          { "required": ["allowedCheckpoints"], "not": { "required": ["allowedFrom"] } }
+        ]
+      }
+    }
+  }
+}

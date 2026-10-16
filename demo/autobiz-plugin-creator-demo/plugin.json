@@ -1,0 +1,15 @@
+{
+  "name": "autobiz-plugin-creator-demo",
+  "version": "0.1.0",
+  "description": "AutoBiz 看板插件脚手架演示：通过对话梳理流程，生成核心配置并检查。",
+  "author": {
+    "name": "autobizdevops_plugin_creator"
+  },
+  "keywords": [
+    "scaffold",
+    "plugin-creator",
+    "kanban",
+    "demo"
+  ],
+  "skills": "./skills/"
+}

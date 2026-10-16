@@ -2,14 +2,16 @@
 
 本文规定脚手架生成的插件**静态形态**：目录、清单、看板配置、内部配置、运行期数据格式、技能格式。命令的调用参数与返回 JSON 等**行为接口**见 [interfaces.md](interfaces.md)。
 
-文中“必须/应当/可以”按 RFC 2119 的含义理解。下文的“宿主”均指 DevClaw。
+文中“必须/应当/可以”按 RFC 2119 的含义理解。下文的“宿主”均指 DevClaw；`board.*`、`session.*`、`knowledge.*` 分别指 `modules/board.json`、`modules/session.json`、`modules/knowledge.json` 中的字段（input-config.md §4）。
 
 ## 1. 目录结构
 
 ```text
 <plugin>/
-├── plugin.scaffold.json                  # developer  工程配置（不随包发布）
+├── plugin.scaffold.json                  # developer  入口文件：基础信息与引用（不随包发布）
 ├── workflow.json                         # developer  核心流程（不随包发布）
+├── modules/                              # developer  模块配置，按需存在（不随包发布）
+│   └── board.json  session.json  knowledge.json
 ├── plugin.json                           # generated  插件清单（DevClaw 只读这一份）
 ├── .codex-plugin/plugin.json             # generated  Codex 清单（可选，plugin.codexManifest）
 ├── board_core/
@@ -30,7 +32,8 @@
 │   │   ├── init_workspace.py             # managed    DevClaw 创建项目（create_project）
 │   │   ├── init_feature.py               # managed    DevClaw 创建 Feature（create_feature）
 │   │   ├── inspect_state.py              # managed    DevClaw 查询项目与 Feature（project_status / feature_status）
-│   │   └── inspect_workflow_templates.py # managed    DevClaw 动态工作流（dynamic_workflow）
+│   │   ├── inspect_workflow_templates.py # managed    DevClaw 动态工作流（dynamic_workflow）
+│   │   └── board_events.py               # managed    写入口提交后推送看板事件（interfaces.md §3.5）
 │   ├── session/
 │   │   └── render_session_context.py     # managed    DevClaw 会话机制（session_context_inject）
 │   ├── knowledge/                        # module     知识模块，启用时生成
@@ -43,13 +46,16 @@
 │   ├── config/                           # generated  编译后的内部配置（§5）
 │   │   └── runtime.json  flow.json  session.json  knowledge.json
 │   └── build-manifest.json               # generated  生成文件及构建信息记录（§8）
-├── .scaffold/*.schema.json               # managed    两份输入配置的 Schema（IDE 补全）
+├── .scaffold/                            # managed    输入配置的 Schema（IDE 补全）
+│   ├── plugin-scaffold.schema.json  workflow.schema.json
+│   └── modules/board.schema.json  session.schema.json  knowledge.schema.json
+├── .githooks/pre-commit                  # seeded     提交前运行 autobiz-plugin lint（input-config.md §7.1）
 └── .gitignore                            # seeded
 ```
 
 `runtime/` 各级目录下的 `__init__.py` 省略未列。入口脚本通过 `__file__` 定位插件根目录，把它加入 `sys.path` 后导入 `runtime.common`。
 
-打包产物（`autobiz-plugin package`）包含：`plugin.json`（开启时另含 `.codex-plugin/plugin.json`）、`board_core/`、`runtime/`、`skills/`、`hooks/`、`agents/`，以及清单中引用的 `.mcp.json`。不包含 `plugin.scaffold.json`、`workflow.json`、`.scaffold/`、`__pycache__/`。知识目录（`knowledge.root`，默认 `sys/`）在声明了 `knowledge.source` 时是运行期缓存，不打包；未声明时视为开发者提供的资源，原样打包。
+打包产物（`autobiz-plugin package`）包含：`plugin.json`（开启时另含 `.codex-plugin/plugin.json`）、`board_core/`、`runtime/`、`skills/`、`hooks/`、`agents/`，以及清单中引用的 `.mcp.json`。不包含 `plugin.scaffold.json`、`workflow.json`、`modules/`、`.scaffold/`、`__pycache__/`。知识目录（`knowledge.root`，默认 `sys/`）在声明了 `knowledge.source` 时是运行期缓存，不打包；未声明时视为开发者提供的资源，原样打包。
 
 ## 2. 插件清单
 
@@ -115,6 +121,7 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 | `inspectCommands` | 是 | §3.2 |
 | `workflow` | 是 | §3.3 |
 | `checkpointSuffixState` | 是 | `in_progress`、`done` 两项 |
+| `boardEvents` | 是 | 固定为 `{"protocol": "autobiz.board-events.v1"}`，表示插件会推送看板事件（interfaces.md §3.5） |
 | `knowledge_config` | 看板能力 `knowledgeSedimentation` | §7.3 |
 | `artifact_sync` | 看板能力 `artifactSync` 且 `entry.enabled` | §7.2 |
 | `supported_deploy_units` | 知识模块 | §7.1；声明 `knowledge.source` 时运行期回写 |
@@ -151,7 +158,7 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
   "checkpoints": {
     "initial": ["<P0>_in_progress"],
     "transitions": { "<P0>_in_progress": ["<P0>_done"], "<P0>_done": ["<P1>_in_progress"], "…": [], "<Pk>_done": [] },
-    "stageLabels": { "<P0>_in_progress": "{label}进行中", "<P0>_done": "{label}完成" }
+    "stageLabels": { "<P0>_in_progress": "{name}进行中", "<P0>_done": "{name}完成" }
   },
   "nodes": [ /* §3.4 */ ],
   "transitions": [ { "id": "<Pi>-to-<Pi+1>", "from": { "nodeId": "…", "state": "done" }, "to": { "nodeId": "…", "state": "in_progress" } } ]
@@ -185,18 +192,16 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 ### 3.5 产物定义
 
 ```json
-{ "id": "plan", "label": "实施计划", "artifactType": "file", "path": "plan.md", "required": true,
-  "legacyPaths": ["PLAN.md"], "extract": { "degrade": "…" } }
-{ "id": "spec_bundle", "label": "规格包", "artifactType": "file", "path": "proposal.md",
+{ "id": "plan", "label": "实施计划", "artifactType": "file", "path": "plan.md", "required": true }
+{ "id": "spec_bundle", "label": "proposal.md", "artifactType": "file", "path": "proposal.md",
   "paths": ["proposal.md", "specs/*/spec.md"], "required": true }
 ```
 
 | 字段 | 必有 | 语义 |
 |---|---|---|
-| `id` / `label` / `artifactType` / `path` / `required` | 是 | 输入 `path` 为数组时，这里的 `path` 取首项，保证只认 `path` 的旧版宿主仍能工作 |
-| `paths` | 否 | 仅在输入 `path` 为数组时输出，给出全部项 |
-| `legacyPaths` | 否 | 仅当 `path` 无匹配时回退；只能和单项 `path` 一起出现 |
-| `extract.degrade` | 否 | 仅用于输入产物：缺失时的降级说明，给技能读 |
+| `id` / `artifactType` / `path` / `required` | 是 | `artifactType` 按扩展名推断；`required` 在 v1 恒为 `true`。核心配置中路径为数组时，这里的 `path` 取首项，保证只认 `path` 的旧版宿主仍能工作 |
+| `label` | 是 | 取 `board.display.artifacts[id]`，未配置时为第一个路径 |
+| `paths` | 否 | 仅在核心配置中路径为数组时输出，给出全部项 |
 
 完成判定见 §4.4。
 
@@ -245,6 +250,7 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 {
   "schemaVersion": 1,
   "pluginId": "autodev-planning-kanban",
+  "boardSeq": 12,
   "features": {
     "example-feature": {
       "feature": "example-feature",
@@ -264,6 +270,7 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 
 - 必须记录 `pluginId`（D3）。`pluginId` 与本插件不符时，拒绝读写，原文件保持不变（防止目录被拷贝或误放）；
 - `schemaVersion` 不符、`checkpoint` 不在当前配置中、或 key 与 `feature` 字段不一致时，拒绝写入，原文件保持不变；
+- `boardSeq` 是看板事件序号（interfaces.md §3.5），非负整数，缺省视为 0。engine 每次提交时在锁内加 1，其他写入方不得修改它；
 - 记录中的未知字段原样保留（允许技能存放自定义元数据）；
 - 不保存历史，事件写入 `hooks.ndjson`；读到旧版的 `history` 字段时，在下一次写入时移除；
 - 写入必须在 `.state.lock` 内完成“读取 → 校验 → 原子替换”的完整事务。
@@ -294,14 +301,15 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 
 | 层次 | 负责方 | 内容 |
 |---|---|---|
-| 存在性（最小校验） | 运行框架 `engine.py` | 产物 `path` 的每一项至少匹配一个普通文件；单项 `path` 无匹配时回退 `legacyPaths`。空文件也算存在。glob 不匹配目录 |
+| 存在性（最小校验） | 运行框架 `engine.py` | 产物路径的每一项至少匹配一个普通文件。空文件也算存在。glob 不匹配目录 |
 | 业务校验 | 开发者的校验命令 | 空文件、格式、内容是否合格，由节点 `validate` 命令判断（D13、D14） |
 
 推进规则：
 
 - 推进到 `<prefix>_in_progress`：检查本节点的必需输入是否存在；
-- 推进到 `<prefix>_done`：检查必需输入和必需输出是否存在，全部存在后再执行节点的 `validate` 命令，退出码为 0 才写入；
-- 非必需产物不检查。
+- 推进到 `<prefix>_done`：检查必需输入和必需输出是否存在，全部存在后再执行节点的 `validate` 命令，退出码为 0 才写入。
+
+v1 中节点的输入和输出都是必需的。
 
 查询（`feature_status`）只报告存在性：产物显示为已生成，不代表节点已完成。节点状态只由 `state.json` 中的 checkpoint 决定。
 
@@ -324,32 +332,40 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 
 ### 5.2 flow.json（流程契约及状态规则）
 
-由 `workflow.json` 规范化得到：展开产物引用、填好默认值、计算 checkpoint 链。
+核心流程 `workflow.json` 只写决策，`flow.json` 是它的编译结果，插件运行时只读这一份（D19）。编译时填好全部默认值：从节点 id 算出 checkpoint，从 `outputs` 汇总产物表并记下生产者，按扩展名推断产物类型，从 `board.display` 取显示名，把模板路径解析成相对插件根目录的路径。
+
+最小示例（input-config.md §8）编译后：
 
 ```jsonc
 {
   "schema": "autobiz.flow.v1",
-  "stages": [ { "id": "biz", "label": "Biz" } ],
+  "source": { "workflow.json": "sha256:…" },        // 用于检测编译配置是否过期（BUILD_STALE）
+  "stages": ["Doc-Review-Kanban"],
   "artifacts": {
-    "draft": { "label": "文档初稿", "type": "file", "paths": ["DRAFT.md"], "legacyPaths": [] }
+    "draft":  { "label": "DRAFT.md",  "type": "file", "paths": ["DRAFT.md"],  "producer": "draft" },
+    "review": { "label": "REVIEW.md", "type": "file", "paths": ["REVIEW.md"], "producer": "review" }
   },
   "nodes": [
-    { "id": "biz.review", "stage": "biz", "label": "评审", "skill": "doc-review", "order": 20,
+    { "id": "draft", "name": "起草", "stage": "Doc-Review-Kanban", "skill": "doc-draft", "order": 10,
+      "checkpoints": ["draft_in_progress", "draft_done"],
+      "inputs": [], "outputs": ["draft"],
+      "templates": ["skills/doc-draft/templates/DRAFT.md"],
+      "validate": null },
+    { "id": "review", "name": "评审", "stage": "Doc-Review-Kanban", "skill": "doc-review", "order": 20,
       "checkpoints": ["review_in_progress", "review_done"],
-      "inputs":  [ { "ref": "draft", "required": true, "degrade": "" } ],
-      "outputs": [ { "ref": "review", "required": true } ],
+      "inputs": ["draft"], "outputs": ["review"],
       "templates": [],
-      "validate": "${python} ${pluginPath}/skills/doc-review/scripts/check_review.py --feature-dir ${featureDir}" }
+      "validate": "${python} ${skillPath}/scripts/check_review.py --feature-dir ${featureDir}" }
   ],
   "checkpoints": {
     "chain": ["draft_in_progress", "draft_done", "review_in_progress", "review_done"],
     "initial": "draft_in_progress",
-    "labels": { "draft_in_progress": "起草进行中", "…": "…" }
+    "labels": { "draft_in_progress": "起草进行中", "draft_done": "起草完成", "review_in_progress": "评审进行中", "review_done": "评审完成" }
   }
 }
 ```
 
-产物的 `paths` 总是数组：输入为字符串时只有一项。`validate` 未声明时为 `null`。
+产物的 `paths` 总是数组：核心配置中为字符串时只有一项。`validate` 未声明时为 `null`，命令中的占位符保持原样，执行时才替换。`flow.json` 不需要人阅读或修改，被手改时 `check` 报 `DRIFT_GENERATED`。
 
 运行框架加载时必须校验以下不变量（沿用 lite 的 `load_config`）：
 
@@ -415,7 +431,7 @@ description: 将工作拆解为有序任务。当你已有规格说明……时�
   ```
   python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --feature "${feature}" --checkpoint plan_done
   ```
-  推进时框架会检查必需产物是否存在，并执行本节点的校验命令 `${python} ${pluginPath}/skills/autodev-plan/scripts/check_plan.py --feature-dir ${featureDir}`。未通过时按返回的错误修正产物后重试，不需要自己调用校验命令。
+  推进时框架会检查必需产物是否存在，并执行本节点的校验命令 `${python} ${skillPath}/scripts/check_plan.py --feature-dir ${featureDir}`。未通过时按返回的错误修正产物后重试，不需要自己调用校验命令。
 - 需要修改已完成阶段时：`--checkpoint plan_in_progress --reopen --reason "<原因>"`
 <!-- scaffold:end state -->
 
@@ -474,7 +490,7 @@ dependencies:
 
 | 资源 | 建议位置 | 规则 |
 |---|---|---|
-| 模板 | `skills/<skill>/templates/` | 由节点 `templates` 引用。build 时缺失则生成 `[TODO: 模板内容]` 桩文件（seeded），之后由开发者维护 |
+| 模板 | `skills/<skill>/templates/` | 由节点 `templates` 引用，路径相对技能目录（例如 `templates/plan.md`）。build 时缺失则生成 `[TODO: 模板内容]` 桩文件（seeded），之后由开发者维护 |
 | 业务校验器 | `skills/<skill>/scripts/` | 由节点 `validate` 命令调用，契约见 interfaces.md §4.4。脚手架不生成校验器；初始化向导可以按开发者要求创建骨架（带 `[TODO]`，`package` 前必须补全） |
 
 ## 7. 模块输出
@@ -518,8 +534,8 @@ skills/<skillName>/
   "uploadUrl": "https://…/file/upload",
   "maxFileSizeMiB": 5,
   "stages": {
-    "biz": { "biz.prd":   { "PRD.md": "结构化需求。" } },
-    "dev": { "dev.specs": { "proposal.md": "变更提案。", "specs/*/spec.md": "行为规格。", "design.md": "技术设计。" },
+    "Biz": { "biz.prd":   { "PRD.md": "结构化需求。" } },
+    "Dev": { "dev.specs": { "proposal.md": "变更提案。", "specs/*/spec.md": "行为规格。", "design.md": "技术设计。" },
              "dev.plan":  { "plan.md": "实施计划。" },
              "dev.code":  { "FEATURE_API_DETAIL.md": "当前 Feature 涉及接口的详细说明。" } }
   }
@@ -528,7 +544,7 @@ skills/<skillName>/
 
 推导规则：
 
-- `stages[stageId][nodeId][path] = 简述`，按节点顺序遍历每个节点的 `outputs`，跳过 `exclude` 中的产物；简述取 `descriptions[产物 id]`，缺省为 `label + "。"`。`path` 为数组的产物，每一项各占一个条目，简述相同；
+- `stages[阶段名][nodeId][path] = 简述`，阶段名取节点的 `stage`（未写时为默认分组名）；按节点顺序遍历每个节点的 `outputs`，跳过 `exclude` 中的产物；简述取 `descriptions[产物 id]`，缺省为产物显示名 + `。`。`path` 为数组的产物，每一项各占一个条目，简述相同；
 - 每个产物只登记到第一个产出它的节点下；
 - 再合并 `extraPaths`；`apiDetail.enabled` 时，在 `apiDetail.node` 下加入 `FEATURE_API_DETAIL.md`；
 - `allowedCheckpoints` 优先用显式列表；否则取 checkpoint 链上 `allowedFrom` 及之后的全部 checkpoint，再去掉 `excludeCheckpoints`；
@@ -570,7 +586,8 @@ skills/<skillName>/
   "pluginId": "autodev-planning-kanban",
   "layout": "legacy",
   "modules": { "board": "1.0.0", "session": "1.0.0", "knowledge": "1.0.0", "artifactSync": "1.0.0" },
-  "inputs": { "plugin.scaffold.json": "sha256:…", "workflow.json": "sha256:…" },
+  "inputs": { "plugin.scaffold.json": "sha256:…", "workflow.json": "sha256:…",
+              "modules/board.json": "sha256:…", "modules/session.json": "sha256:…", "modules/knowledge.json": "sha256:…" },
   "files": {
     "runtime/common/engine.py": { "ownership": "managed", "sha256": "…" },
     "board_core/board_config.json": { "ownership": "generated", "sha256": "…", "runtimeFields": ["supported_deploy_units", "inspectCommands.*.knowledge_path"] },

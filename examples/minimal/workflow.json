@@ -1,28 +1,20 @@
 {
   "$schema": "../../schemas/workflow.schema.json",
-  "workflowVersion": 1,
-  "stages": [
-    { "id": "biz", "label": "Biz" }
-  ],
-  "artifacts": {
-    "draft": { "label": "文档初稿", "path": "DRAFT.md" },
-    "review": { "label": "评审意见", "path": "REVIEW.md" }
-  },
   "nodes": [
     {
-      "id": "biz.draft",
-      "label": "起草",
+      "id": "draft",
+      "name": "起草",
       "skill": "doc-draft",
-      "outputs": ["draft"],
-      "templates": ["skills/doc-draft/templates/DRAFT.md"]
+      "outputs": { "draft": "DRAFT.md" },
+      "templates": ["templates/DRAFT.md"]
     },
     {
-      "id": "biz.review",
-      "label": "评审",
+      "id": "review",
+      "name": "评审",
       "skill": "doc-review",
       "inputs": ["draft"],
-      "outputs": ["review"],
-      "validate": "${python} ${pluginPath}/skills/doc-review/scripts/check_review.py --feature-dir ${featureDir}"
+      "outputs": { "review": "REVIEW.md" },
+      "validate": "${python} ${skillPath}/scripts/check_review.py --feature-dir ${featureDir}"
     }
   ]
 }

@@ -1,7 +1,6 @@
 {
   "$schema": "../../schemas/plugin-scaffold.schema.json",
   "scaffoldVersion": 1,
-  "workflow": "./workflow.json",
   "plugin": {
     "id": "autodev-planning-kanban",
     "name": "AutoBizDevOps-Plugin-Lite",
@@ -15,75 +14,10 @@
   "runtime": {
     "layout": "legacy"
   },
-  "board": {
-    "target": {
-      "utf8Mode": false
-    },
-    "display": {
-      "workflowLabel": "需求开发",
-      "nodes": {
-        "dev.plan": {
-          "nextAction": {
-            "done": {
-              "userMessage": "实现当前feature",
-              "dialogTips": "计划已完成；用户要求实施时进入增量编码。"
-            }
-          }
-        },
-        "dev.code": {
-          "nextAction": {
-            "active": {
-              "userMessage": "实现当前feature,先调研清楚实施计划，再由协调者按phase分阶段分配worker实施",
-              "dialogTips": "当前阶段：增量编码。team 模式按 Phase 分发，worker 开始前读取技能与计划。"
-            },
-            "done": {
-              "dialogTips": "编码已完成。"
-            }
-          }
-        }
-      }
-    },
-    "capabilities": {
-      "knowledgeSedimentation": {
-        "enabled": true
-      },
-      "artifactSync": {
-        "enabled": true,
-        "allowedFrom": "dev.plan:done",
-        "apiDetail": { "enabled": true, "node": "dev.code" }
-      }
-    }
-  },
-  "session": {
-    "policies": {
-      "nodes": {
-        "dev.specs": {
-          "agentMode": "multi",
-          "toolCustomConfig": { "task": { "enabled": true } },
-          "subagentConfig": {}
-        },
-        "dev.plan": {
-          "agentMode": "multi",
-          "toolCustomConfig": { "task": { "enabled": true } },
-          "subagentConfig": {
-            "disabledBuiltinSubagents": ["Explore", "critic"],
-            "customSubagentFiles": ["agents/explore.md", "agents/critic_autodev_plan_zh.md"]
-          }
-        },
-        "dev.code": {
-          "agentMode": "agent_team"
-        }
-      }
-    }
-  },
-  "knowledge": {
-    "enabled": true,
-    "assembly": { "assembler": "plugin" },
-    "source": {
-      "type": "git",
-      "url": "https://gitee.paas.cmbchina.cn/S992391/LF39_Product_Knowledge.git",
-      "sshUrl": "git@gitee.itc.cmbchina.cn:S992391/LF39_Product_Knowledge.git",
-      "ref": "master"
-    }
+  "workflow": "./workflow.json",
+  "modules": {
+    "board": "./modules/board.json",
+    "session": "./modules/session.json",
+    "knowledge": "./modules/knowledge.json"
   }
 }

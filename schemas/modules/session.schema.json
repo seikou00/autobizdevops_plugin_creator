@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "autobiz.scaffold.module.session.v1",
+  "title": "AutoBiz 会话与 Agent 配置 v1（modules/session.json）",
+  "description": "会话与 Agent：可选的自定义会话入口、运行策略。外挂资源（agents/*.md）由策略按路径引用。不引用此文件时全部取默认值。语义校验见 input-config.md §7。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "customEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command"],
+      "description": "自定义会话入口：由默认会话入口调用，输出并入 sessionContext；不替换默认入口。",
+      "properties": {
+        "command": { "$ref": "#/definitions/command" },
+        "timeoutSec": { "type": "integer", "minimum": 1, "default": 30 }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "$ref": "#/definitions/runtimePolicy",
+          "description": "全局默认策略，缺省为 solo + 启用 task。"
+        },
+        "nodes": {
+          "type": "object",
+          "description": "节点策略；key 必须是 workflow.json 中的节点。原样写入 board_config 对应节点的 runtimePolicy。",
+          "propertyNames": { "$ref": "#/definitions/nodeId" },
+          "additionalProperties": { "$ref": "#/definitions/runtimePolicy" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
+    "command": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\r\\n]+$",
+      "description": "完整的单行命令：按 POSIX 规则拆分参数后再替换占位符，不经过 shell 执行。可用占位符见 input-config.md §2.5；格式由 autobiz-plugin lint 检查。"
+    },
+    "runtimePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "agentMode": { "enum": ["solo", "multi", "agent_team", "workflow"] },
+        "toolCustomConfig": {
+          "type": "object",
+          "properties": {
+            "task": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "enabled": { "type": "boolean" } }
+            }
+          }
+        },
+        "subagentConfig": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "disabledBuiltinSubagents": { "type": "array", "items": { "type": "string" } },
+            "customSubagentFiles": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^agents/(?!.*\\.\\.)[^\\\\:]+\\.md$" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
