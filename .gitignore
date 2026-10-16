@@ -218,3 +218,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# autobiz-plugin-scaffold
+.DS_Store
+.idea/
+.vscode/
+sys/
+.knowledge.lock
+.knowledge-sync-*
