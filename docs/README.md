@@ -17,7 +17,7 @@ v1 范围：
 - 同一项目可以安装多个插件，各插件的状态和产物按 `pluginId` 隔离；
 - 运行时只依赖 Python 3.9+ 标准库（知识同步另需 Git）。
 
-脚手架位于独立仓库 `autobiz-plugin-scaffold`（即本仓库，结构见 §3.1）。§8 汇总了已经确认的决策。
+脚手架位于独立仓库 `autobizdevops_plugin_creator`（即本仓库，结构见 §3.1）。§8 汇总了已经确认的决策。
 
 kanban 全栈版的模板子集（lean）、动态阶段、needs_fix 回流、skip_node、归档终态节点、validators/guards 不进 v1，见 §7。
 
@@ -116,10 +116,10 @@ lite 版 `board_config.json` 有 509 行，开发者真正做出的决策只有�
 
 插件开发技能 `autobiz-plugin-creator` 位于第 1 层之上：它只负责对话和编写输入配置，生成工作全部交给 CLI。
 
-### 3.1 仓库结构（autobiz-plugin-scaffold）
+### 3.1 仓库结构（autobizdevops_plugin_creator）
 
 ```text
-autobiz-plugin-scaffold/
+autobizdevops_plugin_creator/
 ├── scaffold/                       # CLI 与构建流水线：cli normalize validate compile emit lock simulate
 │   └── modules/
 │       ├── knowledge/              # module.json  module.py  options.schema.json  files/

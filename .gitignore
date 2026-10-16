@@ -219,7 +219,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# autobiz-plugin-scaffold
+# autobizdevops_plugin_creator
 .DS_Store
 .idea/
 .vscode/

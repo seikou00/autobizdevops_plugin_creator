@@ -1,4 +1,4 @@
-# autobiz-plugin-scaffold
+# autobizdevops_plugin_creator
 
 AutoBiz 看板插件脚手架。插件开发者只需填写阶段、节点和产物，勾选可选模块（知识沉淀与解析、产物同步），再编写各节点的技能。看板配置、三平台宿主命令、状态机、插件清单和模块文件都由脚手架生成。
 
