@@ -1,46 +1,43 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.input.v1",
-  "title": "AutoBiz 插件脚手架输入配置 v1（plugin.scaffold.json）",
-  "description": "插件开发者唯一需要手写的配置：插件信息、阶段、节点、产物与可选模块。其余看板配置由脚手架推导生成。语义校验（引用、顺序、唯一性）见 input-config.md §5，Schema 只负责结构与取值范围。",
+  "title": "AutoBiz 插件脚手架工程配置 v1（plugin.scaffold.json）",
+  "description": "插件基础信息，以及看板、会话与 Agent、知识三个模块的配置。核心流程写在 workflow.json（见 workflow.schema.json）。语义校验（节点引用、命令格式等）见 input-config.md §6，Schema 只负责结构与取值范围。",
   "type": "object",
   "additionalProperties": false,
-  "required": ["scaffoldVersion", "plugin", "stages", "artifacts", "nodes"],
+  "required": ["scaffoldVersion", "plugin"],
   "properties": {
     "$schema": { "type": "string" },
-    "scaffoldVersion": { "const": 1, "description": "输入配置格式主版本。" },
+    "scaffoldVersion": { "const": 1, "description": "工程配置格式主版本。" },
+    "workflow": {
+      "type": "string",
+      "pattern": "^\\./(?!(.*/)?\\.\\.(/|$))[^\\\\:]+\\.json$",
+      "default": "./workflow.json",
+      "description": "核心流程文件，相对插件根目录。"
+    },
     "plugin": { "$ref": "#/definitions/plugin" },
     "runtime": { "$ref": "#/definitions/runtime" },
     "board": { "$ref": "#/definitions/board" },
-    "stages": {
-      "type": "array",
-      "minItems": 1,
-      "items": { "$ref": "#/definitions/stage" },
-      "description": "阶段（看板分组），数组顺序即展示顺序。"
-    },
-    "artifacts": {
-      "type": "object",
-      "description": "产物注册表：key 为产物 id，节点通过 id 引用。",
-      "propertyNames": { "$ref": "#/definitions/artifactId" },
-      "additionalProperties": { "$ref": "#/definitions/artifact" }
-    },
-    "nodes": {
-      "type": "array",
-      "minItems": 1,
-      "items": { "$ref": "#/definitions/node" },
-      "description": "节点，数组顺序即流转顺序。"
-    },
-    "modules": { "$ref": "#/definitions/modules" }
+    "session": { "$ref": "#/definitions/session" },
+    "knowledge": { "$ref": "#/definitions/knowledge" }
   },
   "definitions": {
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9]*\\.[a-z][a-z0-9_]*$" },
     "artifactId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-    "relativePath": {
+    "skillName": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 64 },
+    "relativeDir": {
       "type": "string",
       "minLength": 1,
       "pattern": "^(?![/~])(?!.*\\\\)(?!.*:)(?!(.*/)?\\.\\.(/|$)).+$",
-      "description": "相对 FEATURE_DIR 的 POSIX 路径，可含 glob（* ? [ ]），不得以 / 开头、不得含 \\ : 或 .. 段。"
+      "description": "相对路径，不得以 / 开头、不得含 \\ : 或 .. 段。"
     },
-    "nonEmpty": { "type": "string", "minLength": 1 },
+    "command": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\r\\n]+$",
+      "description": "完整的单行命令：按 POSIX 规则拆分参数后再替换占位符，不经过 shell 执行。可用占位符见 input-config.md §2.5。"
+    },
     "plugin": {
       "type": "object",
       "additionalProperties": false,
@@ -53,7 +50,7 @@
           "not": { "enum": ["features", "archive", "issues", "reviews", "logs", "plugins"] },
           "description": "插件稳定 ID：state.json.pluginId、隔离布局下的元数据目录名、安装目录名（以及可选 Codex 清单的 name）相同。发布后不可修改，否则旧项目状态无法读取。不得使用 .autobizdevops 下的保留目录名。"
         },
-        "name": { "$ref": "#/definitions/nonEmpty", "description": "根 plugin.json.name（看板宿主沿用的展示名，可含大写）。" },
+        "name": { "$ref": "#/definitions/nonEmpty", "description": "根 plugin.json.name（DevClaw 沿用的展示名，可含大写）。" },
         "version": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$"
@@ -78,7 +75,7 @@
         "codexManifest": {
           "type": "boolean",
           "default": false,
-          "description": "是否额外生成 .codex-plugin/plugin.json。看板宿主只读根 plugin.json，需要兼容 Codex 时再开启。"
+          "description": "是否额外生成 .codex-plugin/plugin.json。DevClaw 只读根 plugin.json，需要兼容 Codex 时再开启。"
         },
         "interface": { "$ref": "#/definitions/pluginInterface", "description": "仅在 codexManifest 为 true 时使用。" }
       }
@@ -116,6 +113,40 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "layout": {
+          "enum": ["isolated", "legacy"],
+          "default": "isolated",
+          "description": "元数据与产物目录布局。isolated：.autobizdevops/<pluginId>/，同一项目可装多个插件；legacy：.autobizdevops/ 根目录，仅用于迁移已有插件（例如 lite），保持其已有项目可用。"
+        },
+        "validateTimeoutSec": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 120,
+          "description": "节点校验命令的超时秒数。"
+        }
+      }
+    },
+    "board": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "看板模块：目标平台、展示设置、可选能力。",
+      "properties": {
+        "target": { "$ref": "#/definitions/boardTarget" },
+        "display": { "$ref": "#/definitions/boardDisplay" },
+        "capabilities": { "$ref": "#/definitions/boardCapabilities" }
+      }
+    },
+    "boardTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "platforms": {
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 1,
+          "items": { "enum": ["darwin", "linux", "win32"] },
+          "default": ["darwin", "linux", "win32"]
+        },
         "python": {
           "type": "object",
           "additionalProperties": false,
@@ -128,22 +159,10 @@
           "type": "boolean",
           "default": true,
           "description": "宿主命令是否加 -X utf8。新插件建议保持 true；lite 复刻样例为 false。"
-        },
-        "layout": {
-          "enum": ["isolated", "legacy"],
-          "default": "isolated",
-          "description": "元数据与产物目录布局。isolated：.autobizdevops/<pluginId>/，同一项目可装多个插件；legacy：.autobizdevops/ 根目录，仅用于迁移已有插件（例如 lite），保持其已有项目可用。"
-        },
-        "platforms": {
-          "type": "array",
-          "uniqueItems": true,
-          "minItems": 1,
-          "items": { "enum": ["darwin", "linux", "win32"] },
-          "default": ["darwin", "linux", "win32"]
         }
       }
     },
-    "board": {
+    "boardDisplay": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -159,64 +178,28 @@
             "in_progress": { "type": "string", "default": "进行中" },
             "done": { "type": "string", "default": "已完成" }
           }
-        }
-      }
-    },
-    "stage": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "label"],
-      "properties": {
-        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*$", "description": "节点 id 前缀，也是产物同步配置的分组键。" },
-        "label": { "$ref": "#/definitions/nonEmpty", "description": "看板分组名，写入节点 group。" }
-      }
-    },
-    "artifact": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["label", "path"],
-      "properties": {
-        "label": { "$ref": "#/definitions/nonEmpty" },
-        "path": { "$ref": "#/definitions/relativePath" },
-        "type": { "enum": ["file", "json"], "default": "file", "description": "写入 artifactType。" },
-        "legacyPaths": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/relativePath" },
-          "description": "旧文件名；仅当 path 无匹配时回退读取。"
         },
-        "sync": { "type": "boolean", "default": true, "description": "产物同步模块是否上传此产物（仅对作为节点输出时生效）。" },
-        "syncDescription": { "type": "string", "description": "产物同步目录中的简述，缺省为 label + “。”。" }
+        "nodes": {
+          "type": "object",
+          "description": "按节点 id 覆写看板提示文案；key 必须是 workflow.json 中的节点。",
+          "propertyNames": { "$ref": "#/definitions/nodeId" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "nextAction": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "局部覆写。active 作用于 not_started 与 in_progress；done 作用于本节点完成后（默认指向下一节点技能）。",
+                "properties": {
+                  "active": { "$ref": "#/definitions/actionText" },
+                  "done": { "$ref": "#/definitions/actionText" }
+                }
+              }
+            }
+          }
+        }
       }
-    },
-    "inputRef": {
-      "oneOf": [
-        { "$ref": "#/definitions/artifactId" },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["ref"],
-          "properties": {
-            "ref": { "$ref": "#/definitions/artifactId" },
-            "required": { "type": "boolean", "default": true },
-            "degrade": { "type": "string", "description": "缺失时的降级说明，写入 extract.degrade。" },
-            "external": { "type": "boolean", "default": false, "description": "允许引用不由任何前序节点产出的产物（用户直供）。" }
-          }
-        }
-      ]
-    },
-    "outputRef": {
-      "oneOf": [
-        { "$ref": "#/definitions/artifactId" },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["ref"],
-          "properties": {
-            "ref": { "$ref": "#/definitions/artifactId" },
-            "required": { "type": "boolean", "default": true }
-          }
-        }
-      ]
     },
     "actionText": {
       "type": "object",
@@ -225,6 +208,134 @@
         "slashSkill": { "type": "string" },
         "userMessage": { "type": "string" },
         "dialogTips": { "type": "string" }
+      }
+    },
+    "boardCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "knowledgeSedimentation": { "$ref": "#/definitions/knowledgeSedimentation" },
+        "artifactSync": { "$ref": "#/definitions/artifactSync" }
+      }
+    },
+    "knowledgeSedimentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "description": "知识沉淀入口（DevClaw 提供 knowledge-sync 能力），生成 board_config 顶层 knowledge_config；不依赖知识模块。",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "syncType": { "type": "string", "default": "invoke_session" },
+        "slashSkill": { "type": "string", "default": "knowledge-sync" },
+        "userMessage": { "type": "string", "default": "请针对${projectCode}项目发起知识沉淀，这个是 token：${leanToken}" },
+        "dialogTips": { "type": "string", "default": "发起知识沉淀" }
+      }
+    },
+    "artifactSync": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "skillName": { "$ref": "#/definitions/skillName", "default": "autobizdevops-artifact-sync" },
+        "allowedFrom": {
+          "type": "string",
+          "pattern": "^([a-z][a-z0-9]*\\.[a-z][a-z0-9_]*:(in_progress|done)|[a-z][a-z0-9_]*)$",
+          "description": "<nodeId>:<in_progress|done> 或 checkpoint 名；从该点到流程末尾都允许同步。"
+        },
+        "excludeCheckpoints": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "allowedCheckpoints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "显式列表，与 allowedFrom 二选一。"
+        },
+        "exclude": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/artifactId" },
+          "default": [],
+          "description": "不上传的产物 id。"
+        },
+        "descriptions": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/definitions/artifactId" },
+          "additionalProperties": { "$ref": "#/definitions/nonEmpty" },
+          "default": {},
+          "description": "产物 id → 同步目录中的简述，缺省为 label + “。”。"
+        },
+        "entry": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "看板上的产物同步入口，生成 board_config 顶层 artifact_sync（slashSkill 固定为 skillName）。",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "syncType": { "type": "string", "default": "invoke_session" },
+            "userMessage": { "type": "string", "default": "请针对${projectCode}项目的${feature}特性发起产物同步" },
+            "dialogTips": { "type": "string", "default": "发起产物同步" }
+          }
+        },
+        "uploadUrl": { "type": "string", "format": "uri" },
+        "maxFileSizeMiB": { "type": "number", "exclusiveMinimum": 0, "default": 5 },
+        "apiDetail": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled"],
+          "description": "按实际代码生成 FEATURE_API_DETAIL.md；仅对含编码节点的插件有意义。",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "node": { "$ref": "#/definitions/nodeId", "description": "FEATURE_API_DETAIL.md 归属的节点 id。" }
+          }
+        },
+        "extraPaths": {
+          "type": "object",
+          "description": "不属于节点输出但需要同步的路径：{ nodeId: { pathPattern: 简述 } }。",
+          "propertyNames": { "$ref": "#/definitions/nodeId" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/definitions/nonEmpty" }
+          }
+        }
+      },
+      "if": { "properties": { "enabled": { "const": true } } },
+      "then": {
+        "oneOf": [
+          { "required": ["allowedFrom"], "not": { "required": ["allowedCheckpoints"] } },
+          { "required": ["allowedCheckpoints"], "not": { "required": ["allowedFrom"] } }
+        ]
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "会话与 Agent：可选的自定义会话入口、运行策略。外挂资源（agents/*.md）由策略按路径引用。",
+      "properties": {
+        "customEntry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["command"],
+          "description": "自定义会话入口：由默认会话入口调用，输出并入 sessionContext；不替换默认入口。",
+          "properties": {
+            "command": { "$ref": "#/definitions/command" },
+            "timeoutSec": { "type": "integer", "minimum": 1, "default": 30 }
+          }
+        },
+        "policies": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "$ref": "#/definitions/runtimePolicy",
+              "description": "全局默认策略，缺省为 solo + 启用 task。"
+            },
+            "nodes": {
+              "type": "object",
+              "description": "节点策略；key 必须是 workflow.json 中的节点。原样写入 board_config 对应节点的 runtimePolicy。",
+              "propertyNames": { "$ref": "#/definitions/nodeId" },
+              "additionalProperties": { "$ref": "#/definitions/runtimePolicy" }
+            }
+          }
+        }
       }
     },
     "runtimePolicy": {
@@ -255,147 +366,53 @@
         }
       }
     },
-    "node": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "label", "skill"],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9]*\\.[a-z][a-z0-9_]*$",
-          "description": "<stageId>.<name>，stageId 必须在 stages 中声明。"
-        },
-        "label": { "$ref": "#/definitions/nonEmpty" },
-        "skill": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-          "maxLength": 64,
-          "description": "技能名（Codex 命名规则：小写连字符，不超过 64 字符），对应 skills/<skill>/SKILL.md。"
-        },
-        "checkpointPrefix": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9_]*$",
-          "description": "缺省取 id 中 . 之后的部分；生成 <prefix>_in_progress / <prefix>_done。"
-        },
-        "description": { "type": "string", "description": "缺省：{label}；产物：{输出路径以、连接}。" },
-        "inputs": { "type": "array", "items": { "$ref": "#/definitions/inputRef" }, "default": [] },
-        "outputs": { "type": "array", "items": { "$ref": "#/definitions/outputRef" }, "default": [] },
-        "runtimePolicy": { "$ref": "#/definitions/runtimePolicy" },
-        "nextAction": {
-          "type": "object",
-          "additionalProperties": false,
-          "description": "局部覆写。active 作用于 not_started 与 in_progress；done 作用于本节点完成后（默认指向下一节点技能）。",
-          "properties": {
-            "active": { "$ref": "#/definitions/actionText" },
-            "done": { "$ref": "#/definitions/actionText" }
-          }
-        }
-      }
-    },
-    "modules": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "knowledge": { "$ref": "#/definitions/knowledgeModule" },
-        "artifactSync": { "$ref": "#/definitions/artifactSyncModule" }
-      }
-    },
-    "knowledgeModule": {
+    "knowledge": {
       "type": "object",
       "additionalProperties": false,
       "required": ["enabled"],
+      "description": "知识模块：清单解析、发布单元查询、知识组装；可选由插件拉取知识仓库。",
       "properties": {
         "enabled": { "type": "boolean" },
-        "loader": { "enum": ["manifest"], "default": "manifest", "description": "v1 仅支持 agents.manifest.json 纯 Python 加载器。" },
-        "agentsRepo": {
+        "root": { "$ref": "#/definitions/relativeDir", "default": "sys", "description": "知识目录，相对插件根目录；入口脚本的 --knowledge-path 参数可临时覆盖（生成的宿主命令不带该参数）。" },
+        "manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "清单解析方式。",
+          "properties": {
+            "format": { "enum": ["agents-manifest-v1"], "default": "agents-manifest-v1", "description": "v1 只支持 lite 的 agents.manifest.json 格式。" },
+            "path": { "$ref": "#/definitions/relativeDir", "default": "agents.manifest.json", "description": "清单文件，相对 root。" }
+          }
+        },
+        "assembly": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "assembler": {
+              "enum": ["plugin", "devclaw"],
+              "default": "plugin",
+              "description": "组装方。plugin：插件会话模块内置组装器，结果并入 sessionContext；devclaw：由 DevClaw 组装，插件只提供清单解析结果。"
+            }
+          }
+        },
+        "source": {
           "type": "object",
           "additionalProperties": false,
           "required": ["url"],
+          "description": "可选：由插件拉取知识仓库，生成 sync_knowledge.py 与 pull_knowledge。",
           "properties": {
+            "type": { "const": "git", "default": "git" },
             "url": { "$ref": "#/definitions/nonEmpty" },
             "sshUrl": { "type": "string", "default": "" },
             "ref": { "type": "string", "default": "main" }
-          }
-        },
-        "sedimentation": {
-          "type": "object",
-          "additionalProperties": false,
-          "description": "知识沉淀入口（宿主提供 knowledge-sync 能力），生成 knowledge_config。",
-          "properties": {
-            "enabled": { "type": "boolean", "default": true },
-            "syncType": { "type": "string", "default": "invoke_session" },
-            "slashSkill": { "type": "string", "default": "knowledge-sync" },
-            "userMessage": { "type": "string", "default": "请针对${projectCode}项目发起知识沉淀，这个是 token：${leanToken}" },
-            "dialogTips": { "type": "string", "default": "发起知识沉淀" }
           }
         },
         "supportedDeployUnits": {
           "type": "array",
           "items": { "type": "string" },
           "default": [],
-          "description": "初始值；运行期由 pull_knowledge 回写，打包时重置为此值。"
+          "description": "board_config supported_deploy_units 的初始值；声明 source 时运行期由 pull_knowledge 回写，打包时重置为此值。"
         }
-      },
-      "if": { "properties": { "enabled": { "const": true } } },
-      "then": { "required": ["enabled", "agentsRepo"] }
-    },
-    "artifactSyncModule": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["enabled"],
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "skillName": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 64, "default": "autobizdevops-artifact-sync" },
-        "allowedFrom": {
-          "type": "string",
-          "pattern": "^([a-z][a-z0-9]*\\.[a-z][a-z0-9_]*:(in_progress|done)|[a-z][a-z0-9_]*)$",
-          "description": "<nodeId>:<in_progress|done> 或 checkpoint 名；从该点到流程末尾都允许同步。"
-        },
-        "excludeCheckpoints": { "type": "array", "items": { "type": "string" }, "default": [] },
-        "allowedCheckpoints": {
-          "type": "array",
-          "items": { "type": "string" },
-          "minItems": 1,
-          "description": "显式列表，与 allowedFrom 二选一。"
-        },
-        "entry": {
-          "type": "object",
-          "additionalProperties": false,
-          "description": "看板上的产物同步入口，生成 board_config 顶层 artifact_sync（slashSkill 固定为 skillName）。",
-          "properties": {
-            "enabled": { "type": "boolean", "default": true },
-            "syncType": { "type": "string", "default": "invoke_session" },
-            "userMessage": { "type": "string", "default": "请针对${projectCode}项目的${feature}特性发起产物同步" },
-            "dialogTips": { "type": "string", "default": "发起产物同步" }
-          }
-        },
-        "uploadUrl": { "type": "string", "format": "uri" },
-        "maxFileSizeMiB": { "type": "number", "exclusiveMinimum": 0, "default": 5 },
-        "apiDetail": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["enabled"],
-          "description": "按实际代码生成 FEATURE_API_DETAIL.md；仅对含编码节点的插件有意义。",
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "node": { "type": "string", "description": "FEATURE_API_DETAIL.md 归属的节点 id。" }
-          }
-        },
-        "extraPaths": {
-          "type": "object",
-          "description": "不属于节点输出但需要同步的路径：{ nodeId: { pathPattern: 简述 } }。",
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": { "$ref": "#/definitions/nonEmpty" }
-          }
-        }
-      },
-      "if": { "properties": { "enabled": { "const": true } } },
-      "then": {
-        "oneOf": [
-          { "required": ["allowedFrom"], "not": { "required": ["allowedCheckpoints"] } },
-          { "required": ["allowedCheckpoints"], "not": { "required": ["allowedFrom"] } }
-        ]
       }
     }
   }

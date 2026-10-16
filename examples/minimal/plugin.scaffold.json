@@ -1,0 +1,10 @@
+{
+  "$schema": "../../schemas/plugin-scaffold.schema.json",
+  "scaffoldVersion": 1,
+  "plugin": {
+    "id": "doc-review",
+    "name": "Doc-Review-Kanban",
+    "version": "0.1.0",
+    "description": "文档起草与评审"
+  }
+}

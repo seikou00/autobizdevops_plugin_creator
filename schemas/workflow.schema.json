@@ -1,0 +1,157 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "autobiz.scaffold.workflow.v1",
+  "title": "AutoBiz 插件核心流程配置 v1（workflow.json）",
+  "description": "只表达业务骨架：阶段、节点、技能绑定、执行顺序、输入输出、模板引用与可选校验命令。看板接入、会话策略、知识配置、外挂技能管理和技能内部实现不在此文件中。语义校验（引用、顺序、唯一性、命令格式）见 input-config.md §6，Schema 只负责结构与取值范围。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["workflowVersion", "stages", "artifacts", "nodes"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "workflowVersion": { "const": 1, "description": "流程配置格式主版本。" },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/stage" },
+      "description": "阶段（业务分组），数组顺序即展示顺序。"
+    },
+    "artifacts": {
+      "type": "object",
+      "description": "产物注册表：key 为产物 id，节点通过 id 引用。",
+      "propertyNames": { "$ref": "#/definitions/artifactId" },
+      "additionalProperties": { "$ref": "#/definitions/artifact" }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/node" },
+      "description": "节点，数组顺序即执行顺序。"
+    }
+  },
+  "definitions": {
+    "artifactId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![/~])(?!.*\\\\)(?!.*:)(?!(.*/)?\\.\\.(/|$)).+$",
+      "description": "相对 FEATURE_DIR 的 POSIX 路径，可含 glob（* ? [ ]），不得以 / 开头、不得含 \\ : 或 .. 段。"
+    },
+    "templatePath": {
+      "type": "string",
+      "pattern": "^skills/(?!(.*/)?\\.\\.(/|$))[^\\\\:]+$",
+      "description": "相对插件根目录的模板路径，必须位于 skills/ 下。"
+    },
+    "command": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\r\\n]+$",
+      "description": "完整的单行命令：按 POSIX 规则拆分参数后再替换占位符，不经过 shell 执行。可用占位符见 input-config.md §2.5。"
+    },
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*$", "description": "节点 id 前缀，也是产物同步配置的分组键。" },
+        "label": { "$ref": "#/definitions/nonEmpty", "description": "阶段名，写入看板节点 group。" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "path"],
+      "properties": {
+        "label": { "$ref": "#/definitions/nonEmpty" },
+        "path": {
+          "description": "字符串或字符串数组。数组表示该产物由多项组成，每一项都要存在。",
+          "oneOf": [
+            { "$ref": "#/definitions/relativePath" },
+            {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "#/definitions/relativePath" }
+            }
+          ]
+        },
+        "type": { "enum": ["file", "json"], "default": "file", "description": "写入 artifactType。" },
+        "legacyPaths": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/relativePath" },
+          "description": "旧文件名；仅当 path 无匹配时回退读取。只能和字符串形式的 path 一起使用。"
+        }
+      },
+      "if": { "required": ["path"], "properties": { "path": { "type": "array" } } },
+      "then": { "not": { "required": ["legacyPaths"] } }
+    },
+    "inputRef": {
+      "oneOf": [
+        { "$ref": "#/definitions/artifactId" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref"],
+          "properties": {
+            "ref": { "$ref": "#/definitions/artifactId" },
+            "required": { "type": "boolean", "default": true },
+            "degrade": { "type": "string", "description": "缺失时的降级说明，写入 extract.degrade。" },
+            "external": { "type": "boolean", "default": false, "description": "允许引用不由任何前序节点产出的产物（用户直供）。" }
+          }
+        }
+      ]
+    },
+    "outputRef": {
+      "oneOf": [
+        { "$ref": "#/definitions/artifactId" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref"],
+          "properties": {
+            "ref": { "$ref": "#/definitions/artifactId" },
+            "required": { "type": "boolean", "default": true }
+          }
+        }
+      ]
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "skill"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*\\.[a-z][a-z0-9_]*$",
+          "description": "<stageId>.<name>，stageId 必须在 stages 中声明。"
+        },
+        "label": { "$ref": "#/definitions/nonEmpty" },
+        "skill": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "maxLength": 64,
+          "description": "技能绑定（Codex 命名规则：小写连字符，不超过 64 字符），对应 skills/<skill>/SKILL.md。"
+        },
+        "checkpointPrefix": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "缺省取 id 中 . 之后的部分；生成 <prefix>_in_progress / <prefix>_done。"
+        },
+        "description": { "type": "string", "description": "一句话说明，缺省：{label}；产物：{输出路径以、连接}。详细要求写在技能正文中。" },
+        "inputs": { "type": "array", "items": { "$ref": "#/definitions/inputRef" }, "default": [] },
+        "outputs": { "type": "array", "items": { "$ref": "#/definitions/outputRef" }, "default": [] },
+        "templates": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/templatePath" },
+          "default": [],
+          "description": "模板引用，写入技能托管片段和会话流程上下文。"
+        },
+        "validate": {
+          "$ref": "#/definitions/command",
+          "description": "节点完成时执行的业务校验命令：仅在推进到 _done 且存在性检查通过后执行，退出码 0 才放行。"
+        }
+      }
+    }
+  }
+}

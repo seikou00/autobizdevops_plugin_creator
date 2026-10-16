@@ -1,0 +1,46 @@
+{
+  "$schema": "../../schemas/workflow.schema.json",
+  "workflowVersion": 1,
+  "stages": [
+    { "id": "biz", "label": "Biz" },
+    { "id": "dev", "label": "Dev" }
+  ],
+  "artifacts": {
+    "requirements": { "label": "结构化需求", "path": "PRD.md" },
+    "proposal": { "label": "变更提案", "path": "proposal.md" },
+    "specs": { "label": "行为规格", "path": "specs/*/spec.md" },
+    "design": { "label": "技术设计", "path": "design.md" },
+    "plan": { "label": "实施计划", "path": "plan.md", "legacyPaths": ["PLAN.md"] }
+  },
+  "nodes": [
+    {
+      "id": "biz.prd",
+      "label": "需求清洗",
+      "skill": "autobiz-prd",
+      "outputs": ["requirements"]
+    },
+    {
+      "id": "dev.specs",
+      "label": "规格生成",
+      "skill": "autodev-sepc",
+      "inputs": ["requirements"],
+      "outputs": ["proposal", "specs", "design"]
+    },
+    {
+      "id": "dev.plan",
+      "label": "任务计划",
+      "skill": "autodev-plan",
+      "description": "任务计划；产物：plan.md，包含输入文件、实现范围、任务依赖图和 Phase 划分。",
+      "inputs": ["requirements", "proposal", "specs", "design"],
+      "outputs": ["plan"]
+    },
+    {
+      "id": "dev.code",
+      "label": "增量编码",
+      "skill": "autodev-code",
+      "description": "实现当前 Feature 的 plan.md，你应该先读技能，理解技能后在进行任务规划",
+      "inputs": ["requirements", "proposal", "specs", "design", "plan"],
+      "outputs": []
+    }
+  ]
+}
