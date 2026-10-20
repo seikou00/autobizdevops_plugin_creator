@@ -14,9 +14,10 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 | 能力 | 用途 |
 |---|---|
 | 拦截工具调用：执行前拒绝或改写，执行后读取结果并附加给模型的上下文 | 自动检测、守卫生成文件和状态文件 |
-| 注册模型可以调用的工具，并决定是否自动放行 | 脚手架命令（lint、build 等）、状态推进 |
-| 技能展开时改写技能内容 | 按当前流程注入状态说明，取代 SKILL.md 托管片段 |
-| 轮次结束时拦下结束（Stop） | 产物写完却没推进状态时提醒 |
+| 注册模型可以调用的工具，并决定是否自动放行 | 脚手架命令（lint、build 等） |
+| 读取会话的环境变量 | 确定会话所属的 Feature（`FEATURE_ID` 等） |
+| 技能展开时改写技能内容 | 节点开始的触发点；按当前流程注入产物约定，取代 SKILL.md 托管片段 |
+| 轮次结束时拦下结束（Stop） | 节点完成的触发点；校验不通过时让模型继续修改 |
 | 注册斜杠命令 | `/autobiz new`、`/autobiz open` |
 | 面板（含 Input、Select 表单）、确认对话框、状态栏、提示消息 | 插件工作台、建模确认、更新通知 |
 | 子代理 | 真实试跑 |
@@ -27,7 +28,7 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 结论：
 
 - **mod 不替代核心配置和编译**。插件内容仍然是“核心配置 → lint → 编译配置”，运行期只读编译配置（D19）。mod 改变的是谁来触发、什么时候生效、怎么约束；
-- **分两个 mod**。开发 mod 在脚手架这边，包含原来的 `autobiz-plugin-creator` 技能，负责初始化和开发态的热更新；运行 mod 随每个插件发布，是同一份通用代码，负责会话中的状态推进、守卫和上下文注入；
+- **分两个 mod**。开发 mod 在脚手架这边，包含原来的 `autobiz-plugin-creator` 技能，负责初始化和开发态的热更新；运行 mod 随每个插件发布，是同一份通用代码，根据会话中发生的事自动推进状态，技能对状态无感（§2.3），同时负责守卫和产物约定注入；
 - **热更新的难点是在途 Feature 的状态兼容，不是重载本身**。按变更等级处理：不影响状态的修改即改即生效；影响状态的修改先做影响分析；破坏性修改必须带迁移映射。
 
 ## 1. 设计原则
@@ -46,7 +47,7 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 | 位置 | 脚手架仓库；作为 DevClaw 插件装在开发者的环境中 | 每个生成插件的 `runtime/mod/`，随插件发布 |
 | 组成 | 原 creator 技能（对话流程、建模指南）+ mod 钩子 | 通用 mod 代码 + build 生成的入口 |
 | 归属 | 不随插件发布 | `managed`，入口为 `generated` |
-| 负责 | 自动检测、文件归属守卫、脚手架命令工具、建模确认、开发挂载与自动 build、工作台 | 状态文件守卫、技能展开时注入状态说明、感知配置变化、推进工具、收尾检查、看板刷新 |
+| 负责 | 自动检测、文件归属守卫、脚手架命令工具、建模确认、开发挂载与自动 build、工作台 | 状态文件守卫、技能展开时注入产物约定、感知配置变化、自动推进状态、人工状态操作、看板刷新 |
 | 调用 | `autobiz-plugin` CLI（Python） | `runtime/` 下的 Python 入口 |
 
 技能还要保留。怎么和开发者对话、怎么把业务拆成节点，需要模型判断，写在技能里；检测、守卫、确认、生成这些确定的事交给 mod。
@@ -77,20 +78,94 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 | # | 能力 | 怎么做 | 能做到什么程度 | 必要性 | 不做时 |
 |---|---|---|---|---|---|
 | R1 | 状态文件守卫 | 执行前钩子：拒绝 Edit、Write 写入 `{metaDir}/` 下的 `state.json`、`.state.lock`、`hooks.ndjson`；Bash 命令中出现这些路径的写操作也拒绝 | Edit、Write 全部拦住，Bash 尽力而为 | **P0**：校验命令只在 engine 推进时执行，模型直接改 `state.json` 就能绕过节点完成判定（D13、D14）。校验反复不通过时，模型确实可能这样做 | 没有防护，只能事后从 `hooks.ndjson` 与 `state.json` 对不上发现 |
-| R2 | 技能展开时注入状态说明 | 节点技能被调用（斜杠命令或 Skill 工具）时，运行 mod 按当前的 `flow.json` 和 Feature 状态，在技能正文后附上：开始和完成时推进哪个 checkpoint、校验命令、输入输出及当前是否存在、模板路径 | 说明始终与当前流程一致。SKILL.md 中的托管片段可以取消，build 不再改写开发者的技能文件 | **P0**（对热更新）：否则每次改流程都要改写相关的 SKILL.md，已发布插件里的说明也会与流程脱节。同时可以去掉托管片段、`LEGACY_ENTRY_REF`、build-manifest 中的 `regions` 这一整套机制 | 继续用托管片段，由 build 改写 SKILL.md |
-| R3 | 感知配置变化 | 每次调用推进工具、展开技能之前，比对 `build-manifest.json` 中的摘要；变了就重读编译配置、重新注册推进工具，并提示一次“流程已更新” | 数据热更新就是在这里生效的（§4.2） | **P0**（对热更新） | 改了流程要重开会话 |
-| R4 | 推进工具 | 注册 `advance`：`checkpoint` 用枚举列出当前流程的取值；`feature` 能从会话上下文取到时可以省略；另有 `reopen`、`reason`。内部用参数数组调用 `update_state.py`，返回它的 JSON，自动放行。推进成功后，在工具结果的附加上下文中告诉模型新的状态和下一个节点 | 拼错的 checkpoint 在参数校验时就被拦下；不弹权限确认。状态变化随工具结果送达，不改系统提示，不会让提示缓存失效 | P1：现在的 Bash 命令能用，但要处理解释器、引号、`-X utf8`、路径替换 | 继续用 Bash 调 `update_state.py` |
-| R5 | 收尾检查 | 轮次结束（Stop）时检查：如果本节点的必需产物都已存在，checkpoint 却还停在 `_in_progress`，就拦下这次结束，提示调用 `advance`。每个节点只拦一次，避免死循环 | 解决“产物写完忘了推进”导致的看板与实际不一致 | P1：这是看板不准的常见原因之一，实际比例需要用现有插件的 `hooks.ndjson` 核实 | 看板一直显示进行中，等开发者自己发现 |
+| R2 | 技能展开时注入产物约定 | 节点技能被调用时，运行 mod 按当前的 `flow.json` 和 Feature 状态，在技能正文后附上：本节点要读的输入、要写的输出（相对 `FEATURE_DIR` 的路径）及当前是否存在、模板路径；节点不能开始时附上原因（§2.3）。不含任何状态操作 | 产物约定始终与当前流程一致。SKILL.md 中的托管片段可以取消，build 不再改写开发者的技能文件 | **P0**：自动推进靠“输出写在约定路径上”来判断，路径必须准确送到模型面前；这也是热更新能到达模型的途径。同时可以去掉托管片段和 build-manifest 中的 `regions` | 继续用托管片段，由 build 改写 SKILL.md |
+| R3 | 感知配置变化 | 每次自动推进、展开技能之前，比对 `build-manifest.json` 中的摘要；变了就重读编译配置，并提示一次“流程已更新” | 数据热更新就是在这里生效的（§4.2） | **P0**（对热更新） | 改了流程要重开会话 |
+| R4 | 自动推进状态 | 节点技能展开时推进到 `_in_progress`；主会话一轮结束时，必需输出都在就推进到 `_done`（含校验命令），校验不通过就拦下结束让模型修改。规则见 §2.3 | 技能完全不写状态操作，模型不知道 checkpoint 的存在；看板与实际一致，不依赖模型记得执行命令 | **P0**：直接解决“每个技能都要手写 update 命令才能推进状态”的问题，也覆盖了“产物写完忘了推进” | 每个技能都要写状态维护说明，能否推进取决于模型 |
+| R5 | 人工状态操作 | `/autobiz state` 命令：查看当前状态，重开到某个节点（必须写原因）；内部调用 `update_state.py` | 模型不再持有任何状态工具，例外情况由人处理 | P1 | 只能在看板上操作（如果看板提供） |
 | R6 | 看板刷新与产物实时刷新 | 推进成功后通知 DevClaw 刷新看板；会话中的 Write 落在 `FEATURE_DIR` 下时，防抖后通知刷新产物状态 | 可以替代 D21 的本机服务，还顺带实现了 D21 推迟的“产物实时刷新”：那项功能本来就需要知道模型写了哪些文件，运行 mod 正好能看到 | P1，前提是 DevClaw 给 mod 提供看板接口；没有就按 D21 做 | 按 D21 实现本机服务 |
 | R7 | 下一步建议 | 节点完成后，把下一个节点的技能（如 `/doc-review`）放进输入框的建议里，按 Tab 采用 | — | P2 | 在看板上点下一个节点 |
 | R8 | 开发者扩展 | `entry.ts` 静态导入 `hooks/extension.ts`，开发者可以加自己的面板、命令、守卫 | 给开发者的自由度出口，不用改托管代码 | P2，按需开放：扩展是插件里的任意代码，要和 DevClaw 的权限、审核策略一起定 | 只能用命令钩子 |
 
 刻意不放进运行 mod 的：
 
-- **用修改系统提示来注入流程上下文**：每次状态变化都改系统提示，会让整个提示缓存失效，成本高。会话开始时仍由 `session_context_inject` 注入，之后的变化通过推进工具的结果（R4）和技能展开（R2）送达；
+- **用修改系统提示来注入流程上下文**：每次状态变化都改系统提示，会让整个提示缓存失效，成本高。会话开始时仍由 `session_context_inject` 注入，之后的变化通过技能展开（R2）和自动推进时附给模型的说明（R4）送达；
 - **由 mod 提供看板读取**：没有会话时看板也要显示，而 mod 是随会话加载的（待确认，§6）。
 
-### 2.3 做不到或只能尽力而为的
+### 2.3 技能对状态无感：自动推进
+
+现在的问题：每个技能都要写“开始时执行 `update_state.py` 推进到 `xx_in_progress`，完成后推进到 `xx_done`”（托管片段）。状态能不能推进，取决于模型有没有照做；改了节点或 checkpoint，还要改写技能。
+
+目标：技能正文里不出现任何状态操作，模型不需要知道 checkpoint、`update_state.py`、`state.json`。运行 mod 根据会话中发生的事推进状态，判定规则仍然在 engine 中。
+
+**会话绑定**：Feature 取自 DevClaw 注入会话的环境变量 `FEATURE_ID`、`PLUGIN_WORKSPACE`、`PROJECT_DIR`（[interfaces.md §3.4](interfaces.md)）；节点由被调用的技能确定（`flow.json` 中技能与节点的对应关系）。同一个技能用在多个节点时，取当前 checkpoint 之后第一个使用它的节点。没有 `FEATURE_ID` 的会话不做任何状态操作。
+
+**触发点**：
+
+| 时机 | 触发事件 | 条件 | 动作 | 条件不满足时 |
+|---|---|---|---|---|
+| 节点开始 | 节点技能展开：斜杠命令、Skill 工具，或 DevClaw 从看板发起会话时预载的技能 | Feature 停在上一节点的 `_done`，或已经在本节点 `_in_progress`（新建的 Feature 默认停在首节点的 `_in_progress`） | 推进到 `<节点>_in_progress`，engine 检查必需输入 | 不推进；在技能正文后附上原因（例如“缺少输入 PRD.md”“前一步‘起草’还没完成”），模型据此告诉用户 |
+| 节点完成 | 主会话的一轮结束（Stop） | Feature 在本节点 `_in_progress`，本节点的必需输出都已存在 | 推进到 `<节点>_done`：engine 做存在性检查，再执行校验命令。节点声明了 `humanGate` 时，校验通过后先进入“待人工确认”，人通过后才推进（见下文“人工关口”） | 校验不通过：拦下这次结束，把校验输出作为“产物检查未通过”交给模型继续修改。同一节点最多连续自动重试 3 次（入口文件 `runtime.autoRetry`），之后放行，节点保持进行中，看板显示最后一次校验错误 |
+| 完成后又改了本节点产物 | 一轮结束时发现本节点输出有改动，Feature 停在本节点 `_done` | — | 重新校验：通过则保持完成；不通过则退回本节点 `_in_progress`，按上一行处理。声明了 `humanGate` 的节点，改动后一律退回，重新校验并重新确认。不影响其他节点 | — |
+| 修改上游产物 | 一轮结束时发现已完成的上游节点输出有改动，Feature 已经进入下游节点 | — | 不自动退回。弹出确认，问用户是否退回到该节点（退回后下游节点显示为未开始） | 用户选择不退回时，记一条 `upstream-change` 事件；同一文件的同一次修改只问一次 |
+| 打断或出错 | 用户打断，或轮次出错结束 | — | 不推进 | — |
+
+“有改动”由 engine 比较产物文件的修改时间与该 Feature 最近一次状态变更的时间得出，所以模型用 Bash 写的文件也算在内，不依赖 mod 拦截到写入。
+
+**为什么在一轮结束时判断完成**：写完一个文件不代表节点做完了，模型可能还要修改；一轮结束是模型自己认为这一步告一段落的时刻。再加上“必需输出都在、校验通过”两个条件，误判主要出现在一种情况：模型写完产物后在等用户反馈，这时节点会先被标为完成；用户要求修改后，按“完成后又改了本节点产物”重新校验。对这种误判敏感的重要节点，用人工关口卡住。
+
+**人工关口（humanGate）**：在 `workflow.json` 的节点上声明，和 `validate` 一样属于完成判定：
+
+```json
+{ "id": "review", "name": "评审", "skill": "doc-review",
+  "inputs": ["draft"], "outputs": { "review": "REVIEW.md" },
+  "validate": "${python} ${skillPath}/scripts/check_review.py --feature-dir ${featureDir}",
+  "humanGate": { "prompt": "请确认评审结论后再进入下一步" } }
+```
+
+`humanGate` 写 `true`，或写带 `prompt`（确认时显示的说明）的对象；不写就是没有关口。流程：
+
+1. 输出齐全、校验通过后，不推进到 `_done`，而是在 Feature 记录中写 `gate: {"node": "review", "status": "pending", "since": …}`，看板显示“待人工确认”；
+2. 会话中弹出确认：通过、退回（写原因）、稍后。会话已经结束，或者要由别人确认时，在看板上操作，或者用 `/autobiz approve <节点>`、`/autobiz reject <节点> <原因>`；
+3. 通过：推进到 `_done`，`hooks.ndjson` 记一条 `human-gate` 事件（决定、确认人、时间）；
+4. 退回：保持 `_in_progress` 并清掉 `gate`。会话还在时，原因作为下一条消息交给模型修改；会话已结束时，看板显示原因，下次调用这个节点的技能时附在技能正文后（R2）；
+5. 待确认期间产物又被改了：清掉 `gate`，重新校验后再次进入待确认。通过之后又被改了：退回 `_in_progress`，重新走一遍。
+
+自动重试（`runtime.autoRetry`）只针对校验命令，不针对人工关口。谁有权确认由 DevClaw 决定，engine 只记录确认人。
+
+**校验什么时候跑、要多久**：校验命令是开发者写的单行命令，一般是一个脚本，不经过模型；存在性检查只是文件匹配。校验只在两种时刻执行：本节点的输出刚刚齐全，或者已完成节点的产物有改动；其余轮次结束时，`finish` 只看文件在不在。一次检查的开销是启动一次 Python（空解释器实测约 34 ms）加上脚本本身，正常是几十到几百毫秒。`validateTimeoutSec`（默认 120 秒）只是防止脚本卡死的超时上限。只有校验器自己做了重活（跑测试、构建、联网、调用模型）才会慢，所以约定：校验器只做快速、确定的检查；需要模型或人来判断质量的，放在技能里做，或者交给人工关口。
+
+**模型看到什么**：只有业务信息，即输入、输出路径和模板（R2），以及校验不通过时的输出。看不到 checkpoint，也看不到任何状态命令。
+
+**判定放在 engine**：mod 只在事件发生时调用新的入口 `runtime/workflow/auto_state.py`：
+
+```text
+python -X utf8 runtime/workflow/auto_state.py start --skill <技能名>   # 节点技能展开时
+python -X utf8 runtime/workflow/auto_state.py finish                   # 主会话一轮结束时
+```
+
+两个命令都从环境变量定位 Feature，返回：
+
+```json
+{ "ok": true, "action": "advanced", "node": "plan", "checkpoint": "plan_done",
+  "message": "“任务计划”已完成，下一步是“实现”（/autodev-implement）" }
+```
+
+| `action` | mod 怎么做 |
+|---|---|
+| `advanced` | 刷新看板（R6），提示用户；`finish` 时把下一个节点的技能放进输入建议（R7） |
+| `skipped` | 无事发生（会话不属于任何 Feature、技能不对应节点、输出还不齐） |
+| `blocked` | `start`：把 `message` 附在技能正文后；`finish`：拦下这次结束，把 `message`（校验输出）交给模型 |
+| `ask` | 弹出确认（人工关口、修改上游产物），把用户的选择传回 `auto_state.py decide` |
+
+决策逻辑只有 Python 一份，契约测试可以直接覆盖。不支持 mods 的宿主，只要能在“技能调用”和“轮次结束”时执行命令，也能接入这两个入口。
+
+**模型不再有状态工具**：重开（要写原因）等人工操作，由用户在看板上或用 `/autobiz state` 命令执行（R5），仍然经过 `update_state.py`。R1 的守卫继续阻止模型直接改 `state.json`。
+
+**为什么必须靠 mod**：DevClaw 只知道会话的开始和结束，而一个会话里可能有很多轮，甚至跨几个节点。“技能被调用了”“这一轮结束了”这两个时刻，只有会话里的钩子能拿到。
+
+**兼容**：入口文件的 `plugin.stateMode` 选择状态推进方式：`"auto"`（默认，本节）或 `"skill"`（托管片段，即现有设计），后者给不支持 mods 的宿主使用。迁移进来的旧技能，正文里的状态维护段落在 `auto` 模式下要删掉，`check` 报 `LEGACY_ENTRY_REF` 提示。
+
+### 2.4 做不到或只能尽力而为的
 
 | 限制 | 影响 | 对策 |
 |---|---|---|
@@ -98,20 +173,21 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 | mod 收不到文件变化事件 | 开发者在编辑器里手改，不能立刻检测 | 每 2 秒比对核心配置的摘要 |
 | mod 随会话加载 | 没有会话时 mod 不工作 | 看板读取保留 inspectCommands；会话以外的写入口（`create_project`、`create_feature`）由 DevClaw 直接调用 |
 | 判断不了产物内容 | 业务产物是否合格，mod 管不了 | 仍由节点校验命令负责 |
+| “完成”是推断出来的 | 自动推进按“一轮结束 + 输出齐全 + 校验通过”判断完成，模型写完产物后等用户反馈时会先被标为完成 | 重要节点声明 `humanGate`，人通过后才算完成；其他节点产物再改时重新校验（§2.3） |
 | 移动端没有输入框 | 工作台表单在移动端不可用 | 移动端只读 |
 | 接口还在变化 | Claude Code 的 mods 接口标注为 early access，DevClaw 的版本节奏未知 | 运行 mod 声明所需的宿主接口版本；`check` 的契约测试覆盖运行 mod |
 
-### 2.4 分期建议
+### 2.5 分期建议
 
 | 期 | 开发 mod | 运行 mod | 依赖 DevClaw 的 |
 |---|---|---|---|
-| 一 | A1 自动检测、A2 文件归属守卫、A3 命令工具、A6 斜杠命令 | R1 状态文件守卫、R2 技能注入、R3 感知配置变化、R4 推进工具、R5 收尾检查 | 只需要通用的 mods 能力 |
+| 一 | A1 自动检测、A2 文件归属守卫、A3 命令工具、A6 斜杠命令 | R1 状态文件守卫、R2 产物约定注入、R3 感知配置变化、R4 自动推进、R5 人工状态操作 | 只需要通用的 mods 能力 |
 | 二 | A4 建模确认、A5 开发挂载与自动 build | R6 看板刷新 | 源目录挂载、给 mod 的看板接口；A4 还依赖 CLI 的 `diff` |
 | 三 | A7 工作台面板、A8 真实试跑 | R7 下一步建议、R8 开发者扩展 | 子代理、扩展代码的权限策略 |
 
-第一期做完，规则就从“写给模型看”变成“宿主强制执行”，SKILL.md 也不再被 build 改写；第二期做完，开发态的“改完就生效”才真正成立。
+第一期做完，技能里不再有任何状态操作，规则也从“写给模型看”变成“宿主强制执行”，SKILL.md 不再被 build 改写；第二期做完，开发态的“改完就生效”才真正成立。
 
-### 2.5 插件目录的变化
+### 2.6 插件目录的变化
 
 在 [output-spec.md §1](output-spec.md) 的基础上增加：
 
@@ -129,7 +205,7 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
         └── migrations.json         # generated  编译后的迁移表，随包发布
 ```
 
-一个插件只能有一个钩子模块，模块中也不能动态导入，所以由生成的 `entry.ts` 静态导入运行 mod 和开发者扩展。开发者扩展不能注册与运行 mod 同名的工具，也不能拦截推进工具（build 报 `MOD_EXTENSION_CONFLICT`）。
+一个插件只能有一个钩子模块，模块中也不能动态导入，所以由生成的 `entry.ts` 静态导入运行 mod 和开发者扩展。开发者扩展不能注册与运行 mod 同名的工具，也不能拦截运行 mod 用来自动推进的事件（build 报 `MOD_EXTENSION_CONFLICT`）。
 
 运行 mod 每个插件带一份，而不是做成所有插件共用的一个 DevClaw 插件。这样各插件可以停在不同的框架版本上，与现在 `runtime/` 的做法一致。同一个会话加载了多个插件的运行 mod 时，工具名带插件前缀，各自的守卫只管自己的 `{metaDir}`。
 
@@ -188,7 +264,7 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 |---|---|---|
 | 改了什么 | 编译配置、技能、模板、校验脚本 | 运行 mod（框架升级）、开发者扩展 `hooks/extension.ts` |
 | 频率 | 每次日常修改 | 很少 |
-| 怎么生效 | 运行 mod 每次使用配置前比对 `build-manifest.json` 中的摘要，有变化就重读编译配置、重新注册推进工具，mod 本身不重载 | DevClaw 的插件目录热重载：重新执行 `register`，会话存储保留，模块内的变量重置 |
+| 怎么生效 | 运行 mod 每次使用配置前比对 `build-manifest.json` 中的摘要，有变化就重读编译配置，mod 本身不重载 | DevClaw 的插件目录热重载：重新执行 `register`，会话存储保留，模块内的变量重置 |
 
 数据热更新不依赖 mod 重载。Claude Code 只在钩子模块自己的源文件变化时重载，配置文件变化不会触发；DevClaw 的行为待确认，所以这里不依赖它。
 
@@ -226,7 +302,7 @@ flowchart TD
   M -- "没有" --> P
   M -- "有" --> I
   K --> R["逐个原子替换生成文件<br/>最后写 build-manifest"]
-  R --> S["运行 mod 发现摘要变化<br/>重读配置，重新注册推进工具"]
+  R --> S["运行 mod 发现摘要变化<br/>重读配置"]
   R --> T["DevClaw 重读看板配置<br/>刷新看板"]
 ```
 
@@ -280,7 +356,7 @@ flowchart TD
 |---|---|
 | C1、C2 | 展示类变化不需要告诉模型；C2 的会话策略只影响新会话 |
 | C3 | 下一次展开技能时说明已经是新的（R2）；当前节点的输入或输出变了时，提示开发者一次，并在下一次工具结果中告诉模型 |
-| C4，当前 Feature 已迁移 | 推进工具重新注册，checkpoint 枚举换成新值；模型传入旧 checkpoint 时被拒绝，错误信息给出对应的新 checkpoint |
+| C4，当前 Feature 已迁移 | 自动推进按新流程判断；当前节点被删除或改名时，按迁移表落到新的 checkpoint，并提示用户一次。模型不接触 checkpoint，不受影响 |
 | 代码热更新 | 运行 mod 重新执行 `register`；正在进行的推进由 engine 的锁保证完整 |
 
 ### 4.7 发布态更新
@@ -296,16 +372,17 @@ flowchart TD
 |---|---|
 | D9、[interfaces.md §1.6](interfaces.md) | creator 从技能改为插件：技能 + 开发 mod |
 | D16、[output-spec.md §1](output-spec.md) | 新增 `runtime/mod/`；`plugin.json.hooks` 指向运行 mod；开发者的 mod 钩子放在 `hooks/extension.ts`，由 `plugin.modExtension` 声明 |
-| D19 | 不变 |
+| D11、D19 | 运行期只读编译配置不变；`workflow.json` 的节点增加 `humanGate`，与 `validate` 同属完成判定 |
 | D20 | “agent 修改后”这一环由开发 mod 的钩子保证；提交前检查和 CI 不变 |
 | D21 | 会话中的推送改为运行 mod 直接通知 DevClaw，并增加产物实时刷新（R6）；DevClaw 不给 mod 提供看板接口时才保留本机服务 |
 | [README §4](README.md) | 托管片段取消后，seeded 的 SKILL.md 不再有 build 维护的区域 |
-| [output-spec.md §4.2](output-spec.md) | Feature 增加 `flowRev`；“checkpoint 不在当前配置中时拒绝写入”改为先查迁移表 |
+| [output-spec.md §4.2](output-spec.md) | Feature 增加 `flowRev` 和人工关口的 `gate`；“checkpoint 不在当前配置中时拒绝写入”改为先查迁移表 |
 | [output-spec.md §6.1](output-spec.md) | 取消 `state`、`artifacts` 托管片段，改为技能展开时注入（R2）；只在需要兼容不支持 mods 的宿主（例如开启 `codexManifest`）时保留 |
 | [output-spec.md §8](output-spec.md) | build-manifest 去掉 `regions` |
-| [interfaces.md §4.2](interfaces.md) | `update_state.py` 增加迁移步骤；新增推进工具的参数和返回 |
+| [interfaces.md §4.2](interfaces.md) | `update_state.py` 改为人工和宿主使用的状态入口，不再由模型调用；增加迁移步骤。新增 `auto_state.py`（§2.3） |
+| [output-spec.md §4.3](output-spec.md) | `update-state` 事件增加 `trigger`：`auto-start`、`auto-finish`、`manual`；新增 `upstream-change` 事件（用户选择不退回时）和 `human-gate` 事件（人工关口的决定） |
 | [interfaces.md §1.1](interfaces.md) | 新增 `autobiz-plugin diff`：输出变更等级和影响分析，开发 mod 和 `package` 都使用 |
-| [input-config.md](input-config.md) | 新增 `migrations.json`、`plugin.modExtension`；新增检查规则 `FLOW_BREAKING`、`MIGRATION_MISSING`、`CHANGE_IMPACT`、`VERSION_BUMP`、`MOD_EXTENSION_CONFLICT` |
+| [input-config.md](input-config.md) | 新增 `migrations.json`、`plugin.modExtension`、`plugin.stateMode`、`runtime.autoRetry`，节点新增 `humanGate`；自动模式下技能正文中出现 `update_state.py` 调用时报 `LEGACY_ENTRY_REF`；新增检查规则 `FLOW_BREAKING`、`MIGRATION_MISSING`、`CHANGE_IMPACT`、`VERSION_BUMP`、`MOD_EXTENSION_CONFLICT` |
 
 ## 6. 需要 DevClaw 确认
 
@@ -313,11 +390,12 @@ flowchart TD
 2. 能否从源目录挂载开发插件并监听变化（类似 Claude Code 的 `--plugin-dir`），重载时是否同时重读 `plugin.json`、`board_config.json` 和技能；
 3. 能否给 mod 提供看板接口，用来刷新指定项目或 Feature 的看板（替代 D21 的推送）；
 4. mod 的生命周期是只随会话加载，还是有会话以外的常驻部分。这决定看板读取能否从 inspectCommands 改为由 mod 提供；
-5. mod 能否拿到当前会话的运行上下文：插件、项目目录、Feature、所选发布单元（现在靠占位符和 [interfaces.md §3.4](interfaces.md) 的环境变量传入）；
+5. mod 能否读到会话的环境变量 `FEATURE_ID`、`PLUGIN_WORKSPACE`、`PROJECT_DIR`（[interfaces.md §3.4](interfaces.md)），自动推进（§2.3）靠它们确定 Feature；DevClaw 从看板发起会话、预载节点技能时，是否同样触发技能展开事件；
 6. 插件的 mod 在哪些会话中加载：只在该插件发起的会话中，还是所有会话都加载。这影响守卫的作用范围和多插件隔离（D3）；
 7. 插件清单的 `hooks` 能否同时挂运行 mod 和开发者的命令钩子；
 8. 发布态插件怎么更新，新版本加载失败时能否回退到上一版；
-9. 开发态做影响分析需要知道哪些项目用了这个插件，DevClaw 能否提供项目列表。
+9. 开发态做影响分析需要知道哪些项目用了这个插件，DevClaw 能否提供项目列表；
+10. 看板能否显示节点“待人工确认”并提供通过、退回按钮（`humanGate`，§2.3），确认人怎么识别、谁有权确认。
 
 ## 7. 不做
 
