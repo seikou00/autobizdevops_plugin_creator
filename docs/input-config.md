@@ -55,7 +55,6 @@
       "skill": "autodev-plan",
       "inputs": ["requirements", "design"],
       "outputs": { "plan": "plan.md" },
-      "templates": ["templates/plan.md"],
       "validate": "${python} ${skillPath}/scripts/check_plan.py --feature-dir ${featureDir}"
     }
   ]
@@ -476,7 +475,7 @@ build 把核心配置编译成 `runtime/config/flow.json`（output-spec.md §5.2
   "$schema": "./.scaffold/workflow.schema.json",
   "nodes": [
     { "id": "draft", "name": "起草", "skill": "doc-draft",
-      "outputs": { "draft": "DRAFT.md" }, "templates": ["templates/DRAFT.md"] },
+      "outputs": { "draft": "DRAFT.md" } },
     { "id": "review", "name": "评审", "skill": "doc-review",
       "inputs": ["draft"], "outputs": { "review": "REVIEW.md" },
       "validate": "${python} ${skillPath}/scripts/check_review.py --feature-dir ${featureDir}" }

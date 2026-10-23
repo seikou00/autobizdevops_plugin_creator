@@ -173,7 +173,6 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
   "label": "任务计划",
   "group": "Dev",
   "skill": "autodev-plan",
-  "order": 30,
   "runtimePolicy": { "agentMode": "multi", "toolCustomConfig": { "task": { "enabled": true } }, "subagentConfig": { … } },  // 可选，来自 session.policies.nodes
   "description": "…",
   "checkpoints": ["plan_in_progress", "plan_done"],
@@ -275,7 +274,7 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 - 不保存历史，事件写入 `hooks.ndjson`；读到旧版的 `history` 字段时，在下一次写入时移除；
 - 写入必须在 `.state.lock` 内完成“读取 → 校验 → 原子替换”的完整事务。
 
-### 4.3 hooks.ndjson（变更日志）
+### 4.3 hooks.ndjson（变更日志）简化事件内容，变更到mods，移动本身文件到.autobizdevops同级
 
 文件名沿用现有宿主的 `hookLogRefs` 约定。每行一个 JSON 对象，所有写入方共用以下信封：
 
@@ -408,7 +407,7 @@ v1 中节点的输入和输出都是必需的。
 
 ## 6. 技能规范
 
-### 6.1 SKILL.md
+### 6.1 SKILL.md append进skill.md（待讨论）
 
 ```markdown
 ---
@@ -435,21 +434,11 @@ description: 将工作拆解为有序任务。当你已有规格说明……时�
 - 需要修改已完成阶段时：`--checkpoint plan_in_progress --reopen --reason "<原因>"`
 <!-- scaffold:end state -->
 
-<!-- scaffold:begin artifacts -->
-## 输入、产物与模板
-
-| 方向 | 产物 | 路径（相对 FEATURE_DIR） | 必需 | 缺失时 |
-|---|---|---|---|---|
-| 输入 | 结构化需求 | `PRD.md` | 是 | — |
-| 输出 | 实施计划 | `plan.md` | 是 | — |
-
-模板：`${pluginPath}/skills/autodev-plan/templates/plan.md`
-<!-- scaffold:end artifacts -->
 
 （以下为开发者编写的技能正文）
 ```
 
-`state` 片段就是“状态接入说明”：节点没有校验命令时，省略校验那一句；节点没有模板时，`artifacts` 片段省略模板一行。
+`state` 片段就是“状态接入说明”。
 
 要求：
 
@@ -461,36 +450,11 @@ description: 将工作拆解为有序任务。当你已有规格说明……时�
 - 技能只能在本节点必需产物全部写好之后，才推进 `<prefix>_done`；运行框架会检查存在性并执行校验命令，不通过则拒绝推进；
 - 技能私有的脚本放在 `skills/<skill>/scripts/`，通过 `${pluginPath}/skills/<skill>/scripts/…` 调用。技能不需要、也不应该导入 `runtime/` 下的模块（interfaces.md §4.6）。
 
-### 6.2 agents/openai.yaml（可选，seeded）
-
-格式遵循 Codex skill-creator 的 `references/openai_yaml.md`：
-
-```yaml
-interface:
-  display_name: "任务计划"
-  short_description: "把规格拆成带依赖和验收标准的任务计划"
-  default_prompt: "使用 $autodev-plan 为当前 Feature 生成实施计划。"
-dependencies:
-  tools:
-    - type: "mcp"
-      value: "mcp-arch"
-      description: "架构知识 MCP"
-```
-
-| 字段 | 生成规则 |
-|---|---|
-| `display_name` | 节点 `label` |
-| `short_description` | 25–64 字符；由开发者填写，或由插件开发技能（README §2.3）读完 SKILL.md 后生成。不能截取 description，因为长度和语气都不对 |
-| `default_prompt` | 一句话，必须以 `$<skill>` 形式提及技能 |
-| `dependencies.tools` | 可选，声明技能依赖的 MCP 服务（`type` 目前只支持 `mcp`），对应插件 `.mcp.json` 中的服务 |
-
-所有字符串值都加引号。`icon_small`、`icon_large`、`brand_color` 只在开发者提供时输出。
 
 ### 6.3 模板与业务校验器
 
 | 资源 | 建议位置 | 规则 |
 |---|---|---|
-| 模板 | `skills/<skill>/templates/` | 由节点 `templates` 引用，路径相对技能目录（例如 `templates/plan.md`）。build 时缺失则生成 `[TODO: 模板内容]` 桩文件（seeded），之后由开发者维护 |
 | 业务校验器 | `skills/<skill>/scripts/` | 由节点 `validate` 命令调用，契约见 interfaces.md §4.4。脚手架不生成校验器；初始化向导可以按开发者要求创建骨架（带 `[TODO]`，`package` 前必须补全） |
 
 ## 7. 模块输出
@@ -550,7 +514,7 @@ skills/<skillName>/
 - `allowedCheckpoints` 优先用显式列表；否则取 checkpoint 链上 `allowedFrom` 及之后的全部 checkpoint，再去掉 `excludeCheckpoints`；
 - 没有任何可同步路径的节点和阶段不输出。
 
-看板入口（`entry.enabled` 时生成；与 kanban `9411fc3` 新增的同名键同构）：
+看板入口（`entry.enabled` 时生成）：
 
 ```json
 "artifact_sync": {

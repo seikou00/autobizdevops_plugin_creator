@@ -1,0 +1,23 @@
+{
+  "featureDir": ".autobiz-demo",
+  "annotateSkill": true,
+  "nodes": [
+    {
+      "id": "dev.code",
+      "name": "增量编码",
+      "skill": "demo-code",
+      "outputs": {
+        "code": {
+          "git": { "repos": "project", "branch": "current", "require": ["commits", "clean", "merged"] }
+        }
+      }
+    },
+    {
+      "id": "dev.review",
+      "name": "代码评审",
+      "skill": "demo-review",
+      "inputs": ["code"],
+      "outputs": { "review": "REVIEW.md" }
+    }
+  ]
+}

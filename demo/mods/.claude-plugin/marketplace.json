@@ -1,0 +1,15 @@
+{
+  "name": "autobiz-demo-mods",
+  "description": "autobizdevops_plugin_creator 的演示 mod",
+  "owner": {
+    "name": "autobizdevops_plugin_creator"
+  },
+  "plugins": [
+    {
+      "name": "autobiz-node-monitor",
+      "source": "./autobiz-node-monitor",
+      "description": "演示：监控看板节点技能何时开始、何时完成，用状态栏、提示和面板提醒",
+      "version": "0.1.0"
+    }
+  ]
+}

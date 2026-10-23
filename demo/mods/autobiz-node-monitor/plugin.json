@@ -1,0 +1,9 @@
+{
+  "name": "autobiz-node-monitor",
+  "version": "0.1.0",
+  "description": "演示：监控看板节点技能何时开始、何时完成（git 产物规则），用状态栏、提示和面板提醒，不改状态文件",
+  "author": { "name": "autobizdevops_plugin_creator" },
+  "keywords": ["mods", "monitor", "kanban", "demo"],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json"
+}
