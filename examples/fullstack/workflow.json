@@ -1,0 +1,119 @@
+{
+  "$schema": "../../schemas/workflow.schema.json",
+  "nodes": [
+    {
+      "id": "biz.prd",
+      "name": "需求澄清与 PRD",
+      "stage": "Biz",
+      "skill": "autobiz-requirement-discuss",
+      "outputs": { "prd": "PRD.md", "ui_context_json": "UI_CONTEXT.json" },
+      "validate": "${python} ${pluginPath}/hooks/stage_gate.py validate --stage ${nodeId} --feature ${feature} --workspace ${projectPath}"
+    },
+    {
+      "id": "dev.specs",
+      "name": "行为规格",
+      "stage": "Dev",
+      "skill": "autodev-specs",
+      "inputs": [
+        { "id": "prd"},
+        { "id": "ui_context_json" }
+      ],
+      "outputs": { "proposal": "proposal.md", "specs": "specs/**/*.md", "ui_context_json": "UI_CONTEXT.json" },
+      "validate": "${python} ${pluginPath}/hooks/stage_gate.py validate --stage ${nodeId} --feature ${feature} --workspace ${projectPath}"
+    },
+    {
+      "id": "dev.design",
+      "name": "技术设计",
+      "stage": "Dev",
+      "skill": "autodev-design",
+      "inputs": [
+        { "id": "proposal" },
+        { "id": "specs" },
+        { "id": "ui_context_json"}
+      ],
+      "outputs": { "design": "design.md", "design_contract_lock": ".design-contract.lock.json" },
+      "validate": "${python} ${pluginPath}/hooks/stage_gate.py validate --stage ${nodeId} --feature ${feature} --workspace ${projectPath}"
+    },
+    {
+      "id": "dev.plan",
+      "name": "执行计划",
+      "stage": "Dev",
+      "skill": "autodev-plan",
+      "inputs": [
+        { "id": "proposal" },
+        { "id": "specs" },
+        { "id": "ui_context_json"},
+        { "id": "design" },
+        { "id": "design_contract_lock" }
+      ],
+      "outputs": { "plan": "PLAN.md", "plan_json": "plan.json" },
+      "validate": "${python} ${pluginPath}/hooks/stage_gate.py validate --stage ${nodeId} --feature ${feature} --workspace ${projectPath}"
+    },
+    {
+      "id": "dev.code",
+      "name": "代码实现",
+      "stage": "Dev",
+      "skill": "autodev-code",
+      "inputs": [
+        {"id": "specs"},
+        {"id": "design"},
+        { "id": "plan_json" },
+        { "id": "detail_design","optional": true },
+        { "id": "ui_context_json" }
+      ],
+      "outputs": {
+        "code": { "git": { "repos": "deployUnits" } },
+        "evidence_stream": "evidence/EVIDENCE.jsonl"
+      },
+      "validate": "${python} ${pluginPath}/hooks/stage_gate.py validate --stage ${nodeId} --feature ${feature} --workspace ${projectPath}"
+    },
+    {
+      "id": "ops.cicd",
+      "name": "CI/CD",
+      "stage": "Ops",
+      "skill": "autoops-cicd",
+      "inputs": [
+        { "id": "evidence_stream" },
+        { "id": "plan_json", "optional": true }
+      ],
+      "outputs": {
+        "cicd_checklist": "CICD_CHECKLIST.md",
+        "pr_body": { "path": "PR_BODY.md", "optional": true }
+      }
+    },
+    {
+      "id": "ops.archive",
+      "name": "归档",
+      "stage": "Ops",
+      "skill": "autoops-archive",
+      "terminal": true,
+      "inputs": []
+    }
+  ],
+  "rules": {
+    "dynamicStages": [
+      {
+        "id": "detail_design_before_code",
+        "name": "详细设计",
+        "insertAfter": "dev.plan",
+        "defaultDecision": "pending",
+        "nodes": [
+          {
+            "id": "dev.detail_design",
+            "name": "详细设计",
+            "stage": "Dev",
+            "skill": "autodev-detail-design",
+            "inputs": [
+              { "id": "proposal"},
+              { "id": "specs" },
+              { "id": "design" },
+              { "id": "plan_json" }
+            ],
+            "outputs": { "detail_design": "DETAIL_DESIGN.md" }
+          }
+        ]
+      }
+    ],
+    "skip": true
+  }
+}

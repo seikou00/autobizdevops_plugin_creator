@@ -64,7 +64,7 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 | # | 能力 | 怎么做 | 能做到什么程度 | 必要性 | 不做时 |
 |---|---|---|---|---|---|
 | A1 | 修改后自动检测 | 在 Edit、Write 上挂执行后钩子：路径落在 `plugin.scaffold.json`、`workflow.json`、`modules/*.json`、`migrations.json` 上时运行 `lint --json`，把 Issue 放进工具结果的附加上下文，模型在同一轮就能读到 | agent 用 Edit、Write 改的，全部覆盖，不靠模型自觉。用 Bash 改的（`sed -i`、重定向），只能从命令文本中识别路径，尽力而为。开发者在编辑器里手改的，mod 收不到文件变化事件，改为每 2 秒比对摘要，结果显示在工作台，下一轮再交给模型 | **P0**：D20 要求“agent 修改后检测”，现在只是技能里的一句话 | 到提交前或 build 前才发现 |
-| A2 | 文件归属守卫 | 执行前钩子：目标路径按 `build-manifest.json` 中记录的归属判断，generated、managed、module 文件直接拒绝，拒绝理由告诉模型应该改哪个核心配置 | Edit、Write 全部拦住，Bash 尽力而为。在写入之前拦，模型不会白改一轮 | **P0**：为了让检查通过去改生成文件，是模型的常见行为，技能里专门禁止；实现成本很低 | 事后由 `check` 报 `DRIFT_*`，再回滚 |
+| A2 | 文件归属守卫 | 执行前钩子：目标路径按 `build-manifest.json` 中记录的归属判断，generated、managed、module 文件直接拒绝（内置知识组装脚本除外，插件可以替换它），拒绝理由告诉模型应该改哪个核心配置 | Edit、Write 全部拦住，Bash 尽力而为。在写入之前拦，模型不会白改一轮 | **P0**：为了让检查通过去改生成文件，是模型的常见行为，技能里专门禁止；实现成本很低 | 事后由 `check` 报 `DRIFT_*`，再回滚 |
 | A3 | 脚手架命令注册为工具 | 注册 `autobiz_lint`、`autobiz_build`、`autobiz_check`、`autobiz_simulate`、`autobiz_package`、`autobiz_diff`、`autobiz_skills`。mod 一次性确定解释器（`python3`、`python` 或 `py -3`）和脚本路径，用参数数组调用，返回 CLI 的 JSON。这些工具只读写插件目录，自动放行，不弹权限确认 | 模型不再拼命令行，`${pluginPath}` 没替换、Windows 引号、`python` 与 `python3` 混用这些问题都消失 | P1 | 继续用 Bash 调 CLI，能用但容易出错 |
 | A4 | 建模确认 | 模型调用 `autobiz_propose_nodes` 提交结构化的节点表，参数按 workflow 节点的 Schema 校验。mod 算出与当前流程的差异和变更等级（§4.3），弹出确认；确认后由 mod 写 `workflow.json` 并检测 | 新建时开发者确认整张表；修改时确认的是差异，例如“删除节点 review，等级 C4，影响 3 个在途 Feature”。JSON 由 mod 写，模型不手写 | P1：流程属于业务决策，现在靠模型自觉询问；修改时给出变更等级和影响尤其有用 | 模型在对话中询问，开发者回答“可以” |
 | A5 | 开发挂载与自动 build | lint 通过后按变更等级自动 build（§4.4）；第一次 build 成功后，调用 DevClaw 接口把源目录挂成开发插件 | 保存后几秒内看板就是新的，不用打包、导入 | **P0**（对“随时改”这个目标）：现在的修改循环里最慢的就是打包和重新导入。但这项能力主要在 DevClaw，mod 只负责调用 | 每次修改后打包、导入 |
@@ -79,7 +79,7 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 | # | 能力 | 怎么做 | 能做到什么程度 | 必要性 | 不做时 |
 |---|---|---|---|---|---|
 | R1 | 状态文件守卫 | 执行前钩子：拒绝 Edit、Write 写入 `{metaDir}/` 下的 `state.json`、`.state.lock`、`hooks.ndjson`；Bash 命令中出现这些路径的写操作也拒绝 | Edit、Write 全部拦住，Bash 尽力而为 | **P0**：校验命令只在 engine 推进时执行，模型直接改 `state.json` 就能绕过节点完成判定（D13、D14）。校验反复不通过时，模型确实可能这样做 | 没有防护，只能事后从 `hooks.ndjson` 与 `state.json` 对不上发现 |
-| R2 | 技能展开时注入产物约定 | 节点技能被调用时，运行 mod 按当前的 `flow.json` 和 Feature 状态，在技能正文后附上：本节点要读的输入、要写的输出（相对 `FEATURE_DIR` 的路径）及当前是否存在、模板路径；节点不能开始时附上原因（§2.3）。不含任何状态操作 | 产物约定始终与当前流程一致。SKILL.md 中的托管片段可以取消，build 不再改写开发者的技能文件 | **P0**：自动推进靠“输出写在约定路径上”来判断，路径必须准确送到模型面前；这也是热更新能到达模型的途径。同时可以去掉托管片段和 build-manifest 中的 `regions` | 继续用托管片段，由 build 改写 SKILL.md |
+| R2 | 技能展开时注入产物约定 | 节点技能被调用时，运行 mod 按当前的 `flow.json` 和 Feature 状态，在技能正文后附上：本节点要读的输入、要写的输出（相对 `FEATURE_DIR` 的路径）及当前是否存在；节点不能开始时附上原因（§2.3）。不含任何状态操作 | 产物约定始终与当前流程一致。SKILL.md 中的托管片段可以取消，build 不再改写开发者的技能文件 | **P0**：自动推进靠“输出写在约定路径上”来判断，路径必须准确送到模型面前；这也是热更新能到达模型的途径。同时可以去掉托管片段和 build-manifest 中的 `regions` | 继续用托管片段，由 build 改写 SKILL.md |
 | R3 | 感知配置变化 | 每次自动推进、展开技能之前，比对 `build-manifest.json` 中的摘要；变了就重读编译配置，并提示一次“流程已更新” | 数据热更新就是在这里生效的（§4.2） | **P0**（对热更新） | 改了流程要重开会话 |
 | R4 | 自动推进状态 | 节点技能展开时推进到 `_in_progress`；主会话一轮结束时，必需输出都在就推进到 `_done`（含校验命令），校验不通过就拦下结束让模型修改。规则见 §2.3，编码类节点见 §2.8 | 技能完全不写状态操作，模型不知道 checkpoint 的存在；看板与实际一致，不依赖模型记得执行命令 | **P0**：直接解决“每个技能都要手写 update 命令才能推进状态”的问题，也覆盖了“产物写完忘了推进” | 每个技能都要写状态维护说明，能否推进取决于模型 |
 | R5 | 人工状态操作 | `/autobiz state` 命令：查看当前状态，重开到某个节点（必须写原因）；内部调用 `update_state.py` | 模型不再持有任何状态工具，例外情况由人处理 | P1 | 只能在看板上操作（如果看板提供） |
@@ -136,7 +136,7 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 
 **校验什么时候跑、要多久**：校验命令是开发者写的单行命令，一般是一个脚本，不经过模型；存在性检查只是文件匹配。校验只在两种时刻执行：本节点的输出刚刚齐全，或者已完成节点的产物有改动；其余轮次结束时，`finish` 只看文件在不在。一次检查的开销是启动一次 Python（空解释器实测约 34 ms）加上脚本本身，正常是几十到几百毫秒。`validateTimeoutSec`（默认 120 秒）只是防止脚本卡死的超时上限。只有校验器自己做了重活（跑测试、构建、联网、调用模型）才会慢，所以约定：校验器只做快速、确定的检查；需要模型或人来判断质量的，放在技能里做，或者交给人工关口。
 
-**模型看到什么**：只有业务信息，即输入、输出路径和模板（R2），以及校验不通过时的输出。看不到 checkpoint，也看不到任何状态命令。
+**模型看到什么**：只有业务信息，即输入、输出路径（R2），以及校验不通过时的输出。看不到 checkpoint，也看不到任何状态命令。
 
 **判定放在 engine**：mod 只在事件发生时调用新的入口 `runtime/workflow/auto_state.py`：
 
@@ -173,7 +173,7 @@ python -X utf8 runtime/workflow/auto_state.py finish                   # 主会�
 
 现在的问题：启用知识模块且 `assembler = plugin` 时，`session_context_inject` 在会话开始时把系统级、单元级、会话工作区、领域词汇表四层知识一次性并入 `sessionContext`（[output-spec.md §7.1](output-spec.md)）。选了多个发布单元时，大部分单元级知识在这个会话里用不到，却一直占着上下文；知识仓库要靠 `pull_knowledge` 手动同步；知识沉淀要人想起来去看板上发起。
 
-目标：知识在用到时才进入会话，同步和沉淀不依赖人记得操作。清单解析和四层组装的逻辑不变，仍是 `runtime/knowledge/` 下的 Python，只保留一份实现；运行 mod 只决定**什么时候、加载哪一部分**。
+目标：知识在用到时才进入会话，同步和沉淀不依赖人记得操作。清单解析和组装逻辑不变，仍由知识组装脚本完成（默认为内置的 `render_collected_session_context.py`），只保留一份实现；运行 mod 只决定**什么时候、加载哪一部分**。
 
 **加载方式**：`modules/knowledge.json` 新增 `assembly.loading`：
 
@@ -272,6 +272,8 @@ python -X utf8 runtime/workflow/auto_state.py finish                   # 主会�
 四部分可以分开用：只想让代码节点不被误判，用 §2.8.1 + §2.8.2 就够；有子代理时加上 §2.8.3；要在完成前跑测试再加 §2.8.4。
 
 #### 2.8.1 代码提交作为产物
+
+> git 产物的写法、基线和齐全条件已并入核心设计（[input-config.md §2.9](input-config.md)、[output-spec.md §4.2、§4.4](output-spec.md)），不依赖运行 mod：没有 mod 时由 `update_state.py` 推进到 `_in_progress`、`_done` 时记录基线和检查。下面保留完整说明，运行 mod 在此基础上增加交接时机（§2.8.2）和会话静止（§2.8.3）。
 
 `outputs` 中可以声明 git 类型的产物，与文件产物并列：
 
@@ -492,7 +494,7 @@ build 编译出新流程后，与当前的 `runtime/config/flow.json` 比较，�
 | C0 资源 | 技能正文（托管片段以外）、模板内容、校验脚本内容、`references/`、`agents/*.md` 内容 | 无 | 不需要 build，下次调用或下次会话生效 | patch |
 | C1 展示 | 节点显示名和描述、产物显示名、`nextAction` 文案、阶段名 | 无 | 自动 build，看板重读 | patch |
 | C2 策略 | `session.policies`、子代理、知识配置、看板可选能力的开关 | 只影响新会话 | 自动 build，新会话生效 | minor |
-| C3 流程扩展 | 追加或插入节点，给节点加输入或输出，改校验命令、模板引用、产物路径 | checkpoint 仍然有效，但可能有 Feature 推进不了 | build 后做影响分析（§4.5）：没有受影响的 Feature 就自动生效；有就在工作台列出，开发者确认后生效 | minor |
+| C3 流程扩展 | 追加或插入节点，给节点加输入或输出，改校验命令、产物路径 | checkpoint 仍然有效，但可能有 Feature 推进不了 | build 后做影响分析（§4.5）：没有受影响的 Feature 就自动生效；有就在工作台列出，开发者确认后生效 | minor |
 | C4 流程破坏 | 删除节点，改节点 id 的最后一段（checkpoint 名随之变化），调整节点顺序 | checkpoint 不存在或含义改变，按现有规则 `state.json` 会拒绝写入（[output-spec.md §4.2](output-spec.md)） | 必须在 `migrations.json` 中写迁移映射，否则不生效（`FLOW_BREAKING`） | major，必须带迁移 |
 | C5 身份 | `plugin.id`、`runtime.layout` | 状态找不到 | 禁止（`PLUGIN_ID_CHANGED`、`LAYOUT_CHANGED`） | 禁止 |
 | 框架升级 | `coreVersion`、模块版本 | 可能涉及 `state.json.schemaVersion` | `upgrade` 后代码热更新 | 跟随框架版本 |
@@ -601,7 +603,7 @@ flowchart TD
 | [rpc.md §5.2](rpc.md) | 看板“完成”按钮需要一个方法（例如 `state/complete`），由 `auto_state.py finish --trigger manual` 处理（§2.8.2） |
 | [interfaces.md §1.1](interfaces.md) | 新增 `autobiz-plugin diff`：输出变更等级和影响分析，开发 mod 和 `package` 都使用 |
 | [input-config.md §4.3](input-config.md)、[schemas/modules/knowledge.schema.json](../schemas/modules/knowledge.schema.json) | `knowledge.json` 新增 `assembly.loading`（`eager` / `lazy`）和 `nodes.<节点 id>.include`、`nodes.<节点 id>.sediment`（§2.4）；`nodes` 中的节点 id 必须存在于 `workflow.json` |
-| [output-spec.md §7.1](output-spec.md) | 知识模块新增 `runtime/knowledge/lookup.py`；`assembler.py` 增加索引模式；声明 `source` 时运行 mod 会话开始自动同步，`pull_knowledge` 保留给会话以外使用 |
+| [output-spec.md §7.1](output-spec.md) | 知识模块新增 `runtime/knowledge/lookup.py`；内置组装脚本增加索引模式；声明 `source` 时运行 mod 会话开始自动同步，`pull_knowledge` 保留给会话以外使用 |
 | [interfaces.md §3.3.7](interfaces.md) | `loading = lazy` 时 `sessionContext` 的知识段只有系统级、词汇表、会话工作区和发布单元索引；`agentmdLoadStatus` 中未加载的单元带 `"deferred": true` |
 | [input-config.md](input-config.md) | 新增 `migrations.json`、`plugin.modExtension`、`plugin.stateMode`、`runtime.autoRetry`，节点新增 `humanGate`、`completeOn`、`validateTimeoutSec`，`outputs` 支持 git 类型的产物，校验命令新增占位符 `${repos}`、`${gitRanges}`（§2.8）；自动模式下技能正文中出现 `update_state.py` 调用时报 `LEGACY_ENTRY_REF`；新增检查规则 `FLOW_BREAKING`、`MIGRATION_MISSING`、`CHANGE_IMPACT`、`VERSION_BUMP`、`MOD_EXTENSION_CONFLICT`、`AUTO_NO_EVIDENCE` |
 

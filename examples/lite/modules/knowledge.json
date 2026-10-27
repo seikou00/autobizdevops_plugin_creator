@@ -1,6 +1,6 @@
 {
   "$schema": "../../../schemas/modules/knowledge.schema.json",
-  "assembly": { "assembler": "plugin" },
+  "assembly": { "assembler": "plugin" },//plugin platform（devclaw) 由知识模块确定，解耦具体脚本
   "source": {
     "type": "git",
     "url": "https://gitee.paas.cmbchina.cn/S992391/LF39_Product_Knowledge.git",

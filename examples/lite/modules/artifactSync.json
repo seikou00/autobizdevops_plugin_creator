@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../schemas/modules/artifactSync.schema.json",
+  "allowedFrom": "dev.plan:done",
+  "artifacts": {
+    "requirements": "结构化需求。",
+    "proposal": "变更提案。",
+    "specs": "行为规格。",
+    "design": "技术设计。",
+    "plan": "实施计划。"
+  }
+}

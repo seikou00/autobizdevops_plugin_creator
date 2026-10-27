@@ -1,0 +1,77 @@
+{
+  // properties 下面的键才是配置里能写的字段；required 列出必填字段；additionalProperties: false 表示不能写列表以外的字段，写错字段名会报错。
+  // definitions 是可复用的片段，用 $ref 引用，不会出现在配置文件里；default 是不写时取的值，默认值只写在 Schema 里（D27）。
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "autobiz.scaffold.module.artifactSync.v1",
+  "title": "AutoBiz 产物同步模块配置 v1（modules/artifactSync.json）",
+  "description": "产物同步模块：把产物上传到外部服务，并在看板上生成同步入口。入口文件引用此文件即表示启用，不引用即不启用（D30）。语义校验见 input-config.md §7。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifacts"], // 要上传哪些产物必须显式列出
+  "properties": {
+    "$schema": { "type": "string" },
+    // 生成的同步技能目录名和技能名，看板入口带出的也是它
+    "skillName": { "$ref": "#/definitions/skillName", "default": "autobizdevops-artifact-sync" },
+    // 允许同步的起点：<节点 id>:in_progress|done 或 checkpoint 名，从这里到流程末尾都允许；只沿主干推导，与 allowedCheckpoints 二选一
+    "allowedFrom": {
+      "type": "string",
+      "pattern": "^([a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*:(in_progress|done)|[a-z][a-z0-9_]*)$",
+      "description": "<nodeId>:<in_progress|done> 或 checkpoint 名；从该点到流程末尾都允许同步。"
+    },
+    // 从 allowedFrom 推导出的列表中再去掉的 checkpoint
+    "excludeCheckpoints": { "type": "array", "items": { "type": "string" }, "default": [] },
+    // 直接列出允许同步的 checkpoint；动态阶段节点的 checkpoint 只能用这种写法
+    "allowedCheckpoints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "显式列表，与 allowedFrom 二选一。"
+    },
+    // 要上传的产物：只上传列出的；key 是产物 id，值是同步目录中的简述；git 产物不能列
+    "artifacts": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/definitions/artifactId" },
+      "additionalProperties": { "$ref": "#/definitions/nonEmpty" },
+      "description": "要上传的产物清单：产物 id → 同步目录中的简述。只同步列出的产物，路径和归属节点从节点输出推导。"
+    },
+    // 看板上的同步入口（board_config 顶层 artifact_sync）
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "description": "看板上的产物同步入口，生成 board_config 顶层 artifact_sync（slashSkill 固定为 skillName）。",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "syncType": { "type": "string", "default": "invoke_session" },
+        "userMessage": { "type": "string", "default": "请针对${projectCode}项目的${feature}特性发起产物同步" },
+        "dialogTips": { "type": "string", "default": "发起产物同步" }
+      }
+    },
+    // 上传服务地址，默认值取自全栈版 sync_artifacts.py
+    "uploadUrl": { "type": "string", "format": "uri", "default": "https://tscode-cos-plugin.paasuat.cmbchina.cn/file/upload", "description": "上传服务地址；默认值取自全栈版 sync_artifacts.py。" },
+    // 超过这个大小的文件跳过并报告
+    "maxFileSizeMiB": { "type": "number", "exclusiveMinimum": 0, "default": 5 },
+    // 不属于节点输出、但也要同步的文件：{ 节点 id: { 路径模式: 简述 } }
+    "extraPaths": {
+      "type": "object",
+      "default": {},
+      "description": "不属于节点输出但需要同步的路径：{ nodeId: { pathPattern: 简述 } }。",
+      "propertyNames": { "$ref": "#/definitions/nodeId" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "$ref": "#/definitions/nonEmpty" }
+      }
+    }
+  },
+  // allowedFrom 与 allowedCheckpoints 必须且只能写一个
+  "oneOf": [
+    { "required": ["allowedFrom"], "not": { "required": ["allowedCheckpoints"] } },
+    { "required": ["allowedCheckpoints"], "not": { "required": ["allowedFrom"] } }
+  ],
+  "definitions": { // definitions 是可复用的片段，被上面的 $ref 引用，不是配置字段
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
+    "artifactId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "skillName": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 64 }
+  }
+}

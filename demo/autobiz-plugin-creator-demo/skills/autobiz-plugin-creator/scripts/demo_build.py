@@ -4,7 +4,7 @@
 先执行 demo_lint 的全部检查，有 error 时不写任何文件。生成内容按归属处理（docs/README.md §4）：
 - generated：plugin.json、board_core/board_config.json、runtime/config/*、runtime/build-manifest.json，每次重写；
 - managed：runtime/ 下的框架入口与内部库、.scaffold/ 下的 Schema；被手改过时拒绝覆盖（--force 强制覆盖）；
-- seeded：技能桩、模板桩、校验器骨架（--validator-stubs）、.gitignore，只在缺失时创建；
+- seeded：技能桩、校验器骨架（--validator-stubs）、.gitignore，只在缺失时创建；模板由技能自己维护，不生成；
   已有的 SKILL.md 只更新 state、artifacts 两个托管片段。
 
 演示版不支持知识模块和产物同步；不生成 boardEvents（DevClaw 尚未支持看板事件推送）。
@@ -29,8 +29,6 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 RUNTIME_TEMPLATE = SKILL_DIR / "assets" / "runtime"
 SCAFFOLD_VERSION = "0.1.0-demo"
 CORE_VERSION = "0.1.0-demo"
-BUILTIN_POLICY = {"agentMode": "solo", "toolCustomConfig": {"task": {"enabled": True}}}
-STATE_LABELS = {"not_started": "未开始", "in_progress": "进行中", "done": "已完成"}
 FRONTMATTER_KEYS = {"name", "description", "license", "allowed-tools", "metadata"}
 LEGACY_REFS = re.compile(r"hooks/update_state\.py|hooks/update_checkpoint\.py|hooks/init_workspace\.py"
                          r"|\$\{pluginPath\}/inspect_state\.py")
@@ -58,14 +56,6 @@ def dump(value):
     return (json.dumps(value, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
 
 
-def deep_merge(base, override):
-    merged = json.loads(json.dumps(base))
-    for key, value in (override or {}).items():
-        merged[key] = deep_merge(merged[key], value) if isinstance(value, dict) and isinstance(merged.get(key), dict) \
-            else value
-    return merged
-
-
 class Plan:
     """build 的内存结果：先算完全部内容，没有 error 时再统一写盘。"""
 
@@ -84,14 +74,16 @@ class Compiled:
     def __init__(self, root, configs, labels):
         entry, self.nodes = configs["entry"], configs["workflow"]["nodes"]
         self.root, self.configs, self.labels, self.plugin = root, configs, labels, entry["plugin"]
-        self.board, self.session = configs.get("board", {}), configs.get("session", {})
-        self.display, self.target = self.board.get("display", {}), self.board.get("target", {})
-        self.layout = entry.get("runtime", {}).get("layout", "isolated")
-        self.timeout = entry.get("runtime", {}).get("validateTimeoutSec", 120)
-        self.meta = ".autobizdevops" if self.layout == "legacy" else f".autobizdevops/{self.plugin['id']}"
+        # 配置已由 demo_lint 按 Schema 的 default 补全；没有引用的看板、会话模块取全部默认值
+        self.board = configs.get("board") or demo_lint.with_defaults({}, "board")
+        self.session = configs.get("session") or demo_lint.with_defaults({}, "session")
+        self.display, self.target = self.board["display"], self.board["target"]
+        self.layout, self.meta_root = entry["runtime"]["layout"], entry["runtime"]["metaRoot"]
+        self.timeout = entry["runtime"]["validateTimeoutSec"]
+        self.meta = self.meta_root if self.layout == "legacy" else f"{self.meta_root}/{self.plugin['id']}"
         self.label = self.display.get("workflowLabel", self.plugin["name"])
         self.chain_names = " → ".join(node["name"] for node in self.nodes)
-        self.state_labels = {**STATE_LABELS, **self.display.get("stateLabels", {})}
+        self.state_labels = self.display["stateLabels"]
         self.artifacts = {}
         for node in self.nodes:
             for artifact, paths in node.get("outputs", {}).items():
@@ -146,11 +138,11 @@ class Compiled:
         return result
 
     def inspect_commands(self):
-        python = self.target.get("python", {})
+        python = self.target["python"]
         commands = {}
-        for platform in self.target.get("platforms", demo_lint.DEFAULT_PLATFORMS):
-            py = python.get("win32", "python") if platform == "win32" else python.get("posix", "python3")
-            if self.target.get("utf8Mode", True):
+        for platform in self.target["platforms"]:
+            py = python["win32"] if platform == "win32" else python["posix"]
+            if self.target["utf8Mode"]:
                 py += " -X utf8"
             group = {key: value.replace("{py}", py) for key, value in COMMANDS.items()}
             group.update({
@@ -187,10 +179,8 @@ class Compiled:
         sedimentation = self.board.get("capabilities", {}).get("knowledgeSedimentation", {})
         if sedimentation.get("enabled"):
             config["knowledge_config"] = {
-                "sync_type": sedimentation.get("syncType", "invoke_session"),
-                "nextAction": {"slashSkill": sedimentation.get("slashSkill", "knowledge-sync"),
-                               "userMessage": sedimentation.get("userMessage", "请针对${projectCode}项目发起知识沉淀，这个是 token：${leanToken}"),
-                               "dialogTips": sedimentation.get("dialogTips", "发起知识沉淀")}}
+                "sync_type": sedimentation["syncType"],
+                "nextAction": {key: sedimentation[key] for key in ("slashSkill", "userMessage", "dialogTips")}}
         return config
 
     def flow(self):
@@ -205,7 +195,6 @@ class Compiled:
             "nodes": [{"id": node["id"], "name": node["name"], "stage": self.group(node), "skill": node["skill"],
                        "order": (index + 1) * 10, "checkpoints": self.checkpoints(node),
                        "inputs": list(node.get("inputs", [])), "outputs": list(node.get("outputs", {})),
-                       "templates": [f"skills/{node['skill']}/{template}" for template in node.get("templates", [])],
                        "validate": node.get("validate")} for index, node in enumerate(self.nodes)],
             "checkpoints": {"chain": chain, "initial": chain[0],
                             "labels": {checkpoint: f"{node['name']}{'进行中' if checkpoint.endswith('_in_progress') else '完成'}"
@@ -213,16 +202,14 @@ class Compiled:
         }
 
     def session_config(self):
-        policies = self.session.get("policies", {})
-        entry = self.session.get("customEntry")
+        policies = self.session["policies"]
         return {"schema": "autobiz.session.v1",
-                "policies": {"default": deep_merge(BUILTIN_POLICY, policies.get("default")),
-                             "nodes": policies.get("nodes", {})},
-                "parts": [],
-                "customEntry": {"command": entry["command"], "timeoutSec": entry.get("timeoutSec", 30)} if entry else None}
+                "policies": {"default": policies["default"], "nodes": policies.get("nodes", {})},
+                "knowledgeAssembly": None}
 
     def runtime_config(self):
-        return {"schema": "autobiz.runtime.v1", "pluginId": self.plugin["id"], "layout": self.layout,
+        return {"schema": "autobiz.runtime.v1", "pluginId": self.plugin["id"], "metaRoot": self.meta_root,
+                "layout": self.layout,
                 "validateTimeoutSec": self.timeout}
 
     def manifests(self):
@@ -249,8 +236,8 @@ class Compiled:
 # —— 技能：桩文件与托管片段 ——
 
 def python_command(compiled):
-    py = compiled.target.get("python", {}).get("posix", "python3")
-    return py + (" -X utf8" if compiled.target.get("utf8Mode", True) else "")
+    py = compiled.target["python"]["posix"]
+    return py + (" -X utf8" if compiled.target["utf8Mode"] else "")
 
 
 def state_block(compiled, nodes):
@@ -258,7 +245,7 @@ def state_block(compiled, nodes):
     update = f'{py} "${{pluginPath}}/runtime/workflow/update_state.py" --feature "${{feature}}" --checkpoint'
     lines = ["## 技能状态维护", "",
              "> 由脚手架生成，请勿手改；节点、checkpoint 或校验命令变化后重新 build 更新。"
-             "Windows 上把 `python3` 换成 `python`。"]
+             f"Windows 上把 `{compiled.target['python']['posix']}` 换成 `{compiled.target['python']['win32']}`。"]
     for node in nodes:
         start, finish = compiled.checkpoints(node)
         if len(nodes) > 1:
@@ -275,18 +262,14 @@ def state_block(compiled, nodes):
 
 
 def artifacts_block(compiled, nodes):
-    lines = ["## 输入、产物与模板", "", "| 方向 | 产物 | 路径（相对 FEATURE_DIR） | 必需 |", "|---|---|---|---|"]
-    templates = []
+    lines = ["## 输入与产物", "", "| 方向 | 产物 | 路径（相对 FEATURE_DIR） | 必需 |", "|---|---|---|---|"]
     for node in nodes:
         for direction, items in (("输入", node.get("inputs", [])), ("输出", list(node.get("outputs", {})))):
             for item in items:
                 info = compiled.artifacts[item]
                 lines.append(f"| {direction} | {info['label']} | {'、'.join(f'`{path}`' for path in info['paths'])} | 是 |")
-        templates += [f"`${{pluginPath}}/skills/{node['skill']}/{template}`" for template in node.get("templates", [])]
     if len(lines) == 4:
         lines.append("| — | 无 | — | — |")
-    if templates:
-        lines += ["", "模板：" + "、".join(templates)]
     return "\n".join(lines)
 
 
@@ -387,8 +370,7 @@ def plan_skills(compiled, plan, report, validator_stubs):
         if not existing.is_file():
             text = stub_skill(compiled, skill, nodes)
             plan.add(path, text.encode("utf-8"), "seeded")
-            for folder in ("templates", "scripts"):
-                plan.add(f"skills/{skill}/{folder}/", None, "seeded")
+            plan.add(f"skills/{skill}/scripts/", None, "seeded")
         else:
             text = existing.read_text(encoding="utf-8")
             end, keys = frontmatter(text)
@@ -418,10 +400,6 @@ def plan_skills(compiled, plan, report, validator_stubs):
                 text = upsert(text, "artifacts", artifacts_block(compiled, nodes), after="state")
             plan.add(path, text.encode("utf-8"), "seeded")
         for node in nodes:
-            for template in node.get("templates", []):
-                if not (compiled.root / "skills" / skill / template).is_file():
-                    plan.add(f"skills/{skill}/{template}",
-                             f"# {Path(template).stem}\n\n[TODO: 模板内容]\n".encode("utf-8"), "seeded")
             if validator_stubs and node.get("validate"):
                 for arg in shlex.split(node["validate"]):
                     if arg.startswith("${skillPath}/") and arg.endswith(".py"):
@@ -433,6 +411,40 @@ def plan_skills(compiled, plan, report, validator_stubs):
 
 
 # —— 计划与写盘 ——
+
+def check_supported(root, configs, labels, report):
+    """演示版 build 只生成线性流程：正式版的流程规则、知识模块和产物同步在这里拦下，不进入编译。"""
+    label, workflow = labels["workflow"], configs["workflow"]
+    hint = "演示版只生成线性流程；改用正式版 autobiz-plugin build，或先去掉这一项"
+    for field, name in (("dynamicStages", "动态阶段"), ("skip", "跳过节点")):
+        if workflow.get("rules", {}).get(field):
+            report.add("error", "DEMO_UNSUPPORTED", label, f"/rules/{field}", f"演示版 build 不支持{name}", hint)
+    for index, node in enumerate(workflow["nodes"]):
+        pointer = f"/nodes/{index}"
+        if node.get("terminal"):
+            report.add("error", "DEMO_UNSUPPORTED", label, f"{pointer}/terminal", "演示版 build 不支持终态节点", hint)
+        for input_index, item in enumerate(node.get("inputs", [])):
+            if isinstance(item, dict):
+                report.add("error", "DEMO_UNSUPPORTED", label, f"{pointer}/inputs/{input_index}",
+                           "演示版 build 不支持可选输入", "写成产物 id 字符串")
+        for artifact, spec in node.get("outputs", {}).items():
+            if demo_lint.is_git(spec):
+                report.add("error", "DEMO_UNSUPPORTED", label, f"{pointer}/outputs/{demo_lint.escape(artifact)}",
+                           "演示版 build 不支持代码提交产物（git）", hint)
+            elif isinstance(spec, dict):
+                report.add("error", "DEMO_UNSUPPORTED", label, f"{pointer}/outputs/{demo_lint.escape(artifact)}",
+                           "演示版 build 不支持可选输出", "写成路径字符串或数组")
+        if demo_lint.skill_dir(root, node["skill"]) != Path("skills", node["skill"]):
+            report.add("error", "DEMO_UNSUPPORTED", label, f"{pointer}/skill",
+                       f"演示版 build 不支持分组目录下的技能（{demo_lint.skill_dir(root, node['skill']).as_posix()}）",
+                       f"把技能目录移到 skills/{node['skill']}/")
+    if "knowledge" in labels:
+        report.add("error", "DEMO_UNSUPPORTED", labels["entry"], "/modules/knowledge", "演示版 build 不支持知识模块",
+                   "去掉 modules.knowledge 引用后再 build")
+    if "artifactSync" in labels:
+        report.add("error", "DEMO_UNSUPPORTED", labels["entry"], "/modules/artifactSync", "演示版 build 不支持产物同步模块",
+                   "去掉 modules.artifactSync 引用后再 build")
+
 
 def plan_build(root, configs, labels, report, validator_stubs):
     previous_path = root / "runtime" / "build-manifest.json"
@@ -446,12 +458,10 @@ def plan_build(root, configs, labels, report, validator_stubs):
         report.add("error", "LAYOUT_CHANGED", labels["entry"], "/runtime/layout",
                    f"runtime.layout 从 {previous.get('layout')} 改成了 {compiled.layout}，已有项目的状态会找不到",
                    "发布前确需修改时，删除 runtime/build-manifest.json 后重新 build")
-    if "knowledge" in labels:
-        report.add("error", "DEMO_UNSUPPORTED", labels["entry"], "/modules/knowledge", "演示版 build 不支持知识模块",
-                   "去掉 modules.knowledge 引用后再 build")
-    if compiled.board.get("capabilities", {}).get("artifactSync", {}).get("enabled"):
-        report.add("error", "DEMO_UNSUPPORTED", labels.get("board", "modules/board.json"), "/capabilities/artifactSync",
-                   "演示版 build 不支持产物同步", "把 artifactSync.enabled 改为 false 后再 build")
+    if previous and "metaRoot" in previous and previous["metaRoot"] != compiled.meta_root:
+        report.add("error", "LAYOUT_CHANGED", labels["entry"], "/runtime/metaRoot",
+                   f"runtime.metaRoot 从 {previous['metaRoot']} 改成了 {compiled.meta_root}，已有项目的状态和产物会找不到",
+                   "发布前确需修改时，删除 runtime/build-manifest.json 后重新 build")
     plan = Plan(root, previous)
     for path, manifest in compiled.manifests().items():
         plan.add(path, dump(manifest), "generated")
@@ -503,7 +513,7 @@ def manifest(plan, compiled):
     files = dict(sorted(files.items()))
     modules = {"board": CORE_VERSION, "session": CORE_VERSION}
     return {"schema": "autobiz.build-manifest.v1", "scaffoldVersion": SCAFFOLD_VERSION, "coreVersion": CORE_VERSION,
-            "pluginId": compiled.plugin["id"], "layout": compiled.layout, "modules": modules,
+            "pluginId": compiled.plugin["id"], "layout": compiled.layout, "metaRoot": compiled.meta_root, "modules": modules,
             "inputs": inputs, "files": files}
 
 
@@ -542,6 +552,8 @@ def main(argv=None):
         print(f"用法错误：{error}", file=sys.stderr)
         return 2
     plan = compiled = None
+    if not report.count("error"):
+        check_supported(root, configs, labels, report)
     if not report.count("error"):
         plan, compiled = plan_build(root, configs, labels, report, args.validator_stubs)
         check_drift(plan, report, args.force)

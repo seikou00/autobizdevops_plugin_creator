@@ -9,7 +9,7 @@ metadata:
 
 帮开发者把**已有的技能**组装成一个 DevClaw 看板插件：对话梳理流程 → 写核心配置 → 检查 → build 生成插件 → simulate 模拟 DevClaw 调用 → 打包。
 
-演示版与正式版（`autobiz-plugin` CLI）的差别：生成与校验由本技能 `scripts/` 下的脚本完成；不支持知识模块和产物同步（build 会报 `DEMO_UNSUPPORTED`）；会话上下文只含流程信息，不含知识。
+演示版与正式版（`autobiz-plugin` CLI）的差别：生成与校验由本技能 `scripts/` 下的脚本完成；不支持知识模块和产物同步，也只生成线性流程：动态阶段、跳过节点、终态节点、可选输入输出、代码提交产物（git）和分组目录下的技能都能通过检查，但 build 会报 `DEMO_UNSUPPORTED`；会话上下文只含流程信息，不含知识。
 
 ## 脚本
 
@@ -62,10 +62,10 @@ metadata:
 
 请用户用自己的话描述流程：分几步、每一步用哪个技能、产出什么文件、读前面哪一步的文件、怎样才算完成。可以根据技能的 description 建议顺序和产物，但要让用户确认。整理成表格回显：
 
-| # | 节点 id | 显示名 | 阶段 | 技能 | 读取 | 产出（产物 id = 路径） | 模板 | 完成时校验 |
-|---|---|---|---|---|---|---|---|---|
-| 1 | draft | 起草 | — | doc-draft | — | draft = DRAFT.md | templates/DRAFT.md | — |
-| 2 | review | 评审 | — | doc-review | draft | review = REVIEW.md | — | 检查评审结论 |
+| # | 节点 id | 显示名 | 阶段 | 技能 | 读取 | 产出（产物 id = 路径） | 完成时校验 |
+|---|---|---|---|---|---|---|---|
+| 1 | draft | 起草 | — | doc-draft | — | draft = DRAFT.md | — |
+| 2 | review | 评审 | — | doc-review | draft | review = REVIEW.md | 检查评审结论 |
 
 **用户确认表格后才写入 `workflow.json`**。规则（细节和正反例见 `references/modeling-guide.md`）：
 
@@ -74,9 +74,8 @@ metadata:
 - **阶段**：可选，用作看板分组；同一阶段的节点必须连续；
 - **产物**：在第一个产出它的节点 `outputs` 中定义，id 为小写字母、数字、下划线；路径相对 `FEATURE_DIR`，可以用 glob，多个文件写数组；
 - **读取**：只能读前面节点产出的产物；
-- **模板**：路径相对技能目录，优先用技能已有的 `templates/` 文件；
 - **校验命令**：完成时执行的单行命令，不经过 shell。可用占位符：`${python}`、`${pluginPath}`、`${skillPath}`、`${projectPath}`、`${featureDir}`、`${feature}`、`${nodeId}`。技能 `scripts/` 下已有校验脚本时直接引用；没有时起草 `${python} ${skillPath}/scripts/check_<节点>.py --feature-dir ${featureDir}`，并在 build 时问用户是否生成骨架；
-- **不写进 workflow.json**：节点描述、产物显示名、看板文案（放 `modules/board.json`）；运行策略（放 `modules/session.json`）；项目路径、Feature 名等运行上下文。
+- **不写进 workflow.json**：节点描述、产物显示名、看板文案（放 `modules/board.json`）；运行策略（放 `modules/session.json`）；项目路径、Feature 名等运行上下文；技能用的模板（技能自己维护，放在技能目录下并在技能正文中引用）。
 
 写入后立即运行"检查"。
 
@@ -85,7 +84,7 @@ metadata:
 依次询问，全部取默认值的类别不写文件，也不在入口文件中引用：
 
 1. **看板**（`modules/board.json`）：目标平台（默认 darwin、linux、win32）；产物显示名（默认文件名）；节点描述；是否开启知识沉淀入口（`capabilities.knowledgeSedimentation`）。演示版不支持产物同步；
-2. **会话与 Agent**（`modules/session.json`）：默认 `solo` 并启用 task；是否给某些节点单独配置 `agentMode`（`solo`、`multi`、`agent_team`、`workflow`）或外挂子代理（`agents/*.md`，文件要存在）；
+2. **会话与 Agent**（`modules/session.json`）：默认 `solo`；是否给某些节点单独配置 `agentMode`（`solo`、`multi`、`agent_team`、`workflow`）或外挂子代理（`agents/*.md`；`agents/` 目录可选，文件不存在时只报 warning，会话入口会跳过它）；
 3. **知识**：演示版不支持，告诉用户正式版可以启用。
 
 写模块文件时同步更新 `plugin.scaffold.json` 的 `modules` 引用。写完运行"检查"。
@@ -93,7 +92,7 @@ metadata:
 ### 5. 检查
 
 - **有 error**：把每条 Issue 的 code、文件、位置和说明原样转述，给出修改建议。只改写法（字段名、路径格式）可以直接改；会改变流程（节点顺序、读取关系、产物）的先征得用户同意。改完重新检查，直到没有 error；
-- **只有 warning**：逐条解释。build 之前出现 `SKILL_MISSING`、`TEMPLATE_MISSING`、`COMMAND_SCRIPT_MISSING` 是正常的；
+- **只有 warning**：逐条解释。build 之前出现 `SKILL_MISSING`、`COMMAND_SCRIPT_MISSING` 是正常的；
 - 没有运行脚本、或退出码不是 0 时，不要说"检查通过"。
 
 需要先讲解会生成什么时，运行带 `--preview` 的检查。
@@ -102,7 +101,7 @@ metadata:
 
 运行"生成插件"。节点有校验命令而脚本不存在时，先问用户是否生成校验器骨架（加 `--validator-stubs`；骨架检查产物非空，业务规则由开发者补充）。然后：
 
-- 列出写入的文件，按归属讲解：`generated`（清单、看板配置、编译配置）和 `managed`（runtime/ 下的入口）不能手改；`seeded`（技能桩、模板桩、校验器骨架）只在缺失时创建；已有的 SKILL.md 只插入或更新 `state`、`artifacts` 两个托管片段；
+- 列出写入的文件，按归属讲解：`generated`（清单、看板配置、编译配置）和 `managed`（runtime/ 下的入口）不能手改；`seeded`（技能桩、校验器骨架）只在缺失时创建；已有的 SKILL.md 只插入或更新 `state`、`artifacts` 两个托管片段；
 - 打开一个技能的 SKILL.md，展示插入的"技能状态维护"片段：技能开始和完成时如何推进 checkpoint；
 - 处理 build 报出的问题：
   - `SKILL_NAME_MISMATCH`、`SKILL_FRONTMATTER`（error）：技能的 frontmatter 不对，和用户确认后修改 frontmatter，或修改 workflow.json 中的技能名；
@@ -150,7 +149,7 @@ metadata:
   "$schema": "./.scaffold/workflow.schema.json",
   "nodes": [
     { "id": "draft", "name": "起草", "skill": "doc-draft",
-      "outputs": { "draft": "DRAFT.md" }, "templates": ["templates/DRAFT.md"] },
+      "outputs": { "draft": "DRAFT.md" } },
     { "id": "review", "name": "评审", "skill": "doc-review",
       "inputs": ["draft"], "outputs": { "review": "REVIEW.md" },
       "validate": "${python} ${skillPath}/scripts/check_review.py --feature-dir ${featureDir}" }

@@ -1,0 +1,10 @@
+{
+  "$schema": "../../../schemas/modules/knowledge.schema.json",
+  "assembly": { "assembler": "plugin" },
+  "source": {
+    "type": "git",
+    "url": "https://gitee.paas.cmbchina.cn/S992391/LF39_Product_Knowledge.git",
+    "sshUrl": "git@gitee.itc.cmbchina.cn:S992391/LF39_Product_Knowledge.git",
+    "ref": "master"
+  }
+}

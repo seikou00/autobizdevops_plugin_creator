@@ -11,7 +11,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = ROOT / "runtime" / "config"
 BOARD_CONFIG = ROOT / "board_core" / "board_config.json"
-META = ".autobizdevops"
 GLOB_TOKENS = ("*", "?", "[")
 
 
@@ -124,9 +123,11 @@ def resolve_feature(feature=None, required=True):
 
 
 def metadata_dir(project_path):
-    """isolated：<project>/.autobizdevops/<pluginId>；legacy：<project>/.autobizdevops。"""
-    base = Path(project_path) / META
-    return base if load_runtime()["layout"] == "legacy" else base / plugin_id()
+    """isolated：<project>/<metaRoot>/<pluginId>；legacy：<project>/<metaRoot>。metaRoot 默认 .autobizdevops。"""
+    runtime = load_runtime()
+    base = Path(project_path) / safe_relative(runtime["metaRoot"])
+    inside(project_path, base)
+    return base if runtime["layout"] == "legacy" else base / plugin_id()
 
 
 def feature_dir(project_path, feature):
@@ -207,10 +208,6 @@ def node_skill(node_id):
 def node_artifacts(node_id, direction="outputs"):
     artifacts = load_flow()["artifacts"]
     return [{"id": item, **artifacts[item]} for item in node_by_id(node_id)[direction]]
-
-
-def node_templates(node_id):
-    return [ROOT / path for path in node_by_id(node_id)["templates"]]
 
 
 def checkpoint_chain():

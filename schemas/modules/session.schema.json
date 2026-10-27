@@ -1,72 +1,63 @@
 {
+  // properties 下面的键才是配置里能写的字段；required 列出必填字段；additionalProperties: false 表示不能写列表以外的字段，写错字段名会报错。
+  // definitions 是可复用的片段，用 $ref 引用，不会出现在配置文件里；default 是不写时取的值，默认值只写在 Schema 里（D27）。
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.module.session.v1",
   "title": "AutoBiz 会话与 Agent 配置 v1（modules/session.json）",
-  "description": "会话与 Agent：可选的自定义会话入口、运行策略。外挂资源（agents/*.md）由策略按路径引用。不引用此文件时全部取默认值。语义校验见 input-config.md §7。",
+  "description": "会话与 Agent：运行策略。外挂资源（agents/*.md）由策略按路径引用。不引用此文件时全部取默认值。语义校验见 input-config.md §7。",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string" },
-    "customEntry": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["command"],
-      "description": "自定义会话入口：由默认会话入口调用，输出并入 sessionContext；不替换默认入口。",
-      "properties": {
-        "command": { "$ref": "#/definitions/command" },
-        "timeoutSec": { "type": "integer", "minimum": 1, "default": 30 }
-      }
-    },
+    // 运行策略：default 是全局默认，nodes 按节点覆盖
     "policies": {
       "type": "object",
       "additionalProperties": false,
+      "default": {},
       "properties": {
+        // 全局默认策略：节点策略与它深合并，节点没写的字段沿用这里的；只有这里的 agentMode 有默认值 solo
         "default": {
-          "$ref": "#/definitions/runtimePolicy",
-          "description": "全局默认策略，缺省为 solo + 启用 task。"
+          // allOf：结构与 runtimePolicy 相同，再单独给 agentMode 加默认值；不加在 runtimePolicy 上，否则节点策略会被补成 solo，盖掉全局设置
+          "allOf": [{ "$ref": "#/definitions/runtimePolicy" }],
+          "properties": { "agentMode": { "default": "solo" } },
+          "default": {},
+          "description": "全局默认策略。只有这里的 agentMode 有默认值 solo：节点策略与它深合并，节点不写 agentMode 时沿用这里的。"
         },
+        // 按节点覆盖：key 是节点 id（含动态阶段的节点），原样写进 board_config 对应节点的 runtimePolicy
         "nodes": {
           "type": "object",
-          "description": "节点策略；key 必须是 workflow.json 中的节点。原样写入 board_config 对应节点的 runtimePolicy。",
+          "description": "节点策略；key 必须是 workflow.json 中的节点（含动态阶段的节点）。原样写入 board_config 对应节点的 runtimePolicy。",
           "propertyNames": { "$ref": "#/definitions/nodeId" },
           "additionalProperties": { "$ref": "#/definitions/runtimePolicy" }
         }
       }
     }
   },
-  "definitions": {
+  "definitions": { // definitions 是可复用的片段，被上面的 $ref 引用，不是配置字段，所以 example 里没有
     "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
-    "command": {
-      "type": "string",
-      "minLength": 1,
-      "pattern": "^[^\\r\\n]+$",
-      "description": "完整的单行命令：按 POSIX 规则拆分参数后再替换占位符，不经过 shell 执行。可用占位符见 input-config.md §2.5；格式由 autobiz-plugin lint 检查。"
-    },
     "runtimePolicy": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        // 代理模式，取值由 DevClaw 解释
         "agentMode": { "enum": ["solo", "multi", "agent_team", "workflow"] },
-        "toolCustomConfig": {
-          "type": "object",
-          "properties": {
-            "task": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": { "enabled": { "type": "boolean" } }
-            }
-          }
-        },
+        // 子代理：disabledBuiltinSubagents 禁用 DevClaw 内置子代理，customSubagentFiles 换成插件自己的，两者通常成对使用
         "subagentConfig": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "disabledBuiltinSubagents": { "type": "array", "items": { "type": "string" } },
+            // 插件内的 agents/*.md；agents/ 目录可选，文件不存在时 lint 只报 warning，会话入口下发时跳过它
             "customSubagentFiles": {
               "type": "array",
               "items": { "type": "string", "pattern": "^agents/(?!.*\\.\\.)[^\\\\:]+\\.md$" }
             }
           }
+        },
+        // 宿主工具开关，例如 { task: { enabled: true } }；脚手架不解释，原样透传
+        "toolCustomConfig": {
+          "type": "object",
+          "description": "宿主工具的定制开关，例如 { \"task\": { \"enabled\": true } }。脚手架不解释其内容，原样写入 runtimePolicy 和 agentConfig。"
         }
       }
     }

@@ -2,7 +2,7 @@
 
 本文规定脚手架生成的插件**静态形态**：目录、清单、看板配置、内部配置、运行期数据格式、技能格式。命令的调用参数与返回 JSON 等**行为接口**见 [interfaces.md](interfaces.md)。
 
-文中“必须/应当/可以”按 RFC 2119 的含义理解。下文的“宿主”均指 DevClaw；`board.*`、`session.*`、`knowledge.*` 分别指 `modules/board.json`、`modules/session.json`、`modules/knowledge.json` 中的字段（input-config.md §4）。
+文中“必须/应当/可以”按 RFC 2119 的含义理解。下文的“宿主”均指 DevClaw；`board.*`、`session.*`、`knowledge.*`、`artifactSync.*` 分别指 `modules/board.json`、`modules/session.json`、`modules/knowledge.json`、`modules/artifactSync.json` 中的字段（input-config.md §4）。
 
 ## 1. 目录结构
 
@@ -16,13 +16,13 @@
 ├── .codex-plugin/plugin.json             # generated  Codex 清单（可选，plugin.codexManifest）
 ├── board_core/
 │   └── board_config.json                 # generated  固定看板接口（运行期回写字段见 §3.6）
-├── skills/                               #            业务技能、模板、脚本及校验器
+├── skills/                               #            业务技能、模板、脚本及校验器；技能目录也可以在一层分组下（skills/<分组>/<node-skill>/）
 │   ├── <node-skill>/SKILL.md             # seeded     每个节点一个，含状态接入托管片段
 │   ├── <node-skill>/agents/openai.yaml   # seeded     Codex 技能展示信息（可选）
-│   ├── <node-skill>/templates/…          # seeded     模板（workflow 引用；缺失时生成桩）
+│   ├── <node-skill>/templates/…          # developer  模板，技能自己维护，脚手架不登记、不生成（D29）
 │   ├── <node-skill>/scripts/…            # developer  执行脚本、业务校验器
 │   ├── <node-skill>/references/…         # developer
-│   └── <sync-skill>/…                    # module     产物同步能力（§7.2）
+│   └── <sync-skill>/…                    # module     产物同步模块（§7.2）
 ├── hooks/                                # developer  自定义扩展，原样交付（可含宿主工具钩子 hooks.json）
 ├── agents/*.md                           # developer  可选 Agent 资源（会话策略引用）
 ├── runtime/
@@ -33,12 +33,14 @@
 │   │   ├── init_feature.py               # managed    DevClaw 创建 Feature（create_feature）
 │   │   ├── inspect_state.py              # managed    DevClaw 查询项目与 Feature（project_status / feature_status）
 │   │   ├── inspect_workflow_templates.py # managed    DevClaw 动态工作流（dynamic_workflow）
+│   │   ├── skip_node.py                  # managed    DevClaw 跳过节点（skip_node，开启 skip 时调用）
 │   │   └── board_events.py               # managed    写入口提交后推送看板事件（interfaces.md §3.5）
 │   ├── session/
 │   │   └── render_session_context.py     # managed    DevClaw 会话机制（session_context_inject）
 │   ├── knowledge/                        # module     知识模块，启用时生成
 │   │   ├── inspect_deploy_units.py       #            解析知识清单，提供支持的系统和发布单元
-│   │   ├── assembler.py                  #            内置知识组装器（assembler = plugin 时）
+│   │   ├── render_collected_session_context.py  #     内置知识组装脚本（assembler = plugin 时）
+│   │   ├── collect-knowledge.js          #            内置组装脚本调用的 collector（需要 Node）
 │   │   └── sync_knowledge.py             #            知识仓库同步（声明 knowledge.source 时）
 │   ├── common/
 │   │   ├── query.py                      # managed    内部只读查询模块
@@ -55,7 +57,7 @@
 
 `runtime/` 各级目录下的 `__init__.py` 省略未列。入口脚本通过 `__file__` 定位插件根目录，把它加入 `sys.path` 后导入 `runtime.common`。
 
-打包产物（`autobiz-plugin package`）包含：`plugin.json`（开启时另含 `.codex-plugin/plugin.json`）、`board_core/`、`runtime/`、`skills/`、`hooks/`、`agents/`，以及清单中引用的 `.mcp.json`。不包含 `plugin.scaffold.json`、`workflow.json`、`modules/`、`.scaffold/`、`__pycache__/`。知识目录（`knowledge.root`，默认 `sys/`）在声明了 `knowledge.source` 时是运行期缓存，不打包；未声明时视为开发者提供的资源，原样打包。
+打包产物（`autobiz-plugin package`）包含：`plugin.json`（开启时另含 `.codex-plugin/plugin.json`）、`board_core/`、`runtime/`、`skills/`、`hooks/`、`agents/`（存在时），以及清单中引用的 `.mcp.json`。不包含 `plugin.scaffold.json`、`workflow.json`、`modules/`、`.scaffold/`、`__pycache__/`。知识目录（`knowledge.root`，默认 `sys/`）在声明了 `knowledge.source` 时是运行期缓存，不打包；未声明时视为开发者提供的资源，原样打包。
 
 ## 2. 插件清单
 
@@ -120,10 +122,10 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 | `apiVersion` | 是 | 固定为 `1` |
 | `inspectCommands` | 是 | §3.2 |
 | `workflow` | 是 | §3.3 |
-| `checkpointSuffixState` | 是 | `in_progress`、`done` 两项 |
+| `checkpointSuffixState` | 是 | `in_progress`、`done` 两项；有终态节点时加 `archived`（input-config.md §6） |
 | `boardEvents` | 是 | 固定为 `{"protocol": "autobiz.board-events.v1"}`，表示插件会推送看板事件（interfaces.md §3.5） |
 | `knowledge_config` | 看板能力 `knowledgeSedimentation` | §7.3 |
-| `artifact_sync` | 看板能力 `artifactSync` 且 `entry.enabled` | §7.2 |
+| `artifact_sync` | 产物同步模块且 `artifactSync.entry.enabled` | §7.2 |
 | `supported_deploy_units` | 知识模块 | §7.1；声明 `knowledge.source` 时运行期回写 |
 | `agentsRepo` | 声明 `knowledge.source` | §7.1 |
 
@@ -145,6 +147,7 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 | `knowledge_path` | `${pluginPath}/<knowledge.root>` | 知识模块；声明 `source` 时运行期回写 |
 | `deploy_units` | `{py} "${pluginPath}/runtime/knowledge/inspect_deploy_units.py"` | 知识模块；键名待与 DevClaw 确认（README §9） |
 | `pull_knowledge` | `{py} "${pluginPath}/runtime/knowledge/sync_knowledge.py" --write-board-config` | 声明 `knowledge.source` |
+| `skip_node` | `{py} "${pluginPath}/runtime/adapters/skip_node.py" --workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" --node "${nodeId}"` | 开启 `rules.skip` |
 
 引号规则（D2）：单值占位符一律写成 `"${pluginPath}"` 这样放在双引号内；`${projectDirs...}`（多参数展开）和 `${selectedDeployUnits}`（JSON 数组）不加引号，由宿主当作参数整体转义。
 
@@ -155,15 +158,34 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 ```jsonc
 {
   "templates": { "standard": { "kind": "profile", "label": "…", "description": "…" } },
+  "skipPolicy": { "lockedNodes": [] },                       // 开启 rules.skip 时
+  "dynamicStages": [ /* 有动态阶段时，见下 */ ],
   "checkpoints": {
     "initial": ["<P0>_in_progress"],
-    "transitions": { "<P0>_in_progress": ["<P0>_done"], "<P0>_done": ["<P1>_in_progress"], "…": [], "<Pk>_done": [] },
-    "stageLabels": { "<P0>_in_progress": "{name}进行中", "<P0>_done": "{name}完成" }
+    "transitions": {
+      "<P0>_in_progress": ["<P0>_done"], "<P0>_done": ["<P1>_in_progress"], "…": [],
+      "<Pk-1>_done": ["archived"], "archived": []              // 有终态节点时；否则 "<Pk>_done": []
+    },
+    "stageLabels": { "<P0>_in_progress": "{name}进行中", "<P0>_done": "{name}完成", "archived": "已归档" }
   },
   "nodes": [ /* §3.4 */ ],
   "transitions": [ { "id": "<Pi>-to-<Pi+1>", "from": { "nodeId": "…", "state": "done" }, "to": { "nodeId": "…", "state": "in_progress" } } ]
 }
 ```
+
+动态阶段（`rules.dynamicStages`，input-config.md §2.7）：
+
+```json
+{
+  "id": "detail_design_before_code", "phase": "Dev", "label": "详细设计", "description": "…", "order": 45,
+  "choiceCheckpoint": "plan_done", "defaultDecision": "pending", "insertAfter": "dev.plan",
+  "enableTargetCheckpoint": "detail_design_in_progress", "skipTargetCheckpoint": "code_in_progress",
+  "enableLabel": "…", "skipLabel": "…", "enableDescription": "…", "skipDescription": "…",
+  "nodes": [ { "id": "dev.detail_design", "phase": "Dev", "checkpointPrefix": "detail_design", "…": "其余字段同 §3.4" } ]
+}
+```
+
+`checkpoints.transitions` 只描述主干。动态阶段的流转由 `choiceCheckpoint`、`enableTargetCheckpoint`、`skipTargetCheckpoint` 表达：执行时 `choiceCheckpoint → 阶段节点依次推进 → skipTargetCheckpoint`，跳过时 `choiceCheckpoint → skipTargetCheckpoint`。
 
 ### 3.4 节点
 
@@ -173,7 +195,7 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
   "label": "任务计划",
   "group": "Dev",
   "skill": "autodev-plan",
-  "runtimePolicy": { "agentMode": "multi", "toolCustomConfig": { "task": { "enabled": true } }, "subagentConfig": { … } },  // 可选，来自 session.policies.nodes
+  "runtimePolicy": { "agentMode": "multi", "subagentConfig": { … } },  // 可选，来自 session.policies.nodes
   "description": "…",
   "checkpoints": ["plan_in_progress", "plan_done"],
   "states": [
@@ -186,7 +208,7 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 }
 ```
 
-`states` 必须按 not_started、in_progress、done 的顺序给出这三项。`nextAction.slashSkill` 为空字符串表示流程结束，没有下一步。`validators` 在 v1 固定为空数组：节点的校验命令由运行框架执行（§4.4），不交给 DevClaw。
+`states` 必须按 not_started、in_progress、done 的顺序给出这三项；终态节点只有 not_started、archived 两项，`checkpoints` 为 `["archived"]`。`skipped` 是运行期状态，由 `feature_status` 给出，不在 `states` 中列出。`nextAction.slashSkill` 为空字符串表示流程结束，没有下一步。`validators` 固定为空数组：节点的校验命令由运行框架执行（§4.4），不交给 DevClaw。
 
 ### 3.5 产物定义
 
@@ -194,13 +216,18 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 { "id": "plan", "label": "实施计划", "artifactType": "file", "path": "plan.md", "required": true }
 { "id": "spec_bundle", "label": "proposal.md", "artifactType": "file", "path": "proposal.md",
   "paths": ["proposal.md", "specs/*/spec.md"], "required": true }
+{ "id": "prd", "label": "PRD文档", "artifactType": "file", "path": "PRD.md", "required": false }
+{ "id": "code", "label": "代码提交", "artifactType": "git", "required": true,
+  "git": { "repos": "deployUnits", "branch": "current", "require": ["commits", "clean", "merged"] } }
 ```
 
 | 字段 | 必有 | 语义 |
 |---|---|---|
-| `id` / `artifactType` / `path` / `required` | 是 | `artifactType` 按扩展名推断；`required` 在 v1 恒为 `true`。核心配置中路径为数组时，这里的 `path` 取首项，保证只认 `path` 的旧版宿主仍能工作 |
-| `label` | 是 | 取 `board.display.artifacts[id]`，未配置时为第一个路径 |
+| `id` / `artifactType` / `required` | 是 | 文件产物的 `artifactType` 按扩展名推断为 `file` 或 `json`，代码提交为 `git`；`required` 为核心配置中 `optional` 的反面 |
+| `path` | 文件产物 | 核心配置中路径为数组时取首项，保证只认 `path` 的旧版宿主仍能工作。git 产物没有 `path` |
+| `label` | 是 | 取 `board.display.artifacts[id]`，未配置时为第一个路径，git 产物为产物 id |
 | `paths` | 否 | 仅在核心配置中路径为数组时输出，给出全部项 |
+| `git` | git 产物 | 填好默认值的 `{repos, branch, require}`（input-config.md §2.9） |
 
 完成判定见 §4.4。
 
@@ -223,8 +250,10 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 
 | `runtime.layout` | `{metaDir}`（相对项目目录） | 用途 |
 |---|---|---|
-| `isolated`（默认） | `.autobizdevops/<pluginId>` | 新插件；同一项目可以安装多个插件 |
-| `legacy` | `.autobizdevops` | 迁移已有插件（例如 lite），保证其已有项目可用 |
+| `isolated`（默认） | `<metaRoot>/<pluginId>` | 新插件；同一项目可以安装多个插件 |
+| `legacy` | `<metaRoot>` | 迁移已有插件（例如 lite），保证其已有项目可用 |
+
+`<metaRoot>` 是元数据根目录，取 `runtime.metaRoot`，默认 `.autobizdevops`（input-config.md §3.4）。
 
 ```text
 <pluginWorkspace>/<projectDir>/{metaDir}/
@@ -237,8 +266,8 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
     └── ARTIFACT_CATALOG.json  # 产物同步能力
 ```
 
-- `.autobizdevops` 是协议常量；`{metaDir}` 由运行框架根据 `runtime/config/runtime.json` 推导。框架入口和模块通过 `runtime.common.query` 的 `metadata_dir()` / `feature_dir()` 获取，不得自行拼接；开发者的校验器通过 `${featureDir}` 占位符获取；
-- isolated 布局下，`plugin.id` 不得是 `.autobizdevops` 下的保留目录名：`features`、`archive`、`issues`、`reviews`、`logs`、`plugins`；
+- `{metaDir}` 由运行框架根据 `runtime/config/runtime.json` 中的 `metaRoot`、`layout`、`pluginId` 推导。框架入口和模块通过 `runtime.common.query` 的 `metadata_dir()` / `feature_dir()` 获取，不得自行拼接；开发者的校验器通过 `${featureDir}` 占位符获取；
+- isolated 布局下，`plugin.id` 不得是元数据根目录下的保留目录名：`features`、`archive`、`issues`、`reviews`、`logs`、`plugins`；
 - `<feature>` 必须是安全的路径分量：非空，不是 `.` 或 `..`，不含 `/`、`\`、NUL。不同插件可以有同名 Feature。
 
 ### 4.2 state.json
@@ -259,11 +288,31 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
       "stage": "任务计划进行中",
       "workflowProfile": "standard",
       "workflowTemplate": "standard",
+      "workflowDecisions": { "detail_design_before_code": "enabled" },
+      "workflowSkippedNodes": [],
+      "deployUnits": [ { "deployUnitId": "LF39.18_wg_flow", "localRepoPath": "/Users/u/code/wg_flow" } ],
+      "git": {
+        "dev.code": {
+          "LF39.18_wg_flow": {
+            "path": "/Users/u/code/wg_flow", "branch": "feature/f1", "base": "a1b2c3d",
+            "worktrees": ["/Users/u/code/wg_flow"], "done": null
+          }
+        }
+      },
       "updated_at": "2026-10-14T03:00:00.000000+00:00"
     }
   }
 }
 ```
+
+流程规则和 git 产物相关的字段（只在用到时写入）：
+
+| 字段 | 说明 |
+|---|---|
+| `workflowDecisions` | 动态阶段 id → `enabled` / `skipped`；尚未选择的阶段不出现 |
+| `workflowSkippedNodes` | 被跳过的节点 id |
+| `deployUnits` | 所选发布单元 `[{deployUnitId, localRepoPath}]`，`create_feature` 时由宿主传入（interfaces.md §3.3.2）。`localRepoPath` 是本机绝对路径，属于运行期数据，只出现在项目目录下的 `state.json` 中 |
+| `git` | 节点 id → 仓库键 → 基线：`path`（仓库或子目录的绝对路径）、`branch`（基线分支）、`base`（节点开始时基线分支的 HEAD）、`worktrees`（节点开始时已有的工作树）、`done`（完成时的 HEAD，未完成为 `null`）。仓库键在 `repos` 为 `deployUnits` 时是发布单元 id，否则是相对项目目录的路径（`project` 为 `.`）。重开时保留 `base`、清空 `done` |
 
 规则：
 
@@ -293,7 +342,8 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 
 | `eventId` | 写入时机 | 附加字段 |
 |---|---|---|
-| `update-state` | 状态推进或重开成功 | `from`、`to`、`nodeId`、`reopen` |
+| `update-state` | 状态推进或重开成功 | `from`、`to`、`nodeId`、`reopen`；做出动态阶段选择时另有 `decision: {stageId, value}` |
+| `skip-node` | 跳过节点成功 | `nodeIds`、`from`、`to`（落地的 checkpoint，未变化时与 `from` 相同）、`reason` |
 | `node-validate` | 执行节点校验命令后（无论是否通过；`--dry-run` 时不写） | `nodeId`、`exitCode`（超时为 `null`）、`durationMs`、`timedOut` |
 
 ### 4.4 完成判定
@@ -301,16 +351,18 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 | 层次 | 负责方 | 内容 |
 |---|---|---|
 | 存在性（最小校验） | 运行框架 `engine.py` | 产物路径的每一项至少匹配一个普通文件。空文件也算存在。glob 不匹配目录 |
+| 代码提交（git 产物） | 运行框架 `engine.py` | 按节点开始时记录的基线查仓库：基线分支上有新提交、没有未提交的改动、没有未合并回来的工作树分支（input-config.md §2.9） |
 | 业务校验 | 开发者的校验命令 | 空文件、格式、内容是否合格，由节点 `validate` 命令判断（D13、D14） |
 
 推进规则：
 
-- 推进到 `<prefix>_in_progress`：检查本节点的必需输入是否存在；
-- 推进到 `<prefix>_done`：检查必需输入和必需输出是否存在，全部存在后再执行节点的 `validate` 命令，退出码为 0 才写入。
+- 推进到 `<prefix>_in_progress`：检查本节点的必需输入是否存在；本节点有 git 产物时记录基线（重开时沿用原基线）；
+- 推进到 `<prefix>_done`：检查必需输入和必需输出是否存在，git 产物按齐全条件检查，全部满足后再执行节点的 `validate` 命令，退出码为 0 才写入，同时记下各仓库的 `done`；
+- 推进到 `archived`（终态节点）：检查终态节点的必需输入是否存在，不执行校验命令。
 
-v1 中节点的输入和输出都是必需的。
+输入和输出默认是必需的；标了 `optional` 的不检查。git 产物作为输入时，看上游节点记录的提交范围 `base..done` 是否非空。生产者被跳过、或生产者是未执行的动态阶段节点时，依赖它的必需输入也不检查（input-config.md §2.3）。
 
-查询（`feature_status`）只报告存在性：产物显示为已生成，不代表节点已完成。节点状态只由 `state.json` 中的 checkpoint 决定。
+查询（`feature_status`）只报告存在性：产物显示为已生成，不代表节点已完成。git 产物在查询时按同样的条件实时检查仓库（每个仓库几条只读 git 命令），只报告结果，不写记录。节点状态只由 `state.json` 中的 checkpoint 决定。
 
 ## 5. 内部配置 runtime/config/
 
@@ -322,16 +374,17 @@ v1 中节点的输入和输出都是必需的。
 {
   "schema": "autobiz.runtime.v1",
   "pluginId": "doc-review",
+  "metaRoot": ".autobizdevops",
   "layout": "isolated",
   "validateTimeoutSec": 120
 }
 ```
 
-`pluginId` 和 `layout` 在插件发布后不得修改：改了之后，已有项目的状态会找不到或被拒绝读取。`build` 发现这两项与 build-manifest 中记录的不一致时报错（`PLUGIN_ID_CHANGED`、`LAYOUT_CHANGED`）。
+`pluginId`、`metaRoot` 和 `layout` 在插件发布后不得修改：改了之后，已有项目的状态会找不到或被拒绝读取。`build` 发现它们与 build-manifest 中记录的不一致时报错（`PLUGIN_ID_CHANGED`、`LAYOUT_CHANGED`）。
 
 ### 5.2 flow.json（流程契约及状态规则）
 
-核心流程 `workflow.json` 只写决策，`flow.json` 是它的编译结果，插件运行时只读这一份（D19）。编译时填好全部默认值：从节点 id 算出 checkpoint，从 `outputs` 汇总产物表并记下生产者，按扩展名推断产物类型，从 `board.display` 取显示名，把模板路径解析成相对插件根目录的路径。
+核心流程 `workflow.json` 只写决策，`flow.json` 是它的编译结果，插件运行时只读这一份（D19）。编译时填好全部默认值：从节点 id 算出 checkpoint，从 `outputs` 汇总产物表并记下生产者，按扩展名推断产物类型，从 `board.display` 取显示名。
 
 最小示例（input-config.md §8）编译后：
 
@@ -345,17 +398,19 @@ v1 中节点的输入和输出都是必需的。
     "review": { "label": "REVIEW.md", "type": "file", "paths": ["REVIEW.md"], "producer": "review" }
   },
   "nodes": [
-    { "id": "draft", "name": "起草", "stage": "Doc-Review-Kanban", "skill": "doc-draft", "order": 10,
+    { "id": "draft", "name": "起草", "stage": "Doc-Review-Kanban", "skill": "doc-draft", "skillDir": "skills/doc-draft",
+      "order": 10, "terminal": false,
       "checkpoints": ["draft_in_progress", "draft_done"],
-      "inputs": [], "outputs": ["draft"],
-      "templates": ["skills/doc-draft/templates/DRAFT.md"],
+      "inputs": [], "outputs": [ { "id": "draft", "required": true } ],
       "validate": null },
-    { "id": "review", "name": "评审", "stage": "Doc-Review-Kanban", "skill": "doc-review", "order": 20,
+    { "id": "review", "name": "评审", "stage": "Doc-Review-Kanban", "skill": "doc-review", "skillDir": "skills/doc-review",
+      "order": 20, "terminal": false,
       "checkpoints": ["review_in_progress", "review_done"],
-      "inputs": ["draft"], "outputs": ["review"],
-      "templates": [],
+      "inputs": [ { "id": "draft", "required": true } ], "outputs": [ { "id": "review", "required": true } ],
       "validate": "${python} ${skillPath}/scripts/check_review.py --feature-dir ${featureDir}" }
   ],
+  "dynamicStages": [],
+  "skip": null,
   "checkpoints": {
     "chain": ["draft_in_progress", "draft_done", "review_in_progress", "review_done"],
     "initial": "draft_in_progress",
@@ -364,16 +419,37 @@ v1 中节点的输入和输出都是必需的。
 }
 ```
 
-产物的 `paths` 总是数组：核心配置中为字符串时只有一项。`validate` 未声明时为 `null`，命令中的占位符保持原样，执行时才替换。`flow.json` 不需要人阅读或修改，被手改时 `check` 报 `DRIFT_GENERATED`。
+文件产物的 `paths` 总是数组：核心配置中为字符串时只有一项。git 产物没有 `paths`，改为 `"type": "git"` 加填好默认值的 `git`，例如 `"code": {"label": "代码提交", "type": "git", "git": {"repos": "deployUnits", "branch": "current", "require": ["commits", "clean", "merged"]}, "producer": "dev.code"}`。节点的 `inputs`、`outputs` 都写成 `{id, required}`。`skillDir` 是按 input-config.md §5 查找到的技能目录。`validate` 未声明时为 `null`，命令中的占位符保持原样，执行时才替换。`flow.json` 不需要人阅读或修改，被手改时 `check` 报 `DRIFT_GENERATED`。
+
+用到流程规则时，相关字段的形态：
+
+```jsonc
+{
+  "nodes": [ …, { "id": "ops.archive", "terminal": true, "checkpoints": ["archived"], "outputs": [], "validate": null, "…": "…" } ],
+  "dynamicStages": [
+    { "id": "detail_design_before_code", "name": "详细设计", "insertAfter": "dev.plan", "defaultDecision": "pending",
+      "choiceCheckpoint": "plan_done", "enableTarget": "detail_design_in_progress", "skipTarget": "code_in_progress",
+      "nodes": [ { "id": "dev.detail_design", "checkpoints": ["detail_design_in_progress", "detail_design_done"], "…": "同主干节点" } ] }
+  ],
+  "skip": { "locked": [] },                                  // 未开启 rules.skip 时为 null
+  "checkpoints": {
+    "chain": [ "…", "cicd_done", "archived" ],                // 只含主干
+    "initial": "prd_in_progress",
+    "labels": { "…": "…", "detail_design_in_progress": "详细设计进行中", "archived": "已归档" }
+  }
+}
+```
 
 运行框架加载时必须校验以下不变量（沿用 lite 的 `load_config`）：
 
-- 节点非空，节点 id 唯一，checkpoint 全局唯一；
-- 每个节点恰好有 2 个 checkpoint；
-- `initial` 恰好是首个节点的开始 checkpoint，`chain` 与节点顺序严格一致；
-- `labels` 覆盖全部 checkpoint；
-- 每个节点的 `skills/<skill>/SKILL.md` 存在；
-- 产物路径和模板路径均为安全的相对路径。
+- 节点非空，主干与动态阶段的节点 id 合起来唯一，checkpoint 全局唯一；
+- 非终态节点恰好有 2 个 checkpoint；终态节点最多一个，是最后一个主干节点，只有 `archived`；
+- `initial` 恰好是首个节点的开始 checkpoint，`chain` 与主干节点顺序严格一致；
+- 每个动态阶段的 `choiceCheckpoint` 在 `chain` 中，`skipTarget` 是 `choiceCheckpoint` 在 `chain` 中的后继；
+- `skip.locked` 引用的节点都存在；
+- `labels` 覆盖全部 checkpoint（含动态阶段节点、`archived`）；
+- 每个节点的 `<skillDir>/SKILL.md` 存在；
+- 产物路径均为安全的相对路径。
 
 ### 5.3 session.json
 
@@ -381,15 +457,14 @@ v1 中节点的输入和输出都是必需的。
 {
   "schema": "autobiz.session.v1",
   "policies": {
-    "default": { "agentMode": "solo", "toolCustomConfig": { "task": { "enabled": true } } },
+    "default": { "agentMode": "solo" },
     "nodes": { "dev.plan": { "agentMode": "multi", "subagentConfig": { "customSubagentFiles": ["agents/explore.md"] } } }
   },
-  "parts": ["runtime.knowledge.assembler:assemble"],
-  "customEntry": { "command": "${python} ${pluginPath}/hooks/session_extra.py", "timeoutSec": 30 }
+  "knowledgeAssembly": { "script": "runtime/knowledge/render_collected_session_context.py", "timeoutSec": 30 }
 }
 ```
 
-`parts` 是模块注册的会话片段（interfaces.md §2.4），按注册顺序调用；`customEntry` 未声明时为 `null`。
+`knowledgeAssembly` 由知识模块在 `assembler = plugin` 时写入（interfaces.md §2.4）：`script` 固定为内置组装脚本，`timeoutSec` 取 `knowledge.assembly.timeoutSec`；未启用知识模块或 `assembler = devclaw` 时为 `null`。
 
 ### 5.4 knowledge.json（知识模块）
 
@@ -398,7 +473,7 @@ v1 中节点的输入和输出都是必需的。
   "schema": "autobiz.knowledge.v1",
   "root": "sys",
   "manifest": { "format": "agents-manifest-v1", "path": "agents.manifest.json" },
-  "assembly": { "enabled": true, "assembler": "plugin" },
+  "assembly": { "enabled": true, "assembler": "plugin", "timeoutSec": 30 },
   "source": { "type": "git", "url": "…", "sshUrl": "…", "ref": "master" }
 }
 ```
@@ -438,24 +513,32 @@ description: 将工作拆解为有序任务。当你已有规格说明……时�
 （以下为开发者编写的技能正文）
 ```
 
-`state` 片段就是“状态接入说明”。
+`state` 片段就是“状态接入说明”。用到流程规则时，片段按节点追加对应的说明：
+
+| 条件 | 追加内容 |
+|---|---|
+| 本节点是动态阶段的选择点 | 完成后询问用户是否执行该阶段（附两个选项的文案），按选择推进到 `<阶段首节点>_in_progress` 或 `<下一主干节点>_in_progress` |
+| 开启 `rules.skip` 且本节点未被锁定 | 用户明确要求跳过本节点时：`--skip-node <nodeId> --reason "<原因>"` |
+| 终态节点 | 不写 `_in_progress`/`_done` 两条，改为前一节点完成后推进到 `archived` |
 
 要求：
 
-- frontmatter 遵循 Codex 技能规则：只允许 `name`、`description`、`license`、`allowed-tools`、`metadata` 五个键。`name` 等于目录名和节点的 `skill`；`description` 必填，不超过 1024 字符，不含 `<` `>`。版本号等自定义信息放在 `metadata` 下（例如 `metadata: {version: "v3.0"}`）。现有插件中有 19 个技能把 `version` 写在顶层、2 个写了 `author`。DevClaw 不依赖这两个字段（D8），`import` 时会自动把它们迁到 `metadata`；
+- frontmatter 遵循 Codex 技能规则：只允许 `name`、`description`、`license`、`allowed-tools`、`metadata` 五个键。`name` 等于目录名和节点的 `skill`；`description` 必填，不超过 1024 字符，不含 `<` `>`。版本号等自定义信息放在 `metadata` 下（例如 `metadata: {version: "v3.0"}`）。现有插件中有 19 个技能把 `version` 写在顶层、2 个写了 `author`。DevClaw 不依赖这两个字段（D8），导入技能（`add skill --from`）时会自动把它们迁到 `metadata`；
 - `description` 是技能的触发依据，“什么时候用”要写在这里，而不是正文：正文只有在技能被触发后才会加载。桩文件的 description 预置为 `[TODO: 做什么；在什么情况下使用]`；
 - 技能的详细要求写在正文中。正文建议不超过 500 行，细节放到 `references/`，并在正文中写明什么时候读哪个文件（渐进式加载）；
 - 必须包含 `state` 托管片段，片段内容必须与推导结果一致（`check` 会校验）；
 - `artifacts` 托管片段是可选的，删除后 build 不会再加回来（build-manifest 中会记录 `optOut`）；
 - 技能只能在本节点必需产物全部写好之后，才推进 `<prefix>_done`；运行框架会检查存在性并执行校验命令，不通过则拒绝推进；
-- 技能私有的脚本放在 `skills/<skill>/scripts/`，通过 `${pluginPath}/skills/<skill>/scripts/…` 调用。技能不需要、也不应该导入 `runtime/` 下的模块（interfaces.md §4.6）。
+- 技能私有的脚本放在技能目录的 `scripts/` 下（技能目录可能在分组下，见 input-config.md §5），校验命令中用 `${skillPath}/scripts/…` 引用。技能不需要、也不应该导入 `runtime/` 下的模块（interfaces.md §4.6）。
 
 
-### 6.3 模板与业务校验器
+### 6.3 业务校验器
 
 | 资源 | 建议位置 | 规则 |
 |---|---|---|
 | 业务校验器 | `skills/<skill>/scripts/` | 由节点 `validate` 命令调用，契约见 interfaces.md §4.4。脚手架不生成校验器；初始化向导可以按开发者要求创建骨架（带 `[TODO]`，`package` 前必须补全） |
+
+技能用的模板由技能自己维护：放在技能目录下（例如 `templates/`），在技能正文中引用。脚手架不登记、不检查、不生成，`flow.json` 和会话上下文中也没有模板信息（D29）。
 
 ## 7. 模块输出
 
@@ -466,7 +549,8 @@ description: 将工作拆解为有序任务。当你已有规格说明……时�
 | 文件 | 来源 | 条件 | 作用 |
 |---|---|---|---|
 | `runtime/knowledge/inspect_deploy_units.py` | lite `agents_repo.py` | 启用即生成 | 按 `manifest.format` 解析知识清单，输出支持的系统和发布单元（interfaces.md §3.3.8） |
-| `runtime/knowledge/assembler.py` | 从 lite `render_session_context.py` 拆出 | `assembler = plugin` | 会话片段：系统级、单元级、会话工作区、领域词汇表四层上下文 |
+| `runtime/knowledge/render_collected_session_context.py` | 全栈版 `render_collected_session_context.py`，去掉流程上下文和运行策略部分 | `assembler = plugin` | 内置组装脚本（interfaces.md §4.5）：调用 `collect-knowledge.js` 按所选发布单元组装知识；collector 不可用或单元未命中时按清单映射加载，最后回退 `<localRepoPath>/AGENTS.md`；始终读取 `<sessionWorkspacePath>/AGENTS.md`。插件可以替换这个文件，被替换后 build 和 upgrade 保留插件的版本（README §4） |
+| `runtime/knowledge/collect-knowledge.js` | 全栈版 `collect-knowledge.js` | `assembler = plugin` | collector：列出支持的发布单元、按单元恢复知识，依赖 Node 和 `gray-matter` |
 | `runtime/knowledge/sync_knowledge.py` | lite `sync_agents.py` | 声明 `source` | 克隆知识仓库到 `root`：先在临时目录克隆并校验清单，成功后再替换；HTTPS 失败时回退 SSH；回写 §3.6 字段 |
 
 board_config 中的配置：
@@ -476,16 +560,16 @@ board_config 中的配置：
 "supported_deploy_units": []
 ```
 
-`agentsRepo` 只在声明 `source` 时输出。另外会在 `inspectCommands` 中加入 `knowledge_path`、`deploy_units`（声明 `source` 时再加 `pull_knowledge`），生成 `runtime/config/knowledge.json`，在 `session.json` 的 `parts` 中注册 `runtime.knowledge.assembler:assemble`（仅 `assembler = plugin`）。声明 `source` 时还会在 `.gitignore` 中追加 `<root>/`、`.knowledge.lock`、`.knowledge-sync-*`。
+`agentsRepo` 只在声明 `source` 时输出。另外会在 `inspectCommands` 中加入 `knowledge_path`、`deploy_units`（声明 `source` 时再加 `pull_knowledge`），生成 `runtime/config/knowledge.json`，在 `session.json` 中写入 `knowledgeAssembly`（仅 `assembler = plugin`，§5.3）。声明 `source` 时还会在 `.gitignore` 中追加 `<root>/`、`.knowledge.lock`、`.knowledge-sync-*`。
 
-### 7.2 产物同步（看板可选能力 artifactSync）
+### 7.2 产物同步模块（modules/artifactSync.json）
 
 ```text
 skills/<skillName>/
 ├── SKILL.md                         # module（文案中的技能名、路径会按 skillName 渲染）
 ├── config/artifact-sync.json        # generated（由节点输出推导）
 ├── references/sync-runtime.md       # module
-├── references/feature-api-detail.md # module，仅 apiDetail.enabled 时拷贝
+├── references/feature-api-detail.md # module
 └── scripts/sync_artifacts.py  scripts/artifact_sync_utils.py   # module
 ```
 
@@ -500,18 +584,17 @@ skills/<skillName>/
   "stages": {
     "Biz": { "biz.prd":   { "PRD.md": "结构化需求。" } },
     "Dev": { "dev.specs": { "proposal.md": "变更提案。", "specs/*/spec.md": "行为规格。", "design.md": "技术设计。" },
-             "dev.plan":  { "plan.md": "实施计划。" },
-             "dev.code":  { "FEATURE_API_DETAIL.md": "当前 Feature 涉及接口的详细说明。" } }
+             "dev.plan":  { "plan.md": "实施计划。" } }
   }
 }
 ```
 
 推导规则：
 
-- `stages[阶段名][nodeId][path] = 简述`，阶段名取节点的 `stage`（未写时为默认分组名）；按节点顺序遍历每个节点的 `outputs`，跳过 `exclude` 中的产物；简述取 `descriptions[产物 id]`，缺省为产物显示名 + `。`。`path` 为数组的产物，每一项各占一个条目，简述相同；
+- `stages[阶段名][nodeId][path] = 简述`，阶段名取节点的 `stage`（未写时为默认分组名）；按流程顺序（动态阶段节点在插入位置）遍历每个节点的 `outputs`，只取 `artifacts` 中列出的产物；简述取 `artifacts[产物 id]`。`path` 为数组的产物，每一项各占一个条目，简述相同；
 - 每个产物只登记到第一个产出它的节点下；
-- 再合并 `extraPaths`；`apiDetail.enabled` 时，在 `apiDetail.node` 下加入 `FEATURE_API_DETAIL.md`；
-- `allowedCheckpoints` 优先用显式列表；否则取 checkpoint 链上 `allowedFrom` 及之后的全部 checkpoint，再去掉 `excludeCheckpoints`；
+- 再合并 `extraPaths`；
+- `allowedCheckpoints` 优先用显式列表；否则取主干 checkpoint 链（含 `archived`，不含动态阶段节点）上 `allowedFrom` 及之后的全部 checkpoint，再去掉 `excludeCheckpoints`；
 - 没有任何可同步路径的节点和阶段不输出。
 
 看板入口（`entry.enabled` 时生成）：
@@ -525,7 +608,7 @@ skills/<skillName>/
 
 同步脚本属于框架模块，与运行框架同版本发布，通过 `runtime.common.query` 定位 Feature 目录和状态，因此同时支持 isolated 和 legacy 布局。上传路径（`{PROJECT_CODE}/DEV/Features/{feature}/{employeeId}/`）是否加入 `pluginId`，见 README §9。
 
-脚本相对全栈版的改动见 [README.md §6.3](README.md)。v1 配置（无 `schemaVersion`、`stages` 只有 biz/dev）仍需能读取，以兼容 kanban 现有插件。
+脚本相对全栈版的改动见 [README.md §6.3](README.md)。v1 配置（无 `schemaVersion`、`stages` 只有 biz/dev）仍需能读取，以兼容全栈版现有插件。
 
 ### 7.3 知识沉淀入口（看板可选能力 knowledgeSedimentation）
 
@@ -549,9 +632,11 @@ skills/<skillName>/
   "coreVersion": "1.0.0",
   "pluginId": "autodev-planning-kanban",
   "layout": "legacy",
+  "metaRoot": ".autobizdevops",
   "modules": { "board": "1.0.0", "session": "1.0.0", "knowledge": "1.0.0", "artifactSync": "1.0.0" },
   "inputs": { "plugin.scaffold.json": "sha256:…", "workflow.json": "sha256:…",
-              "modules/board.json": "sha256:…", "modules/session.json": "sha256:…", "modules/knowledge.json": "sha256:…" },
+              "modules/board.json": "sha256:…", "modules/session.json": "sha256:…", "modules/knowledge.json": "sha256:…",
+              "modules/artifactSync.json": "sha256:…" },
   "files": {
     "runtime/common/engine.py": { "ownership": "managed", "sha256": "…" },
     "board_core/board_config.json": { "ownership": "generated", "sha256": "…", "runtimeFields": ["supported_deploy_units", "inspectCommands.*.knowledge_path"] },

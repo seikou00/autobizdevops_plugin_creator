@@ -1,22 +1,58 @@
 {
+  // 读法：properties 下面的键才是配置里能写的字段；required 列出必填字段；additionalProperties: false 表示不能写列表以外的字段，写错字段名会报错。
+  // definitions 是可复用的片段，用 $ref 引用，不会出现在配置文件里；default 是不写时取的值，默认值只写在 Schema 里（D27）。
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.workflow.v1",
   "title": "核心流程 workflow.json",
   "description": "人与 agent 共同维护的最小流程骨架。Schema 只检查字段名、类型和必填项；引用、顺序、路径安全、命令格式等规则由 autobiz-plugin lint 检查（input-config.md §7）。插件运行时使用的是编译结果 runtime/config/flow.json。",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["nodes"],
+  "additionalProperties": false, // 只能写 properties 里列出的字段（$schema、nodes、rules），写错字段名会报错
+  "required": ["nodes"], // nodes 必须写，其余字段都可以省略
   "properties": {
     "$schema": { "type": "string" },
+    // 主干节点：数组顺序就是执行顺序
     "nodes": {
       "type": "array",
       "minItems": 1,
-      "description": "节点，数组顺序即执行顺序。",
+      "description": "主干节点，数组顺序即执行顺序。",
       "items": { "$ref": "#/definitions/node" }
+    },
+    // 改变线性推进方式的规则；不写就是纯线性流程
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "流程规则：改变主干线性推进方式的规则，不写时流程就是纯线性的。",
+      "properties": {
+        // 动态阶段：插在某个主干节点之后的一组可选节点，该节点完成时由用户决定执行还是跳过
+        "dynamicStages": {
+          "type": "array",
+          "description": "动态阶段：插在某个主干节点之后、由用户在该节点完成时决定是否执行的一组节点。",
+          "items": { "$ref": "#/definitions/dynamicStage" }
+        },
+        // 跳过节点：true 表示允许跳过任意节点；{ locked: [节点 id] } 表示允许跳过但锁定这些节点；终态节点永远不能跳过
+        "skip": {
+          "description": "跳过节点：true 表示开启；也可以写 { locked: [节点 id] } 列出不允许跳过的节点。终态节点始终不可跳过。",
+          "oneOf": [
+            { "type": "boolean" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["locked"],
+              "properties": {
+                "locked": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/definitions/nodeId" } }
+              }
+            }
+          ]
+        }
+      }
     }
   },
   "definitions": {
+    // 节点 id 可用 . 分段（dev.plan），最后一段是 checkpoint 前缀：dev.plan → plan_in_progress、plan_done，所以各节点的最后一段不能重复
+    "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
+    // 产物 id：在第一个输出它的节点的 outputs 里定义，后面的节点用它作为输入
     "artifactId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    // 产物路径：相对 FEATURE_DIR，可含 glob；写数组表示每一项都要存在
     "paths": {
       "description": "相对 FEATURE_DIR 的路径，可含 glob；数组表示每一项都要存在。",
       "oneOf": [
@@ -24,43 +60,147 @@
         { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
       ]
     },
+    // 输入：一般直接写产物 id 字符串；要标可选时写成 { id, optional: true }
+    "input": {
+      "description": "产物 id；需要标可选时写成对象。",
+      "oneOf": [
+        { "$ref": "#/definitions/artifactId" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id"],
+          "properties": {
+            "id": { "$ref": "#/definitions/artifactId" },
+            // 可选输入：推进时不检查它是否存在
+            "optional": { "type": "boolean", "default": false, "description": "可选输入：推进时不检查是否存在。" }
+          }
+        }
+      ]
+    },
+    // 输出有三种写法：路径（字符串或数组）、可选输出 { path, optional: true }、代码提交 { git: {...} }
+    "output": {
+      "description": "路径；可选输出写成 { path, optional: true }；代码提交写成 { git: {…} }。",
+      "oneOf": [
+        { "$ref": "#/definitions/paths" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "optional"],
+          "properties": {
+            "path": { "$ref": "#/definitions/paths" },
+            "optional": { "const": true, "description": "可选输出：完成时不检查是否存在。" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["git"],
+          "properties": {
+            "git": { "$ref": "#/definitions/gitOutput" }
+          }
+        }
+      ]
+    },
+    // 代码提交产物：节点开始时记录各仓库的基线，完成时按 require 检查仓库状态；字段都可以省略
+    "gitOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "代码提交产物：节点开始时记录各仓库的基线，完成时查仓库状态判断是否齐全。",
+      "properties": {
+        // deployUnits：本 Feature 选中的发布单元的仓库（需要启用知识模块）；project：项目目录本身；也可以写路径数组
+        "repos": {
+          "description": "看哪些仓库。deployUnits：本 Feature 所选发布单元的 localRepoPath；project：项目目录本身；或相对项目目录的路径数组。",
+          "default": "deployUnits",
+          "oneOf": [
+            { "enum": ["deployUnits", "project"] },
+            { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+          ]
+        },
+        // 基线分支；current 表示节点开始时各仓库检出的分支
+        "branch": {
+          "type": "string",
+          "minLength": 1,
+          "default": "current",
+          "description": "基线分支。current：节点开始时各仓库检出的分支；也可以写分支名，可用 ${feature}。"
+        },
+        // 完成条件：commits 有新提交；clean 没有未提交的改动；merged 子代理的工作树分支已合回；pushed 已推送（默认不要求）
+        "require": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["commits", "clean", "merged", "pushed"] },
+          "default": ["commits", "clean", "merged"],
+          "description": "齐全条件：commits 基线分支上有新提交；clean 没有未提交的改动；merged 没有未合并回来的工作树分支；pushed 已推送到上游。"
+        }
+      }
+    },
+    // 节点：id、name、skill 必填，其余可以省略
     "node": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "name", "skill"],
       "properties": {
         "id": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$",
+          "$ref": "#/definitions/nodeId",
           "description": "节点 id，可用 . 分段（例如 dev.plan）；最后一段作为 checkpoint 前缀。"
         },
         "name": { "type": "string", "minLength": 1, "description": "节点显示名。" },
+        // 看板分组名（例如 Biz、Dev）；同一 stage 的节点必须连续排列
         "stage": { "type": "string", "minLength": 1, "description": "所属阶段名（例如 Biz、Dev），用作看板分组。" },
+        // 绑定的技能：skills/<skill>/SKILL.md 或 skills/<分组>/<skill>/SKILL.md；不存在时 build 生成桩文件
         "skill": {
           "type": "string",
           "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-          "description": "绑定的技能，对应 skills/<skill>/SKILL.md。"
+          "description": "绑定的技能名，对应 skills/<skill>/SKILL.md 或 skills/<分组>/<skill>/SKILL.md。"
         },
+        // 读取的产物，必须由前面的节点输出
         "inputs": {
           "type": "array",
-          "items": { "$ref": "#/definitions/artifactId" },
-          "description": "读取的产物 id，必须由前面的节点输出。"
+          "items": { "$ref": "#/definitions/input" },
+          "description": "读取的产物，必须由前面的节点输出。"
         },
+        // 产出的产物：{ 产物 id: 输出写法 }
         "outputs": {
           "type": "object",
           "propertyNames": { "$ref": "#/definitions/artifactId" },
-          "additionalProperties": { "$ref": "#/definitions/paths" },
+          "additionalProperties": { "$ref": "#/definitions/output" },
           "description": "产出的产物：{ 产物 id: 路径 }。"
         },
-        "templates": {
-          "type": "array",
-          "items": { "type": "string", "minLength": 1 },
-          "description": "模板文件，相对本节点的技能目录 skills/<skill>/。"
-        },
+        // 节点完成时执行的单行校验命令，退出码 0 才算完成；不经过 shell，不能用管道和 &&
         "validate": {
           "type": "string",
           "minLength": 1,
           "description": "节点完成时执行的单行校验命令，退出码 0 才放行。"
+        },
+        // 终态节点（例如归档）：只能是最后一个主干节点，只有 archived 一个 checkpoint，不能写 outputs 和 validate
+        "terminal": {
+          "type": "boolean",
+          "default": false,
+          "description": "终态节点：只能是最后一个主干节点，只有 archived 一个 checkpoint，不能有 outputs 和 validate。"
+        }
+      }
+    },
+    // 动态阶段：id、name、insertAfter、nodes 必填
+    "dynamicStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "insertAfter", "nodes"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "动态阶段 id，记录在 Feature 的 workflowDecisions 中。" },
+        "name": { "type": "string", "minLength": 1, "description": "动态阶段显示名。" },
+        // 插在哪个主干节点之后；它后面必须还有非终态的主干节点
+        "insertAfter": { "$ref": "#/definitions/nodeId", "description": "插在哪个主干节点之后；该节点完成时由用户决定是否执行本阶段。" },
+        // pending：到达时询问用户；enabled / skipped：默认执行或跳过，用户仍然可以改选
+        "defaultDecision": {
+          "enum": ["pending", "enabled", "skipped"],
+          "default": "pending",
+          "description": "pending：到达时询问用户；enabled / skipped：默认执行或跳过，用户仍可改选。"
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "description": "本阶段的节点，写法与主干节点相同（不能是终态节点）。",
+          "items": { "$ref": "#/definitions/node" }
         }
       }
     }

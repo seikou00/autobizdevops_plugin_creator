@@ -18,6 +18,7 @@
   "modules": {
     "board": "./modules/board.json",
     "session": "./modules/session.json",
-    "knowledge": "./modules/knowledge.json"
+    "knowledge": "./modules/knowledge.json",
+    "artifactSync": "./modules/artifactSync.json"
   }
 }

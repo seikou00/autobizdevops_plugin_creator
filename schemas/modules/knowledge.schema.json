@@ -1,38 +1,54 @@
 {
+  // 读法：properties 下面的键才是配置里能写的字段；required 列出必填字段；additionalProperties: false 表示不能写列表以外的字段，写错字段名会报错。
+  // definitions 是可复用的片段，用 $ref 引用，不会出现在配置文件里；default 是不写时取的值，默认值只写在 Schema 里（D27）。
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.module.knowledge.v1",
   "title": "AutoBiz 知识模块配置 v1（modules/knowledge.json）",
   "description": "知识模块：清单解析、发布单元查询、知识组装；可选由插件拉取知识仓库。入口文件引用此文件即表示启用知识模块。语义校验见 input-config.md §7。",
   "type": "object",
   "additionalProperties": false,
-  "properties": {
+  "properties": { // properties 下的键才是能写的字段；example 只写与默认值不同的部分，没写的取 default
     "$schema": { "type": "string" },
+    // 知识目录，相对插件根目录
     "root": {
       "$ref": "#/definitions/relativeDir",
       "default": "sys",
       "description": "知识目录，相对插件根目录；入口脚本的 --knowledge-path 参数可临时覆盖（生成的宿主命令不带该参数）。"
     },
-    "manifest": {
+    "manifest": { // 知识清单的格式和位置；v1 只有一种格式，默认值就是 lite 的写法，所以 example 没写
       "type": "object",
       "additionalProperties": false,
+      "default": {},
       "description": "清单解析方式。",
       "properties": {
         "format": { "enum": ["agents-manifest-v1"], "default": "agents-manifest-v1", "description": "v1 只支持 lite 的 agents.manifest.json 格式。" },
         "path": { "$ref": "#/definitions/relativeDir", "default": "agents.manifest.json", "description": "清单文件，相对 root。" }
       }
     },
+    // 知识组装：会话开始时把所选发布单元的知识放进会话上下文
     "assembly": {
       "type": "object",
       "additionalProperties": false,
+      "default": {},
       "properties": {
+        // false：会话不带知识段
         "enabled": { "type": "boolean", "default": true },
+        // plugin：插件执行 runtime/knowledge/render_collected_session_context.py（插件可以整个替换这个文件）；devclaw：DevClaw 自己组装
         "assembler": {
           "enum": ["plugin", "devclaw"],
           "default": "plugin",
-          "description": "组装方。plugin：插件会话模块内置组装器，结果并入 sessionContext；devclaw：由 DevClaw 组装，插件只提供清单解析结果。"
+          "description": "组装方。plugin：插件执行组装脚本 runtime/knowledge/render_collected_session_context.py（插件可以直接替换这个文件），结果并入 sessionContext；devclaw：由 DevClaw 组装，插件只提供清单解析结果。"
+        },
+        // 组装脚本最多跑多久，超时后这次会话不带知识段
+        "timeoutSec": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30,
+          "description": "组装脚本的超时秒数；超时后本次会话不含知识段。"
         }
       }
     },
+    // 声明了才由插件自己拉取知识仓库（生成 pull_knowledge 命令）；不写时知识目录随插件打包
     "source": {
       "type": "object",
       "additionalProperties": false,
@@ -41,18 +57,20 @@
       "properties": {
         "type": { "const": "git", "default": "git" },
         "url": { "type": "string", "minLength": 1 },
+        // HTTPS 克隆失败时回退的地址
         "sshUrl": { "type": "string", "default": "" },
         "ref": { "type": "string", "default": "main" }
       }
     },
-    "supportedDeployUnits": {
+    "supportedDeployUnits": { // 可为空：看板发布单元列表的初始值；声明 source 时运行期由 pull_knowledge 回写，打包时重置为这里的值
       "type": "array",
       "items": { "type": "string" },
       "default": [],
       "description": "board_config supported_deploy_units 的初始值；声明 source 时运行期由 pull_knowledge 回写，打包时重置为此值。"
     }
   },
-  "definitions": {
+  "definitions": { // definitions 是可复用的片段，被上面的 $ref 引用，不是配置字段
+    // 相对路径：不能以 / 或 ~ 开头，不能含 \ : 和 .. 段
     "relativeDir": {
       "type": "string",
       "minLength": 1,

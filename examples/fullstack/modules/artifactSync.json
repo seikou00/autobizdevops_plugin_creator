@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schemas/modules/artifactSync.schema.json",
+  "allowedFrom": "dev.plan:done",
+  "excludeCheckpoints": ["code_in_progress"],
+  "artifacts": {
+    "prd": "正式产品需求文档。",
+    "proposal": "行为规格总览。",
+    "specs": "行为规格明细。",
+    "design": "技术设计文档。",
+    "plan": "开发执行计划。",
+    "detail_design": "文件级详细设计文档。"
+  },
+  "extraPaths": {
+    "biz.prd": {
+      "prd_original/**/*": "原始需求文档或参考材料。",
+      "sources/**/*": "外部资料原件或 Feature 固定快照。"
+    }
+  }
+}

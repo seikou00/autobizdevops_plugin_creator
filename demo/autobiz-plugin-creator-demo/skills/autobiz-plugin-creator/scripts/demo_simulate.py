@@ -138,7 +138,7 @@ class Simulation:
 
 def meta_dir(board, plugin):
     runtime = json.loads((plugin / "runtime" / "config" / "runtime.json").read_text(encoding="utf-8"))
-    return ".autobizdevops" if runtime["layout"] == "legacy" else f".autobizdevops/{runtime['pluginId']}"
+    return runtime["metaRoot"] if runtime["layout"] == "legacy" else f"{runtime['metaRoot']}/{runtime['pluginId']}"
 
 
 def describe(key, payload):

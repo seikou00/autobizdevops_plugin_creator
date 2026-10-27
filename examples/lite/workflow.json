@@ -29,7 +29,8 @@
       "name": "增量编码",
       "stage": "Dev",
       "skill": "autodev-code",
-      "inputs": ["requirements", "proposal", "specs", "design", "plan"]
+      "inputs": ["requirements", "proposal", "specs", "design", "plan"],
+      "outputs": { "code": { "git": { "repos": "deployUnits" } } }
     }
   ]
 }

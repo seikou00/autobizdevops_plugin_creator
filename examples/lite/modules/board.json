@@ -10,12 +10,13 @@
       "proposal": "变更提案",
       "specs": "行为规格",
       "design": "技术设计",
-      "plan": "实施计划"
+      "plan": "实施计划",
+      "code": "代码提交"
     },
     "nodes": {
       "dev.plan": {
-        "description": "任务计划；产物：plan.md，包含输入文件、实现范围、任务依赖图和 Phase 划分。",
-        "nextAction": {
+        "description": "任务计划；产物：plan.md，包含输入文件、实现范围、任务依赖图和 Phase 划分。", //覆盖推导内容 【任务计划；产物：plan.md】
+        "nextAction": {//skill 自动推导，这里只更改显示说明
           "done": {
             "userMessage": "实现当前feature",
             "dialogTips": "计划已完成；用户要求实施时进入增量编码。"
@@ -25,7 +26,7 @@
       "dev.code": {
         "description": "实现当前 Feature 的 plan.md，你应该先读技能，理解技能后在进行任务规划",
         "nextAction": {
-          "active": {
+          "active": { //active: not_started,in_progress
             "userMessage": "实现当前feature,先调研清楚实施计划，再由协调者按phase分阶段分配worker实施",
             "dialogTips": "当前阶段：增量编码。team 模式按 Phase 分发，worker 开始前读取技能与计划。"
           },
@@ -39,11 +40,6 @@
   "capabilities": {
     "knowledgeSedimentation": {
       "enabled": true
-    },
-    "artifactSync": {
-      "enabled": true,
-      "allowedFrom": "dev.plan:done",
-      "apiDetail": { "enabled": true, "node": "dev.code" }
     }
   }
 }

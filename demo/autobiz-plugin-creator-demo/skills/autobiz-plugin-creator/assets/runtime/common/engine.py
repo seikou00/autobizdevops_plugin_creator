@@ -164,7 +164,7 @@ def run_validate(project_path, feature, node):
            "FEATURE_DIR": str(directory), "FEATURE_ID": feature, "NODE_ID": node["id"],
            "PYTHONIOENCODING": "utf-8"}
     started = time.monotonic()
-    timeout = query.load_runtime().get("validateTimeoutSec", 120)
+    timeout = query.load_runtime()["validateTimeoutSec"]
     try:
         completed = subprocess.run(args, cwd=directory, env=env, stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, timeout=timeout)

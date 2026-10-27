@@ -61,7 +61,7 @@ sequenceDiagram
 | 常驻令牌 | 只注入连接命令的环境变量 | `resident` |
 | 客户端令牌 | 该插件发起的会话、该插件的 inspectCommands | `oneshot` |
 
-两个令牌都通过环境变量 `AUTOBIZ_RPC_TOKEN` 传递，不放在命令行参数里（`ps` 能看到命令行）。分成两个，是因为会话里的命令由模型执行，不能让它冒充常驻进程、接管 DevClaw 发来的请求。同样的原因，常驻进程执行校验命令、自定义会话入口时，要从子进程的环境变量中去掉 `AUTOBIZ_RPC_TOKEN`。
+两个令牌都通过环境变量 `AUTOBIZ_RPC_TOKEN` 传递，不放在命令行参数里（`ps` 能看到命令行）。分成两个，是因为会话里的命令由模型执行，不能让它冒充常驻进程、接管 DevClaw 发来的请求。同样的原因，常驻进程执行校验命令、知识组装脚本时，要从子进程的环境变量中去掉 `AUTOBIZ_RPC_TOKEN`。
 
 **插件 ID**：取 `plugin.id`。DevClaw 从 board_config 新增的 `rpc.pluginId` 读到它（§9），并记录为每个插件生成的令牌。握手时检查：
 
@@ -108,7 +108,7 @@ JSON-RPC 错误只用于协议和系统层面的失败：
 
 - 双方都可以同时有多个未完成的请求，结果可以乱序返回，按 `id` 对应；
 - 常驻进程用线程池处理请求（默认 4 个线程）。状态写入的互斥仍由 engine 的 `.state.lock` 保证，与其他进程（例如会话中的 `update_state.py`）之间也是如此；
-- 超时由发起方决定。DevClaw 的默认值：看板读取 10 秒，新建 30 秒，`session/context` 为 30 秒加自定义会话入口的超时，`knowledge/pull` 300 秒。超时后发送 `$/cancelRequest`；
+- 超时由发起方决定。DevClaw 的默认值：看板读取 10 秒，新建 30 秒，`session/context` 为 30 秒加知识组装脚本的超时，`knowledge/pull` 300 秒。超时后发送 `$/cancelRequest`；
 - `$/cancelRequest {"id": …}`：只读请求收到后尽快停止，返回 -32800；写请求一旦进入 engine 的锁就会执行完，结果照常返回。
 
 ## 5. 方法

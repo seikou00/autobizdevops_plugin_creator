@@ -5,8 +5,7 @@
       "id": "draft",
       "name": "起草",
       "skill": "doc-draft",
-      "outputs": { "draft": "DRAFT.md" },
-      "templates": ["templates/DRAFT.md"]
+      "outputs": { "draft": "DRAFT.md" }
     },
     {
       "id": "review",

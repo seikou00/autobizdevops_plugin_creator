@@ -128,6 +128,7 @@ flowchart LR
     I3["modules/board.json"]
     I4["modules/session.json"]
     I5["modules/knowledge.json"]
+    I6["modules/artifactSync.json"]
   end
 
   BUILD{{"autobiz-plugin build<br/>lint 通过才编译"}}
@@ -135,14 +136,14 @@ flowchart LR
   subgraph COMP["编译配置（只由 build 写入，随插件发布）"]
     direction TB
     O1["runtime/config/flow.json<br/>流程契约与状态规则"]
-    O2["runtime/config/session.json<br/>策略 · 会话片段 · 自定义入口"]
+    O2["runtime/config/session.json<br/>策略 · 知识组装脚本"]
     O3["runtime/config/knowledge.json"]
     O4["runtime/config/runtime.json<br/>pluginId · layout"]
     O5["board_core/board_config.json<br/>固定看板接口"]
     O6["runtime/build-manifest.json<br/>输入摘要 · 文件哈希"]
   end
 
-  I1 & I2 & I3 & I4 & I5 --> BUILD
+  I1 & I2 & I3 & I4 & I5 & I6 --> BUILD
   BUILD --> O1 & O2 & O3 & O4 & O5 & O6
   O1 & O2 & O3 & O4 --> RTR["运行框架读取"]
   O5 --> DCR["DevClaw 读取"]
@@ -152,10 +153,10 @@ flowchart LR
 | 编译配置 | 主要来自 |
 |---|---|
 | `flow.json` | `workflow.json`，加上 `board.display` 中的产物显示名 |
-| `session.json` | `modules/session.json`，加上知识模块注册的会话片段 |
+| `session.json` | `modules/session.json`，加上知识模块写入的知识组装脚本 |
 | `knowledge.json` | `modules/knowledge.json` |
 | `runtime.json` | `plugin.scaffold.json` 的 `plugin.id`、`runtime` |
-| `board_config.json` | `workflow.json` + `modules/board.json` + `modules/session.json` 的节点策略 + 知识模块的命令 |
+| `board_config.json` | `workflow.json` + `modules/board.json` + `modules/session.json` 的节点策略 + 知识模块的命令 + 产物同步模块的入口 `artifact_sync` |
 
 ---
 
@@ -268,7 +269,7 @@ stateDiagram-v2
 
 ### 8. 会话内容组成
 
-默认会话入口始终生成流程上下文和 `agentConfig`；知识段和自定义会话入口的输出按配置追加，自定义入口不能替换默认入口。见 [README §6.2](README.md)、[interfaces.md §3.3.7、§4.5](interfaces.md)。
+默认会话入口始终生成流程上下文和 `agentConfig`；启用知识模块且 `assembler = plugin` 时再执行组装脚本，追加知识段。组装脚本是知识模块的 `render_collected_session_context.py`，插件可以替换它，但它只负责知识段。见 [README §6.2](README.md)、[interfaces.md §3.3.7、§4.5](interfaces.md)。
 
 ```mermaid
 sequenceDiagram
@@ -277,35 +278,30 @@ sequenceDiagram
   participant R as render_session_context.py
   participant Q as query.py
   participant P as 会话策略
-  participant K as 知识组装器
-  participant C as 自定义会话入口
+  participant K as 知识组装脚本（内置，插件可替换）
 
   D->>R: session_context_inject（项目、Feature、发布单元、会话工作区）
-  R->>Q: 查询当前节点、目标节点、输入输出及存在情况、模板
+  R->>Q: 查询当前节点、目标节点、输入输出及存在情况
   Q-->>R: 流程上下文 flow
   R->>P: 目标节点 → 当前节点 → 默认，三级降级
   P-->>R: agentConfig
   opt 启用知识模块且 assembler = plugin
-    R->>K: SessionRequest
-    K-->>R: 知识段与 agentmdLoadStatus
+    R->>K: stdin 传入请求 JSON（含所选发布单元、flow、agentConfig）
+    K-->>R: stdout 返回知识段、agentmdLoadStatus、message
   end
-  opt 声明了 session.customEntry
-    R->>C: stdin 传入请求 JSON（含 flow、agentConfig）
-    C-->>R: stdout 返回 sessionContext、message
-  end
-  R-->>D: sessionContext（流程 + 知识 + 自定义）、flow、agentConfig
+  R-->>D: sessionContext（流程 + 知识）、flow、agentConfig
 ```
 
 ### 9. 知识模块
 
-清单解析由 `inspect_deploy_units.py` 统一完成；组装方选择 `plugin` 时由插件组装知识段，选择 `devclaw` 时由 DevClaw 调用 `deploy_units` 后自行组装。知识仓库同步是可选项。见 [input-config.md §4.3](input-config.md)、[output-spec.md §7.1](output-spec.md)。
+清单解析由 `inspect_deploy_units.py` 统一完成；组装方选择 `plugin` 时由插件执行组装脚本（内置的 collector 脚本，插件可以替换），选择 `devclaw` 时由 DevClaw 调用 `deploy_units` 后自行组装。知识仓库同步是可选项。见 [input-config.md §4.3](input-config.md)、[output-spec.md §7.1](output-spec.md)。
 
 ```mermaid
 flowchart LR
   SRC["知识仓库<br/>（可选 source）"]
   ROOT[("知识目录 sys/<br/>agents.manifest.json")]
   IDU["inspect_deploy_units.py<br/>解析清单 → 系统与发布单元"]
-  ASM["assembler.py<br/>系统 · 单元 · 会话工作区 · 词汇表"]
+  ASM["组装脚本<br/>默认 render_collected_session_context.py<br/>（collector，未命中时按清单映射加载）"]
   SC["sessionContext 知识段"]
   DC["DevClaw 自行组装"]
 
