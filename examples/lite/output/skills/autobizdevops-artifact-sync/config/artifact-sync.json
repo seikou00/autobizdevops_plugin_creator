@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "allowedCheckpoints": [
+    "plan_done",
+    "code_in_progress",
+    "code_done"
+  ],
+  "uploadUrl": "https://tscode-cos-plugin.paasuat.cmbchina.cn/file/upload",
+  "maxFileSizeMiB": 5,
+  "stages": {
+    "Biz": {
+      "biz.prd": {
+        "PRD.md": "结构化需求。"
+      }
+    },
+    "Dev": {
+      "dev.specs": {
+        "proposal.md": "变更提案。",
+        "specs/*/spec.md": "行为规格。",
+        "design.md": "技术设计。"
+      },
+      "dev.plan": {
+        "plan.md": "实施计划。"
+      }
+    }
+  }
+}

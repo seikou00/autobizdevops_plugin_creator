@@ -1,0 +1,7 @@
+{
+  "schema": "autobiz.runtime.v1",
+  "pluginId": "doc-review",
+  "metaRoot": ".autobizdevops",
+  "layout": "isolated",
+  "validateTimeoutSec": 120
+}

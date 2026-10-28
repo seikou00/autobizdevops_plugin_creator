@@ -1,0 +1,10 @@
+{
+  "schema": "autobiz.session.v1",
+  "policies": {
+    "default": {
+      "agentMode": "solo"
+    },
+    "nodes": {}
+  },
+  "knowledgeAssembly": null
+}

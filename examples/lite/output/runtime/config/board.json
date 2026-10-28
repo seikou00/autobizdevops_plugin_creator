@@ -1,0 +1,96 @@
+{
+  "schema": "autobiz.board.v1",
+  "template": {
+    "id": "standard",
+    "label": "需求开发",
+    "description": "需求清洗 → 规格生成 → 任务计划 → 增量编码。"
+  },
+  "stateLabels": {
+    "not_started": "未开始",
+    "in_progress": "进行中",
+    "done": "已完成"
+  },
+  "nodes": {
+    "biz.prd": {
+      "description": "需求清洗；产物：PRD.md",
+      "nextAction": {
+        "not_started": {
+          "slashSkill": "autobiz-prd",
+          "userMessage": "请使用 /autobiz-prd 处理当前 Feature，先读取现有状态和产物。",
+          "dialogTips": "当前阶段：需求清洗。"
+        },
+        "in_progress": {
+          "slashSkill": "autobiz-prd",
+          "userMessage": "请使用 /autobiz-prd 处理当前 Feature，先读取现有状态和产物。",
+          "dialogTips": "当前阶段：需求清洗。"
+        },
+        "done": {
+          "slashSkill": "autodev-sepc",
+          "userMessage": "请使用 /autodev-sepc 处理当前 Feature，先读取现有状态和产物。",
+          "dialogTips": "下一阶段：规格生成。"
+        }
+      }
+    },
+    "dev.specs": {
+      "description": "规格生成；产物：proposal.md、specs/*/spec.md、design.md",
+      "nextAction": {
+        "not_started": {
+          "slashSkill": "autodev-sepc",
+          "userMessage": "请使用 /autodev-sepc 处理当前 Feature，先读取现有状态和产物。",
+          "dialogTips": "当前阶段：规格生成。"
+        },
+        "in_progress": {
+          "slashSkill": "autodev-sepc",
+          "userMessage": "请使用 /autodev-sepc 处理当前 Feature，先读取现有状态和产物。",
+          "dialogTips": "当前阶段：规格生成。"
+        },
+        "done": {
+          "slashSkill": "autodev-plan",
+          "userMessage": "请使用 /autodev-plan 处理当前 Feature，先读取现有状态和产物。",
+          "dialogTips": "下一阶段：任务计划。"
+        }
+      }
+    },
+    "dev.plan": {
+      "description": "任务计划；产物：plan.md，包含输入文件、实现范围、任务依赖图和 Phase 划分。",
+      "nextAction": {
+        "not_started": {
+          "slashSkill": "autodev-plan",
+          "userMessage": "请使用 /autodev-plan 处理当前 Feature，先读取现有状态和产物。",
+          "dialogTips": "当前阶段：任务计划。"
+        },
+        "in_progress": {
+          "slashSkill": "autodev-plan",
+          "userMessage": "请使用 /autodev-plan 处理当前 Feature，先读取现有状态和产物。",
+          "dialogTips": "当前阶段：任务计划。"
+        },
+        "done": {
+          "slashSkill": "autodev-code",
+          "userMessage": "实现当前feature",
+          "dialogTips": "计划已完成；用户要求实施时进入增量编码。"
+        }
+      }
+    },
+    "dev.code": {
+      "description": "实现当前 Feature 的 plan.md，你应该先读技能，理解技能后在进行任务规划",
+      "nextAction": {
+        "not_started": {
+          "slashSkill": "autodev-code",
+          "userMessage": "实现当前feature,先调研清楚实施计划，再由协调者按phase分阶段分配worker实施",
+          "dialogTips": "当前阶段：增量编码。team 模式按 Phase 分发，worker 开始前读取技能与计划。"
+        },
+        "in_progress": {
+          "slashSkill": "autodev-code",
+          "userMessage": "实现当前feature,先调研清楚实施计划，再由协调者按phase分阶段分配worker实施",
+          "dialogTips": "当前阶段：增量编码。team 模式按 Phase 分发，worker 开始前读取技能与计划。"
+        },
+        "done": {
+          "slashSkill": "",
+          "userMessage": "",
+          "dialogTips": "编码已完成。"
+        }
+      }
+    }
+  },
+  "dynamicStages": {}
+}

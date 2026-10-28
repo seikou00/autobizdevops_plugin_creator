@@ -43,7 +43,7 @@ flowchart LR
 
   subgraph PLG["插件（随包发布）"]
     direction TB
-    P1["plugin.json<br/>board_core/board_config.json"]
+    P1["plugin.json<br/>board_core/board_config.json · modules.json"]
     P2["runtime/<br/>固定入口 · query/engine · 编译配置"]
     P3["skills/（含状态接入说明）<br/>hooks/ · agents/"]
   end
@@ -139,13 +139,14 @@ flowchart LR
     O2["runtime/config/session.json<br/>策略 · 知识组装脚本"]
     O3["runtime/config/knowledge.json"]
     O4["runtime/config/runtime.json<br/>pluginId · layout"]
-    O5["board_core/board_config.json<br/>固定看板接口"]
+    O7["runtime/config/board.json<br/>看板文案"]
+    O5["board_core/board_config.json · modules.json<br/>宿主命令 · 模块与入口"]
     O6["runtime/build-manifest.json<br/>输入摘要 · 文件哈希"]
   end
 
   I1 & I2 & I3 & I4 & I5 & I6 --> BUILD
-  BUILD --> O1 & O2 & O3 & O4 & O5 & O6
-  O1 & O2 & O3 & O4 --> RTR["运行框架读取"]
+  BUILD --> O1 & O2 & O3 & O4 & O5 & O6 & O7
+  O1 & O2 & O3 & O4 & O7 --> RTR["运行框架读取"]
   O5 --> DCR["DevClaw 读取"]
   O6 --> LNT["lint 比对摘要<br/>不一致时报 BUILD_STALE"]
 ```
@@ -156,7 +157,9 @@ flowchart LR
 | `session.json` | `modules/session.json`，加上知识模块写入的知识组装脚本 |
 | `knowledge.json` | `modules/knowledge.json` |
 | `runtime.json` | `plugin.scaffold.json` 的 `plugin.id`、`runtime` |
-| `board_config.json` | `workflow.json` + `modules/board.json` + `modules/session.json` 的节点策略 + 知识模块的命令 + 产物同步模块的入口 `artifact_sync` |
+| `board.json` | `modules/board.json` 的 `display`，按节点展开 `nextAction` |
+| `board_config.json` | `modules/board.json` 的 `target` 与文案模板，加上知识模块、跳过节点的命令 |
+| `modules.json` | 入口文件 `modules` 的引用情况，加上知识沉淀入口和产物同步模块的入口 `artifact_sync` |
 
 ---
 

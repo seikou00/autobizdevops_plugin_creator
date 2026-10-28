@@ -23,10 +23,10 @@
           "default": {},
           "description": "全局默认策略。只有这里的 agentMode 有默认值 solo：节点策略与它深合并，节点不写 agentMode 时沿用这里的。"
         },
-        // 按节点覆盖：key 是节点 id（含动态阶段的节点），原样写进 board_config 对应节点的 runtimePolicy
+        // 按节点覆盖：key 是节点 id（含动态阶段的节点），原样写进 runtime/config/session.json，即看板数据中对应节点的 runtimePolicy
         "nodes": {
           "type": "object",
-          "description": "节点策略；key 必须是 workflow.json 中的节点（含动态阶段的节点）。原样写入 board_config 对应节点的 runtimePolicy。",
+          "description": "节点策略；key 必须是 workflow.json 中的节点（含动态阶段的节点）。原样写入 runtime/config/session.json，即看板数据中对应节点的 runtimePolicy。",
           "propertyNames": { "$ref": "#/definitions/nodeId" },
           "additionalProperties": { "$ref": "#/definitions/runtimePolicy" }
         }

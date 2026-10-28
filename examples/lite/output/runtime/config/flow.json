@@ -1,0 +1,228 @@
+{
+  "schema": "autobiz.flow.v1",
+  "source": {
+    "workflow.json": "sha256:ba4a81b2d46afa584e50e28197d3616237edec51bd8613fdd626884f5fbe1829"
+  },
+  "stages": [
+    "Biz",
+    "Dev"
+  ],
+  "artifacts": {
+    "requirements": {
+      "label": "结构化需求",
+      "type": "file",
+      "paths": [
+        "PRD.md"
+      ],
+      "producer": "biz.prd"
+    },
+    "proposal": {
+      "label": "变更提案",
+      "type": "file",
+      "paths": [
+        "proposal.md"
+      ],
+      "producer": "dev.specs"
+    },
+    "specs": {
+      "label": "行为规格",
+      "type": "file",
+      "paths": [
+        "specs/*/spec.md"
+      ],
+      "producer": "dev.specs"
+    },
+    "design": {
+      "label": "技术设计",
+      "type": "file",
+      "paths": [
+        "design.md"
+      ],
+      "producer": "dev.specs"
+    },
+    "plan": {
+      "label": "实施计划",
+      "type": "file",
+      "paths": [
+        "plan.md"
+      ],
+      "producer": "dev.plan"
+    },
+    "code": {
+      "label": "代码提交",
+      "type": "git",
+      "git": {
+        "repos": "deployUnits",
+        "branch": "current",
+        "require": [
+          "commits",
+          "clean",
+          "merged"
+        ]
+      },
+      "producer": "dev.code"
+    }
+  },
+  "nodes": [
+    {
+      "id": "biz.prd",
+      "name": "需求清洗",
+      "stage": "Biz",
+      "skill": "autobiz-prd",
+      "skillDir": "skills/autobiz-prd",
+      "order": 10,
+      "terminal": false,
+      "checkpoints": [
+        "prd_in_progress",
+        "prd_done"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "requirements",
+          "required": true
+        }
+      ],
+      "validate": null
+    },
+    {
+      "id": "dev.specs",
+      "name": "规格生成",
+      "stage": "Dev",
+      "skill": "autodev-sepc",
+      "skillDir": "skills/autodev-sepc",
+      "order": 20,
+      "terminal": false,
+      "checkpoints": [
+        "specs_in_progress",
+        "specs_done"
+      ],
+      "inputs": [
+        {
+          "id": "requirements",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "id": "proposal",
+          "required": true
+        },
+        {
+          "id": "specs",
+          "required": true
+        },
+        {
+          "id": "design",
+          "required": true
+        }
+      ],
+      "validate": null
+    },
+    {
+      "id": "dev.plan",
+      "name": "任务计划",
+      "stage": "Dev",
+      "skill": "autodev-plan",
+      "skillDir": "skills/autodev-plan",
+      "order": 30,
+      "terminal": false,
+      "checkpoints": [
+        "plan_in_progress",
+        "plan_done"
+      ],
+      "inputs": [
+        {
+          "id": "requirements",
+          "required": true
+        },
+        {
+          "id": "proposal",
+          "required": true
+        },
+        {
+          "id": "specs",
+          "required": true
+        },
+        {
+          "id": "design",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "id": "plan",
+          "required": true
+        }
+      ],
+      "validate": null
+    },
+    {
+      "id": "dev.code",
+      "name": "增量编码",
+      "stage": "Dev",
+      "skill": "autodev-code",
+      "skillDir": "skills/autodev-code",
+      "order": 40,
+      "terminal": false,
+      "checkpoints": [
+        "code_in_progress",
+        "code_done"
+      ],
+      "inputs": [
+        {
+          "id": "requirements",
+          "required": true
+        },
+        {
+          "id": "proposal",
+          "required": true
+        },
+        {
+          "id": "specs",
+          "required": true
+        },
+        {
+          "id": "design",
+          "required": true
+        },
+        {
+          "id": "plan",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "id": "code",
+          "required": true
+        }
+      ],
+      "validate": null
+    }
+  ],
+  "dynamicStages": [],
+  "skip": null,
+  "checkpoints": {
+    "chain": [
+      "prd_in_progress",
+      "prd_done",
+      "specs_in_progress",
+      "specs_done",
+      "plan_in_progress",
+      "plan_done",
+      "code_in_progress",
+      "code_done"
+    ],
+    "initial": "prd_in_progress",
+    "labels": {
+      "prd_in_progress": "需求清洗进行中",
+      "prd_done": "需求清洗完成",
+      "specs_in_progress": "规格生成进行中",
+      "specs_done": "规格生成完成",
+      "plan_in_progress": "任务计划进行中",
+      "plan_done": "任务计划完成",
+      "code_in_progress": "增量编码进行中",
+      "code_done": "增量编码完成"
+    }
+  }
+}

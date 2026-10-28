@@ -167,7 +167,7 @@ frontmatter 中的 `description` 要写明触发场景，例如“新建看板�
 
 ## 2. 模块契约
 
-模块分两类：核心模块 `board`（看板）和 `session`（会话与 Agent）始终启用；`knowledge`（知识）和 `artifactSync`（产物同步）按配置启用，各自有独立的配置文件，入口文件引用即启用。知识沉淀入口只是一段 board_config 配置，由 `board` 模块直接生成。
+模块分两类：核心模块 `board`（看板）和 `session`（会话与 Agent）始终启用；`knowledge`（知识）和 `artifactSync`（产物同步）按配置启用，各自有独立的配置文件，入口文件引用即启用。知识沉淀入口只是 `board_core/modules.json` 中的一个看板入口，由 `board` 模块直接生成。
 
 ### 2.1 模块包结构
 
@@ -259,9 +259,9 @@ class CommandSpec:
 @dataclass
 class Contribution:
     files: list[FileSpec] = field(default_factory=list)
-    config: dict = field(default_factory=dict)                     # 新增 board_config 顶层键
+    entries: dict = field(default_factory=dict)                    # 看板入口，写入 board_core/modules.json 顶层，例如 {"artifact_sync": {...}}
+    manifest: dict = field(default_factory=dict)                   # 写入 modules.json 中本模块的条目，例如 {"assembler": "plugin", "source": True}
     runtime_config: dict[str, dict] = field(default_factory=dict)  # 写入 runtime/config/<name>.json，例如 {"knowledge": {...}}
-    runtime_fields: list[str] = field(default_factory=list)        # 例如 "supported_deploy_units"
     inspect_commands: dict[str, CommandSpec] = field(default_factory=dict)
     knowledge_assembly: Optional[dict] = None                      # {"script", "timeoutSec"}，写入 session.json 的 knowledgeAssembly
     skills: list[str] = field(default_factory=list)                # 模块占用的技能名
@@ -294,13 +294,13 @@ class Module(Protocol):
 
 | 贡献 | 规则 | 冲突时 |
 |---|---|---|
-| `config` | 只能新增顶层键，不能覆盖核心键（`apiVersion`、`inspectCommands`、`workflow`、`checkpointSuffixState`） | `MODULE_CONFLICT` |
-| `runtime_config` | 只能新增文件名；`runtime`、`flow`、`session` 由核心生成，模块不得占用 | `MODULE_CONFLICT` |
-| `inspect_commands` | 只能新增键，不能覆盖 output-spec.md §3.2 中标为“必有”的键；每个平台各生成一份。模块未启用时它贡献的键直接不出现（D1），不输出空值 | `MODULE_CONFLICT` |
+| `entries` | 只能新增 `modules.json` 的顶层键，不能占用 `apiVersion`、`modules`、`boardEvents` | `MODULE_CONFLICT` |
+| `manifest` | 只写本模块在 `modules.<id>` 下的条目，`enabled`、`version` 由核心填写 | `MODULE_CONFLICT` |
+| `runtime_config` | 只能新增文件名；`runtime`、`flow`、`board`、`session` 由核心生成，模块不得占用 | `MODULE_CONFLICT` |
+| `inspect_commands` | 写入 `board_config.json`。只能新增键，不能覆盖 output-spec.md §3.2 中标为“必有”的键；每个平台各生成一份。模块未启用时它贡献的键直接不出现（D1），不输出空值 | `MODULE_CONFLICT` |
 | `files` | `dst` 不能与框架文件或其他模块重复 | `MODULE_CONFLICT` |
 | `skills` | 不能与节点技能重名 | `MODULE_SKILL_CONFLICT` |
 | `knowledge_assembly` | 写入 `runtime/config/session.json` 的 `knowledgeAssembly`（§2.4）；只有知识模块提供 | — |
-| `runtime_fields` | 汇总写入 build-manifest，供 build（保留）和 package（重置）使用 | — |
 
 ### 2.4 运行期接口：知识组装
 
@@ -318,7 +318,7 @@ class Module(Protocol):
 
 ## 3. 宿主命令协议
 
-DevClaw 负责展示看板、发起会话、传入运行上下文、调用插件入口。它调用的全部入口都是 `runtime/` 下的框架入口，命令写在 `board_config.json` 的 `inspectCommands` 中。反方向上，插件在状态提交后把看板数据推送给 DevClaw 的本机服务（§3.5）。
+DevClaw 负责展示看板、发起会话、传入运行上下文、调用插件入口。它调用的全部入口都是 `runtime/` 下的框架入口，命令写在 `board_core/board_config.json` 的 `inspectCommands` 中；插件开启了哪些模块、看板上放哪些入口写在 `board_core/modules.json`（output-spec.md §3）。看板要展示的流程、节点、状态和产物全部由下面的命令输出，DevClaw 不读插件的其他文件。反方向上，插件在状态提交后把看板数据推送给 DevClaw 的本机服务（§3.5）。
 
 ### 3.1 通用约定
 
@@ -342,8 +342,8 @@ DevClaw 负责展示看板、发起会话、传入运行上下文、调用插件
 | `${feature}` | 当前 Feature | `feature_status`、`create_feature`、`session_context_inject`、`system_prompt_inject`、技能正文 |
 | `${selectedDeployUnits}` | 所选发布单元，JSON 数组，宿主作为一个参数整体转义 | `create_feature`、`session_context_inject` |
 | `${sessionWorkspacePath}` | 会话工作区目录 | `session_context_inject` |
-| `${projectCode}` | 项目编码 | `dialog_tips`、`knowledge_config.nextAction`、`artifact_sync.nextAction` |
-| `${leanToken}` | 知识沉淀 token | `knowledge_config.nextAction` |
+| `${projectCode}` | 项目编码 | `dialog_tips`、`modules.json` 的 `knowledge_config.nextAction`、`artifact_sync.nextAction` |
+| `${leanToken}` | 知识沉淀 token | `modules.json` 的 `knowledge_config.nextAction` |
 | `${nodeId}` | 用户在看板上选中的节点 | `skip_node` |
 | `${workflowTemplate}` `${workflowNodes}` | 全栈版旧模板（精简路线、自定义节点子集）使用 | 不使用（模板子集预留到 v2） |
 
@@ -391,7 +391,7 @@ runtime/adapters/inspect_state.py --mode project --workspace <dir> --projects <n
 
 ```json
 {
-  "workflow": { "nodes": [ WorkflowNode ] },
+  "workflow": { "nodes": [ WorkflowNode ], "dynamicStages": [ DynamicStage ] },
   "projects": {
     "<project>": { "runs": [ { "featureId": "f1", "featureName": "f1", "currentNodeId": "dev.plan",
                                "currentNodeStatus": "in_progress", "currentNodeStatusLabel": "进行中",
@@ -400,16 +400,61 @@ runtime/adapters/inspect_state.py --mode project --workspace <dir> --projects <n
 }
 ```
 
-`WorkflowNode`：
+`inspect_state.py` 调用 `query.py` 取得状态与流程数据（`runtime/config/flow.json`），再结合 `runtime/config/board.json` 的展示文案和 `session.json` 的运行策略，转换成看板接口数据。`workflow` 是静态的，同一次 build 下每次输出都相同；`runs[].nodeIds` 是该 Feature 实际经过的节点，包含已决定执行的动态阶段节点，不含被跳过的节点。
 
-```json
-{ "id": "dev.plan", "label": "任务计划", "group": "Dev", "description": "…",
-  "states": [ { "nodeStatus": "not_started", "id": "not_started", "label": "未开始", "nextAction": { … } } ],
-  "runtimePolicy": { … },
-  "artifactDefinitions": [ { "id": "plan", "artifactType": "file", "required": true } ] }
+`WorkflowNode`（字段沿用全栈版 board_config 中的节点，DevClaw 原来从静态文件读取，现在从命令输出读取）：
+
+```jsonc
+{
+  "id": "dev.plan", "label": "任务计划", "group": "Dev", "order": 40, "skill": "autodev-plan",
+  "description": "…",
+  "runtimePolicy": { "agentMode": "multi", "subagentConfig": { … } },   // 仅在节点配置了时输出
+  "checkpoints": ["plan_in_progress", "plan_done"],
+  "states": [
+    { "nodeStatus": "not_started", "id": "not_started", "label": "未开始", "nextAction": { "slashSkill": "…", "userMessage": "…", "dialogTips": "…" } },
+    { "nodeStatus": "in_progress", "id": "in_progress", "label": "进行中", "nextAction": { … } },
+    { "nodeStatus": "done",        "id": "done",        "label": "已完成", "nextAction": { … } }
+  ],
+  "artifacts": { "inputs": [ ArtifactDef ], "outputs": [ ArtifactDef ] }
+}
 ```
 
-`inspect_state.py` 调用 `query.py` 取得状态与流程数据，再结合 `board_config.json` 的展示字段转换成看板接口数据。`runtimePolicy` 仅在节点配置了时输出。`states[].id` 与 `nodeStatus` 相同。`workflow.nodes` 只列主干节点，动态阶段的节点在 `board_config.workflow.dynamicStages` 中；`runs[].nodeIds` 是该 Feature 实际经过的节点，包含已决定执行的动态阶段节点，不含被跳过的节点。
+- `states` 按 not_started、in_progress、done 的顺序给出；终态节点只有 not_started、archived 两项，`checkpoints` 为 `["archived"]`。`skipped` 是运行期状态，由 `feature_status` 给出，不在 `states` 中列出。`states[].id` 与 `nodeStatus` 相同；
+- `nextAction.slashSkill` 为空字符串表示流程结束，没有下一步；
+- `workflow.nodes` 只列主干节点，动态阶段的节点在 `workflow.dynamicStages[].nodes` 中；
+- 不再输出 `validators`：节点的校验命令由运行框架执行，不交给 DevClaw。
+
+`ArtifactDef`（产物定义）：
+
+```json
+{ "id": "plan", "label": "实施计划", "artifactType": "file", "path": "plan.md", "required": true }
+{ "id": "spec_bundle", "label": "proposal.md", "artifactType": "file", "path": "proposal.md",
+  "paths": ["proposal.md", "specs/*/spec.md"], "required": true }
+{ "id": "code", "label": "代码提交", "artifactType": "git", "required": true,
+  "git": { "repos": "deployUnits", "branch": "current", "require": ["commits", "clean", "merged"] } }
+```
+
+| 字段 | 必有 | 语义 |
+|---|---|---|
+| `id` / `artifactType` / `required` | 是 | 文件产物的 `artifactType` 按扩展名推断为 `file` 或 `json`，代码提交为 `git`；`required` 为核心配置中 `optional` 的反面 |
+| `path` | 文件产物 | 核心配置中路径为数组时取首项，保证只认 `path` 的旧版宿主仍能工作。git 产物没有 `path` |
+| `label` | 是 | 取 `board.display.artifacts[id]`，未配置时为第一个路径，git 产物为产物 id |
+| `paths` | 否 | 仅在核心配置中路径为数组时输出，给出全部项 |
+| `git` | git 产物 | 填好默认值的 `{repos, branch, require}`（input-config.md §2.9） |
+
+`DynamicStage`（有动态阶段时）：
+
+```json
+{
+  "id": "detail_design_before_code", "phase": "Dev", "label": "详细设计", "description": "…", "order": 45,
+  "choiceCheckpoint": "plan_done", "defaultDecision": "pending", "insertAfter": "dev.plan",
+  "enableTargetCheckpoint": "detail_design_in_progress", "skipTargetCheckpoint": "code_in_progress",
+  "enableLabel": "…", "skipLabel": "…", "enableDescription": "…", "skipDescription": "…",
+  "nodes": [ { "id": "dev.detail_design", "phase": "Dev", "checkpointPrefix": "detail_design", "…": "其余字段同 WorkflowNode" } ]
+}
+```
+
+执行时 `choiceCheckpoint → 阶段节点依次推进 → skipTargetCheckpoint`，跳过时 `choiceCheckpoint → skipTargetCheckpoint`。主干的 checkpoint 链与阶段标签见 `dynamic_workflow`（§3.3.5）。
 
 `nextAction.slashSkill` 用于让宿主**带出**该技能，方便用户直接发起（D6），值为不带命名空间前缀的技能名；空字符串表示不带出任何技能。`userMessage` 和 `dialogTips` 是随技能一起带出的文案。
 
@@ -421,7 +466,7 @@ runtime/adapters/inspect_state.py --mode run --workspace <dir> --project <name> 
 
 ```json
 {
-  "workflow": { "nodes": [ WorkflowNode ] },
+  "workflow": { "nodes": [ WorkflowNode ], "dynamicStages": [ DynamicStage ] },
   "run": {
     "featureId": "f1", "featureName": "f1",
     "workflowId": "base", "workflowProfile": "standard", "workflowTemplate": "standard",
@@ -467,11 +512,18 @@ runtime/adapters/inspect_state.py --mode run --workspace <dir> --project <name> 
   "templates": [ { "id": "standard", "templateType": "classical", "label": "需求开发", "description": "…",
                    "nodes": ["biz.prd", "dev.specs", "dev.plan", "dev.code"] } ],
   "nodes": [ { "id": "dev.plan", "label": "任务计划", "group": "Dev", "skill": "autodev-plan", "description": "…",
-               "inputs": [ ArtifactDef ], "outputs": [ ArtifactDef ] } ]
+               "inputs": [ ArtifactDef ], "outputs": [ ArtifactDef ] } ],
+  "checkpoints": {
+    "initial": ["prd_in_progress"],
+    "transitions": { "prd_in_progress": ["prd_done"], "prd_done": ["specs_in_progress"], "…": [], "cicd_done": ["archived"], "archived": [] },
+    "stageLabels": { "prd_in_progress": "需求澄清与 PRD进行中", "…": "…", "archived": "已归档" }
+  },
+  "transitions": [ { "id": "prd-to-specs", "from": { "nodeId": "biz.prd", "state": "done" }, "to": { "nodeId": "dev.specs", "state": "in_progress" } } ],
+  "skipPolicy": { "lockedNodes": [] }
 }
 ```
 
-通过 `query.py` 查询流程定义，返回宿主需要的模板结构。`ArtifactDef` 即 output-spec.md §3.5 中的完整产物定义。全栈版现有入口只输出 `{path, label}`，宿主应能兼容两种形态。`templates` 只有 `standard` 一项（精简路线、自定义节点子集预留到 v2）；`nodes` 只列主干节点。
+通过 `query.py` 查询流程定义，返回宿主需要的模板结构。`ArtifactDef` 见 §3.3.3；全栈版现有入口只输出 `{path, label}`，宿主应能兼容两种形态。全栈版 board_config 中 `workflow` 下的 `checkpoints`、`transitions`、`skipPolicy` 改由这里输出：`checkpoints.transitions` 只描述主干，最后一个主干节点是终态节点时前一节点的 `_done → archived`；`transitions` 是主干相邻节点的流转；`skipPolicy` 仅在开启 `rules.skip` 时输出。`templates` 只有 `standard` 一项（精简路线、自定义节点子集预留到 v2）；`nodes` 只列主干节点。
 
 #### 3.3.6 system_prompt_inject / dialog_tips / plugin_dir_hook / knowledge_path
 
@@ -564,12 +616,11 @@ runtime/knowledge/inspect_deploy_units.py [--knowledge-path <dir>] [--system <sy
   "supported_deploy_units": ["…"],
   "systems": [ { "systemId": "LF39", "systemName": "…", "agentsReady": true, "agentsPath": "sys/LF39/AGENTS.md",
                  "deployUnits": [ { "deployUnitId": "…", "name": "…" } ] } ],
-  "supported_deploy_units_source": "agents.manifest.json",
-  "boardConfigWritten": true
+  "supported_deploy_units_source": "agents.manifest.json"
 }
 ```
 
-失败时返回 `{"ok": false, "schemaVersion": "…", "message": "…", "errors": ["…"]}`，已有的知识目录保持不变。
+只更新知识目录，不回写任何配置文件。DevClaw 需要最新的发布单元时，读本输出的 `supported_deploy_units` 或再执行 `deploy_units`。失败时返回 `{"ok": false, "schemaVersion": "…", "message": "…", "errors": ["…"]}`，已有的知识目录保持不变。
 
 #### 3.3.10 skip_node（skip_node.py，开启 rules.skip 时）
 
@@ -621,7 +672,7 @@ runtime/adapters/skip_node.py --workspace <dir> --project <name> --feature <name
 | 协议 | JSON-RPC 2.0 通知（不带 `id`，不需要回复），通过 HTTP/1.1 `POST` 发送，`Content-Type: application/json`，UTF-8 编码 |
 | 服务端 | DevClaw 启动时在 `127.0.0.1` 的随机端口上监听，路径由 DevClaw 决定。收到后返回任意 2xx（建议 204），响应体会被忽略 |
 | 发现 | DevClaw 把服务地址写入环境变量 `AUTOBIZ_BOARD_ENDPOINT`，例如 `http://127.0.0.1:53817/rpc`（§3.4）。它要注入到 DevClaw 执行的全部 inspectCommands 和发起的会话中；模型在会话中执行 `update_state.py` 时会自动继承 |
-| 声明 | 插件在 board_config 中写 `boardEvents`（output-spec.md §3.1），DevClaw 据此知道该插件会推送。没有这个键的插件按原方式处理 |
+| 声明 | 插件在 `board_core/modules.json` 中写 `boardEvents`（output-spec.md §3.3），DevClaw 据此知道该插件会推送。没有这个键的插件按原方式处理 |
 
 #### 3.5.2 消息
 
@@ -673,7 +724,7 @@ runtime/adapters/skip_node.py --workspace <dir> --project <name> --feature <name
 | 收到事件 | 按 (`pluginPath`, 项目目录的 realpath) 缓存。`seq` 小于或等于已缓存的值时丢弃；否则用 `projectRuns` 替换总览，用 `run` 替换该 Feature 的详情 |
 | `seq` 跳号 | 说明漏收了事件。总览以本条事件为准；该项目其他 Feature 的详情缓存作废，下次显示时调用 `feature_status` |
 | 冷启动 | DevClaw 启动后第一次显示某个项目时，按插件合并调用一次 `project_status`；第一次打开某个 Feature 时调用 `feature_status` |
-| 插件升级或重新 build | 重新加载 board_config 时，清空该插件的缓存 |
+| 插件升级或重新 build | 重新加载 `board_core/` 时，清空该插件的缓存（包括静态的 `workflow`） |
 | 未声明 `boardEvents` 的插件 | 保持现有方式：执行读取命令、使用 `watchRefs` |
 | 产物状态 | P0 中产物状态在两种时候更新：收到事件时（也就是节点推进时），以及打开 Feature 时拉取。对声明了 `boardEvents` 的插件，DevClaw 不再需要轮询读取命令或监听 `state.json` |
 
@@ -876,12 +927,12 @@ class engine.BoardError(ValueError): ...                          # 所有业务
 | `scaffoldVersion` | `plugin.scaffold.json` | 入口文件格式出现不兼容变化时升主版本，脚手架提供 `migrate` |
 | 模块配置格式 | `modules/*.json` | 不单独标版本，随模块主版本变化；出现不兼容变化时由模块提供迁移 |
 | 核心流程格式 | `workflow.json` | 不单独标版本，随 `scaffoldVersion` 变化 |
-| `apiVersion` | `board_config.json` | 宿主协议出现不兼容变化时（与 DevClaw 共同决定） |
+| `apiVersion` | `board_core/board_config.json`、`board_core/modules.json` | 宿主协议出现不兼容变化时（与 DevClaw 共同决定） |
 | 运行框架版本 | build-manifest 的 `coreVersion` | 遵循 semver；同一主版本内 `upgrade` 可以直接替换 |
-| 模块版本 | `module.json`、build-manifest | 遵循 semver；`requiresCore` 不满足时拒绝启用 |
+| 模块版本 | 模块包的 `module.json`、插件的 `board_core/modules.json`、build-manifest | 遵循 semver；`requiresCore` 不满足时拒绝启用 |
 | `state.json.schemaVersion` | 运行期 | 状态格式变化时；新版运行框架必须能读取旧版本 |
 | `schemaVersion` 字符串 | 各命令输出 | 例如 `autobizdevops.workflow.templates.v2`、`autobizdevops.agents.sync.v1`；沿用现有值 |
-| `boardEvents.protocol` | `board_config.json`、看板事件的 `params.schema` | 看板事件消息出现不兼容变化时，例如 `autobiz.board-events.v1` → `v2`（§3.5） |
+| `boardEvents.protocol` | `board_core/modules.json`、看板事件的 `params.schema` | 看板事件消息出现不兼容变化时，例如 `autobiz.board-events.v1` → `v2`（§3.5） |
 
 兼容承诺：
 
@@ -891,7 +942,7 @@ class engine.BoardError(ValueError): ...                          # 所有业务
 
 由 lite 迁移时的行为差异：
 
-- 入口从 `hooks/`、根目录迁到 `runtime/`，board_config 中的命令随之重新生成；技能托管片段中的状态命令也会更新；
+- 入口从 `hooks/`、根目录迁到 `runtime/`，board_config 中的命令随之重新生成；board_config 只剩 `inspectCommands`，流程定义改由命令输出，看板入口移到 `modules.json`；技能托管片段中的状态命令也会更新；
 - 框架不再检查产物是否为空。lite 现在“去除空白后非空”的判定，如需保留，要写成节点的校验命令；
 - 会话内容新增流程上下文段；
 - 节点描述、产物显示名移到 `modules/board.json`，编译结果不变；

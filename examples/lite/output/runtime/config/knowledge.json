@@ -1,0 +1,19 @@
+{
+  "schema": "autobiz.knowledge.v1",
+  "root": "sys",
+  "manifest": {
+    "format": "agents-manifest-v1",
+    "path": "agents.manifest.json"
+  },
+  "assembly": {
+    "enabled": true,
+    "assembler": "plugin",
+    "timeoutSec": 30
+  },
+  "source": {
+    "type": "git",
+    "url": "https://gitee.paas.cmbchina.cn/S992391/LF39_Product_Knowledge.git",
+    "sshUrl": "git@gitee.itc.cmbchina.cn:S992391/LF39_Product_Knowledge.git",
+    "ref": "master"
+  }
+}

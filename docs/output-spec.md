@@ -14,8 +14,9 @@
 │   └── board.json  session.json  knowledge.json
 ├── plugin.json                           # generated  插件清单（DevClaw 只读这一份）
 ├── .codex-plugin/plugin.json             # generated  Codex 清单（可选，plugin.codexManifest）
-├── board_core/
-│   └── board_config.json                 # generated  固定看板接口（运行期回写字段见 §3.6）
+├── board_core/                           #            DevClaw 读取的全部静态内容（§3）
+│   ├── board_config.json                 # generated  宿主命令 inspectCommands
+│   └── modules.json                      # generated  已开启的模块与看板入口
 ├── skills/                               #            业务技能、模板、脚本及校验器；技能目录也可以在一层分组下（skills/<分组>/<node-skill>/）
 │   ├── <node-skill>/SKILL.md             # seeded     每个节点一个，含状态接入托管片段
 │   ├── <node-skill>/agents/openai.yaml   # seeded     Codex 技能展示信息（可选）
@@ -45,8 +46,8 @@
 │   ├── common/
 │   │   ├── query.py                      # managed    内部只读查询模块
 │   │   └── engine.py                     # managed    内部初始化与状态变更模块
-│   ├── config/                           # generated  编译后的内部配置（§5）
-│   │   └── runtime.json  flow.json  session.json  knowledge.json
+│   ├── config/                           # generated  编译后的内部配置（§5），DevClaw 不读
+│   │   └── runtime.json  flow.json  board.json  session.json  knowledge.json
 │   └── build-manifest.json               # generated  生成文件及构建信息记录（§8）
 ├── .scaffold/                            # managed    输入配置的 Schema（IDE 补全）
 │   ├── plugin-scaffold.schema.json  workflow.schema.json
@@ -111,23 +112,25 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 - 引用到的 `./assets/*` 文件必须存在（`check` 会校验）；
 - 不写入 `hooks`（D7）：宿主 `hooks.json` 用的是宿主专有格式（`onBlock`、`persistAfterInterrupt`，工具名为 `write_file`/`execute`），只写在根清单里。
 
-## 3. 看板配置 board_config.json
+## 3. 宿主接口 board_core/
 
-`board_core/board_config.json` 是插件对 DevClaw 的固定看板接口。运行框架的状态规则不从这里读取，而是读取 `runtime/config/flow.json`（§5.2）；两者由同一份中间表示生成，`check` 会校验二者一致。
+DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_config.json` 取命令并执行，从 `modules.json` 得知插件开启了哪些模块、要在看板上放哪些入口。看板要展示的流程、节点、状态和产物都由命令输出（interfaces.md §3.3），不放在静态文件里。
 
-### 3.1 顶层键
+插件自己的脚本不读这两个文件：运行框架、adapter 和模块脚本只读 `runtime/config/`（§5）。两个文件都只由 build 生成，运行期不回写。
 
-| 键 | 必有 | 来源 |
-|---|---|---|
-| `apiVersion` | 是 | 固定为 `1` |
-| `inspectCommands` | 是 | §3.2 |
-| `workflow` | 是 | §3.3 |
-| `checkpointSuffixState` | 是 | `in_progress`、`done` 两项；有终态节点时加 `archived`（input-config.md §6） |
-| `boardEvents` | 是 | 固定为 `{"protocol": "autobiz.board-events.v1"}`，表示插件会推送看板事件（interfaces.md §3.5） |
-| `knowledge_config` | 看板能力 `knowledgeSedimentation` | §7.3 |
-| `artifact_sync` | 产物同步模块且 `artifactSync.entry.enabled` | §7.2 |
-| `supported_deploy_units` | 知识模块 | §7.1；声明 `knowledge.source` 时运行期回写 |
-| `agentsRepo` | 声明 `knowledge.source` | §7.1 |
+### 3.1 board_config.json
+
+```json
+{
+  "apiVersion": 1,
+  "inspectCommands": { "darwin": { "…": "…" }, "linux": { "…": "…" }, "win32": { "…": "…" } }
+}
+```
+
+| 键 | 说明 |
+|---|---|
+| `apiVersion` | 固定为 `1`，宿主协议版本（interfaces.md §5） |
+| `inspectCommands` | 每个平台一组宿主命令，§3.2 |
 
 ### 3.2 inspectCommands
 
@@ -144,103 +147,45 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 | `dialog_tips` | `board.display.dialogTips` | 必有 |
 | `system_prompt_inject` | `board.display.systemPromptInject` | 必有 |
 | `session_context_inject` | `{py} "${pluginPath}/runtime/session/render_session_context.py" --platform <platform> --plugin-workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path "${sessionWorkspacePath}"` | 必有 |
-| `knowledge_path` | `${pluginPath}/<knowledge.root>` | 知识模块；声明 `source` 时运行期回写 |
-| `deploy_units` | `{py} "${pluginPath}/runtime/knowledge/inspect_deploy_units.py"` | 知识模块；键名待与 DevClaw 确认（README §9） |
-| `pull_knowledge` | `{py} "${pluginPath}/runtime/knowledge/sync_knowledge.py" --write-board-config` | 声明 `knowledge.source` |
+| `knowledge_path` | `${pluginPath}/<knowledge.root>` | 知识模块 |
+| `deploy_units` | `{py} "${pluginPath}/runtime/knowledge/inspect_deploy_units.py"` | 知识模块；DevClaw 由它取得支持的发布单元。键名待与 DevClaw 确认（README §9） |
+| `pull_knowledge` | `{py} "${pluginPath}/runtime/knowledge/sync_knowledge.py"` | 声明 `knowledge.source` |
 | `skip_node` | `{py} "${pluginPath}/runtime/adapters/skip_node.py" --workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" --node "${nodeId}"` | 开启 `rules.skip` |
 
 引号规则（D2）：单值占位符一律写成 `"${pluginPath}"` 这样放在双引号内；`${projectDirs...}`（多参数展开）和 `${selectedDeployUnits}`（JSON 数组）不加引号，由宿主当作参数整体转义。
 
 关闭知识模块时，`knowledge_path`、`deploy_units`、`pull_knowledge` 三个键直接不生成（D1），不会输出空值。
 
-### 3.3 workflow
+### 3.3 modules.json
 
-```jsonc
+文件名与模块包的元数据 `module.json`（interfaces.md §2.1）区分开：这里描述的是一个插件开启了哪些模块。
+
+```json
 {
-  "templates": { "standard": { "kind": "profile", "label": "…", "description": "…" } },
-  "skipPolicy": { "lockedNodes": [] },                       // 开启 rules.skip 时
-  "dynamicStages": [ /* 有动态阶段时，见下 */ ],
-  "checkpoints": {
-    "initial": ["<P0>_in_progress"],
-    "transitions": {
-      "<P0>_in_progress": ["<P0>_done"], "<P0>_done": ["<P1>_in_progress"], "…": [],
-      "<Pk-1>_done": ["archived"], "archived": []              // 有终态节点时；否则 "<Pk>_done": []
-    },
-    "stageLabels": { "<P0>_in_progress": "{name}进行中", "<P0>_done": "{name}完成", "archived": "已归档" }
+  "apiVersion": 1,
+  "modules": {
+    "board":        { "enabled": true,  "version": "1.0.0" },
+    "session":      { "enabled": true,  "version": "1.0.0" },
+    "knowledge":    { "enabled": true,  "version": "1.0.0", "assembler": "plugin", "source": true },
+    "artifactSync": { "enabled": false }
   },
-  "nodes": [ /* §3.4 */ ],
-  "transitions": [ { "id": "<Pi>-to-<Pi+1>", "from": { "nodeId": "…", "state": "done" }, "to": { "nodeId": "…", "state": "in_progress" } } ]
+  "boardEvents": { "protocol": "autobiz.board-events.v1" },
+  "knowledge_config": {
+    "sync_type": "invoke_session",
+    "nextAction": { "slashSkill": "knowledge-sync", "userMessage": "请针对${projectCode}项目发起知识沉淀，这个是 token：${leanToken}", "dialogTips": "发起知识沉淀" }
+  }
 }
 ```
 
-动态阶段（`rules.dynamicStages`，input-config.md §2.7）：
-
-```json
-{
-  "id": "detail_design_before_code", "phase": "Dev", "label": "详细设计", "description": "…", "order": 45,
-  "choiceCheckpoint": "plan_done", "defaultDecision": "pending", "insertAfter": "dev.plan",
-  "enableTargetCheckpoint": "detail_design_in_progress", "skipTargetCheckpoint": "code_in_progress",
-  "enableLabel": "…", "skipLabel": "…", "enableDescription": "…", "skipDescription": "…",
-  "nodes": [ { "id": "dev.detail_design", "phase": "Dev", "checkpointPrefix": "detail_design", "…": "其余字段同 §3.4" } ]
-}
-```
-
-`checkpoints.transitions` 只描述主干。动态阶段的流转由 `choiceCheckpoint`、`enableTargetCheckpoint`、`skipTargetCheckpoint` 表达：执行时 `choiceCheckpoint → 阶段节点依次推进 → skipTargetCheckpoint`，跳过时 `choiceCheckpoint → skipTargetCheckpoint`。
-
-### 3.4 节点
-
-```jsonc
-{
-  "id": "dev.plan",
-  "label": "任务计划",
-  "group": "Dev",
-  "skill": "autodev-plan",
-  "runtimePolicy": { "agentMode": "multi", "subagentConfig": { … } },  // 可选，来自 session.policies.nodes
-  "description": "…",
-  "checkpoints": ["plan_in_progress", "plan_done"],
-  "states": [
-    { "nodeStatus": "not_started", "label": "未开始", "nextAction": { "slashSkill": "…", "userMessage": "…", "dialogTips": "…" } },
-    { "nodeStatus": "in_progress", "label": "进行中", "nextAction": { … } },
-    { "nodeStatus": "done",        "label": "已完成", "nextAction": { … } }
-  ],
-  "artifacts": { "inputs": [ /* §3.5 */ ], "outputs": [ /* §3.5 */ ] },
-  "validators": []
-}
-```
-
-`states` 必须按 not_started、in_progress、done 的顺序给出这三项；终态节点只有 not_started、archived 两项，`checkpoints` 为 `["archived"]`。`skipped` 是运行期状态，由 `feature_status` 给出，不在 `states` 中列出。`nextAction.slashSkill` 为空字符串表示流程结束，没有下一步。`validators` 固定为空数组：节点的校验命令由运行框架执行（§4.4），不交给 DevClaw。
-
-### 3.5 产物定义
-
-```json
-{ "id": "plan", "label": "实施计划", "artifactType": "file", "path": "plan.md", "required": true }
-{ "id": "spec_bundle", "label": "proposal.md", "artifactType": "file", "path": "proposal.md",
-  "paths": ["proposal.md", "specs/*/spec.md"], "required": true }
-{ "id": "prd", "label": "PRD文档", "artifactType": "file", "path": "PRD.md", "required": false }
-{ "id": "code", "label": "代码提交", "artifactType": "git", "required": true,
-  "git": { "repos": "deployUnits", "branch": "current", "require": ["commits", "clean", "merged"] } }
-```
-
-| 字段 | 必有 | 语义 |
+| 键 | 必有 | 说明 |
 |---|---|---|
-| `id` / `artifactType` / `required` | 是 | 文件产物的 `artifactType` 按扩展名推断为 `file` 或 `json`，代码提交为 `git`；`required` 为核心配置中 `optional` 的反面 |
-| `path` | 文件产物 | 核心配置中路径为数组时取首项，保证只认 `path` 的旧版宿主仍能工作。git 产物没有 `path` |
-| `label` | 是 | 取 `board.display.artifacts[id]`，未配置时为第一个路径，git 产物为产物 id |
-| `paths` | 否 | 仅在核心配置中路径为数组时输出，给出全部项 |
-| `git` | git 产物 | 填好默认值的 `{repos, branch, require}`（input-config.md §2.9） |
+| `apiVersion` | 是 | 同 `board_config.json` |
+| `modules` | 是 | 四个模块逐个列出，未开启的写 `{"enabled": false}`，不靠缺省表达。开启的模块带 `version`；知识模块另带 `assembler`（`plugin`/`devclaw`，DevClaw 据此决定是否自己组装知识）和 `source`（是否由插件拉取知识仓库，即是否有 `pull_knowledge`）；产物同步模块另带 `skill`（同步技能名） |
+| `boardEvents` | 是 | 插件会推送看板事件（interfaces.md §3.5），值固定为 `{"protocol": "autobiz.board-events.v1"}`。这是本脚手架新增的协议，现有插件没有，DevClaw 实现推送服务前忽略即可 |
+| `knowledge_config` | 看板能力 `knowledgeSedimentation` | 知识沉淀入口，§7.3 |
+| `artifact_sync` | 产物同步模块且 `artifactSync.entry.enabled` | 产物同步入口，§7.2 |
 
-完成判定见 §4.4。
-
-### 3.6 运行期回写字段
-
-只在声明了 `knowledge.source` 时存在：
-
-| 字段 | 写入方 | 说明 |
-|---|---|---|
-| `supported_deploy_units` | `runtime/knowledge/sync_knowledge.py --write-board-config` | 来自同步后的知识清单 |
-| `inspectCommands.<当前平台>.knowledge_path` | 同上 | 同步后的知识目录 |
-
-运行期写入方只能改动上述字段。`build` 保留这两个字段的当前值，`package` 将其重置为输入值或模板默认值。
+`knowledge_config`、`artifact_sync` 沿用全栈版 board_config 中同名键的形态，DevClaw 只需改为从这里读取。
 
 ## 4. 运行期数据
 
@@ -366,7 +311,7 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 
 ## 5. 内部配置 runtime/config/
 
-编译后的内部配置，只给运行框架读取，DevClaw 不读。`engine.py` 只依赖这里的配置和 `state.json`；适配入口（`adapters/`、`session/`）在拼装宿主数据时，可以额外读取 `board_config.json` 中的展示字段（标签、`nextAction` 文案）。
+编译后的内部配置，只给运行框架和模块脚本读取，DevClaw 不读。每个文件由一个模块生成，脚本只读自己需要的那几份：`engine.py` 只依赖 `runtime.json`、`flow.json` 和 `state.json`；适配入口（`adapters/`、`session/`）拼装宿主数据时再读 `board.json`（展示文案）和 `session.json`（运行策略）。
 
 ### 5.1 runtime.json
 
@@ -451,7 +396,41 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 - 每个节点的 `<skillDir>/SKILL.md` 存在；
 - 产物路径均为安全的相对路径。
 
-### 5.3 session.json
+### 5.3 board.json（看板展示）
+
+看板模块的编译结果：`board.display` 填好默认值、按节点展开后的文案。节点的名称、分组、顺序、checkpoint、产物及其显示名、阶段标签已经在 `flow.json` 中，这里不重复。adapter 把 `flow.json`、`board.json`、`session.json` 合起来，拼成 `project_status`、`feature_status`、`dynamic_workflow` 输出的看板数据（interfaces.md §3.3）。
+
+```jsonc
+{
+  "schema": "autobiz.board.v1",
+  "template": { "id": "standard", "label": "标准", "description": "…" },
+  "stateLabels": { "not_started": "未开始", "in_progress": "进行中", "done": "已完成", "skipped": "已跳过", "archived": "已归档" },
+  "nodes": {
+    "dev.plan": {
+      "description": "…",
+      "nextAction": {
+        "not_started": { "slashSkill": "autodev-plan", "userMessage": "…", "dialogTips": "…" },
+        "in_progress": { "slashSkill": "autodev-plan", "userMessage": "…", "dialogTips": "…" },
+        "done":        { "slashSkill": "autodev-code", "userMessage": "…", "dialogTips": "…" }
+      }
+    },
+    "ops.archive": { "description": "…", "nextAction": { "not_started": { … }, "archived": { … } } }
+  },
+  "dynamicStages": {
+    "detail_design_before_code": {
+      "description": "…", "order": 45,
+      "enable": { "label": "…", "description": "…" },
+      "skip":   { "label": "…", "description": "…" }
+    }
+  }
+}
+```
+
+- `nodes` 包含主干节点和动态阶段节点，按流程顺序排列，`nextAction` 按 input-config.md §6 推导并合并覆写；
+- `stateLabels` 只列用得到的状态：`skipped` 仅在开启 `rules.skip` 时出现，`archived` 仅在有终态节点时出现；
+- `dynamicStages` 只放选择文案和看板排序 `order`，流转规则在 `flow.json` 的 `dynamicStages`。
+
+### 5.4 session.json
 
 ```json
 {
@@ -466,7 +445,7 @@ DevClaw 只读取根目录的 `plugin.json`（D5）。`.codex-plugin/plugin.json
 
 `knowledgeAssembly` 由知识模块在 `assembler = plugin` 时写入（interfaces.md §2.4）：`script` 固定为内置组装脚本，`timeoutSec` 取 `knowledge.assembly.timeoutSec`；未启用知识模块或 `assembler = devclaw` 时为 `null`。
 
-### 5.4 knowledge.json（知识模块）
+### 5.5 knowledge.json（知识模块）
 
 ```json
 {
@@ -551,16 +530,11 @@ description: 将工作拆解为有序任务。当你已有规格说明……时�
 | `runtime/knowledge/inspect_deploy_units.py` | lite `agents_repo.py` | 启用即生成 | 按 `manifest.format` 解析知识清单，输出支持的系统和发布单元（interfaces.md §3.3.8） |
 | `runtime/knowledge/render_collected_session_context.py` | 全栈版 `render_collected_session_context.py`，去掉流程上下文和运行策略部分 | `assembler = plugin` | 内置组装脚本（interfaces.md §4.5）：调用 `collect-knowledge.js` 按所选发布单元组装知识；collector 不可用或单元未命中时按清单映射加载，最后回退 `<localRepoPath>/AGENTS.md`；始终读取 `<sessionWorkspacePath>/AGENTS.md`。插件可以替换这个文件，被替换后 build 和 upgrade 保留插件的版本（README §4） |
 | `runtime/knowledge/collect-knowledge.js` | 全栈版 `collect-knowledge.js` | `assembler = plugin` | collector：列出支持的发布单元、按单元恢复知识，依赖 Node 和 `gray-matter` |
-| `runtime/knowledge/sync_knowledge.py` | lite `sync_agents.py` | 声明 `source` | 克隆知识仓库到 `root`：先在临时目录克隆并校验清单，成功后再替换；HTTPS 失败时回退 SSH；回写 §3.6 字段 |
+| `runtime/knowledge/sync_knowledge.py` | lite `sync_agents.py` | 声明 `source` | 按 `runtime/config/knowledge.json` 的 `source` 克隆知识仓库到 `root`：先在临时目录克隆并校验清单，成功后再替换；HTTPS 失败时回退 SSH。不回写任何配置文件 |
 
-board_config 中的配置：
+另外会在 `inspectCommands` 中加入 `knowledge_path`、`deploy_units`（声明 `source` 时再加 `pull_knowledge`），在 `modules.json` 中写入知识模块的开启信息，生成 `runtime/config/knowledge.json`，在 `session.json` 中写入 `knowledgeAssembly`（仅 `assembler = plugin`，§5.4）。
 
-```json
-"agentsRepo": { "url": "…", "sshUrl": "…", "ref": "master" },
-"supported_deploy_units": []
-```
-
-`agentsRepo` 只在声明 `source` 时输出。另外会在 `inspectCommands` 中加入 `knowledge_path`、`deploy_units`（声明 `source` 时再加 `pull_knowledge`），生成 `runtime/config/knowledge.json`，在 `session.json` 中写入 `knowledgeAssembly`（仅 `assembler = plugin`，§5.3）。声明 `source` 时还会在 `.gitignore` 中追加 `<root>/`、`.knowledge.lock`、`.knowledge-sync-*`。
+支持的发布单元由 DevClaw 执行 `deploy_units` 取得，`pull_knowledge` 同步后也会在输出中给出（interfaces.md §3.3.8、§3.3.9）。全栈版 board_config 中的 `supported_deploy_units` 和 `agentsRepo` 不再生成：前者改由命令给出，后者是同步脚本自己的配置，放在 `knowledge.json` 的 `source`。声明 `source` 时还会在 `.gitignore` 中追加 `<root>/`、`.knowledge.lock`、`.knowledge-sync-*`。
 
 ### 7.2 产物同步模块（modules/artifactSync.json）
 
@@ -597,7 +571,7 @@ skills/<skillName>/
 - `allowedCheckpoints` 优先用显式列表；否则取主干 checkpoint 链（含 `archived`，不含动态阶段节点）上 `allowedFrom` 及之后的全部 checkpoint，再去掉 `excludeCheckpoints`；
 - 没有任何可同步路径的节点和阶段不输出。
 
-看板入口（`entry.enabled` 时生成）：
+看板入口（`entry.enabled` 时写入 `modules.json`）：
 
 ```json
 "artifact_sync": {
@@ -612,7 +586,7 @@ skills/<skillName>/
 
 ### 7.3 知识沉淀入口（看板可选能力 knowledgeSedimentation）
 
-只生成 board_config 中的配置，不带脚本：
+只在 `modules.json` 中生成入口，不带脚本：
 
 ```json
 "knowledge_config": {
@@ -639,7 +613,8 @@ skills/<skillName>/
               "modules/artifactSync.json": "sha256:…" },
   "files": {
     "runtime/common/engine.py": { "ownership": "managed", "sha256": "…" },
-    "board_core/board_config.json": { "ownership": "generated", "sha256": "…", "runtimeFields": ["supported_deploy_units", "inspectCommands.*.knowledge_path"] },
+    "board_core/board_config.json": { "ownership": "generated", "sha256": "…" },
+    "board_core/modules.json": { "ownership": "generated", "sha256": "…" },
     "skills/autodev-plan/SKILL.md": { "ownership": "seeded", "regions": { "state": "sha256:…", "artifacts": "optOut" } }
   }
 }

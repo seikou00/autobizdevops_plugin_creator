@@ -1,0 +1,192 @@
+{
+  "schema": "autobiz.build-manifest.v1",
+  "scaffoldVersion": "1.0.0",
+  "coreVersion": "1.0.0",
+  "pluginId": "autodev-planning-kanban",
+  "layout": "legacy",
+  "metaRoot": ".autobizdevops",
+  "modules": {
+    "board": "1.0.0",
+    "session": "1.0.0",
+    "knowledge": "1.0.0",
+    "artifactSync": "1.0.0"
+  },
+  "inputs": {
+    "plugin.scaffold.json": "sha256:60d3155eb1c173ac809b1dbbf258543bdfeeb21961e70a62c70da73dcc37e8b7",
+    "workflow.json": "sha256:ba4a81b2d46afa584e50e28197d3616237edec51bd8613fdd626884f5fbe1829",
+    "modules/board.json": "sha256:5d3b7b6c1318bdf4f2f69af87efa4e42cf800564b1eab27c382c80f3596d782a",
+    "modules/session.json": "sha256:6afa891e6007a4e1dcc7325f0fdd58cc98fcc0a654df70b5e9c4d3fdc67d6c8f",
+    "modules/knowledge.json": "sha256:ea3baddd769613c3020962752fc6a61e79a291199800132dbdfe30657333d189",
+    "modules/artifactSync.json": "sha256:68d2606dc5514aa940c856af31382223d0ec4dfb5a0bc065058d0e2e9dba94a4"
+  },
+  "files": {
+    "runtime/workflow/update_state.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/init_workspace.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/init_feature.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/inspect_state.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/inspect_workflow_templates.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/board_events.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/session/render_session_context.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/query.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/engine.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/knowledge/inspect_deploy_units.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "runtime/knowledge/render_collected_session_context.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "runtime/knowledge/collect-knowledge.js": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "runtime/knowledge/sync_knowledge.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "skills/autobizdevops-artifact-sync/SKILL.md": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "skills/autobizdevops-artifact-sync/references/sync-runtime.md": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "skills/autobizdevops-artifact-sync/references/feature-api-detail.md": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "skills/autobizdevops-artifact-sync/scripts/sync_artifacts.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "skills/autobizdevops-artifact-sync/scripts/artifact_sync_utils.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    ".scaffold/plugin-scaffold.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".scaffold/workflow.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".scaffold/modules/board.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".scaffold/modules/session.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".scaffold/modules/knowledge.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".scaffold/modules/artifactSync.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".gitignore": {
+      "ownership": "seeded",
+      "sha256": "sha256:0241049f681214d045c64ef79f7e51119c45d6ed4d789d0c4dc48bbe9872e8d6"
+    },
+    "board_core/board_config.json": {
+      "ownership": "generated",
+      "sha256": "sha256:5f205d0c365902612120fd4172851631b6dfa62fe92afb578219ddcdd3f28775"
+    },
+    "board_core/modules.json": {
+      "ownership": "generated",
+      "sha256": "sha256:4102e3773343b8e339409d3949a03b51b0b846f8a579c497d844b8d58b3c2fe4"
+    },
+    "plugin.json": {
+      "ownership": "generated",
+      "sha256": "sha256:b8118fa9408aeba2f9fc7e61c14dc567bf89c043aa16a2143e0dbdde035de318"
+    },
+    "runtime/config/board.json": {
+      "ownership": "generated",
+      "sha256": "sha256:855149b8bc495357b02ae1399b20d2274c60acf1abf3a1c8f97ca76515a434ba"
+    },
+    "runtime/config/flow.json": {
+      "ownership": "generated",
+      "sha256": "sha256:c2346a60ef3be8ebdd3013d58a3d3f01e6c326c69dbe03630bec2bb49026ce0e"
+    },
+    "runtime/config/knowledge.json": {
+      "ownership": "generated",
+      "sha256": "sha256:a9039cf1e98f811d7f49002aaadc6b3deaf6e718f012589f105c0bbe82bb60bd"
+    },
+    "runtime/config/runtime.json": {
+      "ownership": "generated",
+      "sha256": "sha256:10389a4bb390d6a9203e0b8cb2fc85cb26841f4eaad42b04bdabf10d24bbc64a"
+    },
+    "runtime/config/session.json": {
+      "ownership": "generated",
+      "sha256": "sha256:3fbd26101b0550f1d8b6ef414ffbfa44114cabdb7765c69959e0532702834467"
+    },
+    "skills/autobiz-prd/SKILL.md": {
+      "ownership": "seeded",
+      "regions": {
+        "state": "sha256:75a09587e6b4ed06cdd8055a3b4fd01704008530938eb942e6124419da377058",
+        "artifacts": "sha256:23d710d253b527c424ecbaa056f57029d62827ba80ff60e93ca5d463f477703a"
+      }
+    },
+    "skills/autobizdevops-artifact-sync/config/artifact-sync.json": {
+      "ownership": "generated",
+      "sha256": "sha256:35623f43ffc319444043e31bd4f608b40439543e57d030f20b3a17b476dbcac3"
+    },
+    "skills/autodev-code/SKILL.md": {
+      "ownership": "seeded",
+      "regions": {
+        "state": "sha256:9a463cfaf97e9e09565f79d14ceb9985a02b17835807174ee50a26febb7f4598",
+        "artifacts": "sha256:e6eccf4e5811a1ab4d5d434f1ac83480e7fd90e5124b7142a2983d657ef944d1"
+      }
+    },
+    "skills/autodev-plan/SKILL.md": {
+      "ownership": "seeded",
+      "regions": {
+        "state": "sha256:2167631c8f9b2f4eb121f38ea178c200b99aab99032c60966ba6ecb0716ebb53",
+        "artifacts": "sha256:24eaf5e21b47b08646f6314abb3e940ab16328856f98b67b4b352bbd3ad65c8d"
+      }
+    },
+    "skills/autodev-sepc/SKILL.md": {
+      "ownership": "seeded",
+      "regions": {
+        "state": "sha256:8a19acaae199043c7d892f3a99b698fc8bed28d35ead1c8eae77815bc91b02b9",
+        "artifacts": "sha256:9d2fface78f8824612b61ec23b8a2e6ff86ed9c3049d991df68c948bcf02c18a"
+      }
+    },
+    ".githooks/pre-commit": {
+      "ownership": "seeded",
+      "sha256": "…"
+    }
+  }
+}

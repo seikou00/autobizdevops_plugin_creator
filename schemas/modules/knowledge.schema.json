@@ -61,12 +61,6 @@
         "sshUrl": { "type": "string", "default": "" },
         "ref": { "type": "string", "default": "main" }
       }
-    },
-    "supportedDeployUnits": { // 可为空：看板发布单元列表的初始值；声明 source 时运行期由 pull_knowledge 回写，打包时重置为这里的值
-      "type": "array",
-      "items": { "type": "string" },
-      "default": [],
-      "description": "board_config supported_deploy_units 的初始值；声明 source 时运行期由 pull_knowledge 回写，打包时重置为此值。"
     }
   },
   "definitions": { // definitions 是可复用的片段，被上面的 $ref 引用，不是配置字段

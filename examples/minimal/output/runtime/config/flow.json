@@ -1,0 +1,93 @@
+{
+  "schema": "autobiz.flow.v1",
+  "source": {
+    "workflow.json": "sha256:58d3169de11e756d1b088b13098415e06fc89ef73ad66e6c8ee5bca6a5b21328"
+  },
+  "stages": [
+    "Doc-Review-Kanban"
+  ],
+  "artifacts": {
+    "draft": {
+      "label": "DRAFT.md",
+      "type": "file",
+      "paths": [
+        "DRAFT.md"
+      ],
+      "producer": "draft"
+    },
+    "review": {
+      "label": "REVIEW.md",
+      "type": "file",
+      "paths": [
+        "REVIEW.md"
+      ],
+      "producer": "review"
+    }
+  },
+  "nodes": [
+    {
+      "id": "draft",
+      "name": "起草",
+      "stage": "Doc-Review-Kanban",
+      "skill": "doc-draft",
+      "skillDir": "skills/doc-draft",
+      "order": 10,
+      "terminal": false,
+      "checkpoints": [
+        "draft_in_progress",
+        "draft_done"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "draft",
+          "required": true
+        }
+      ],
+      "validate": null
+    },
+    {
+      "id": "review",
+      "name": "评审",
+      "stage": "Doc-Review-Kanban",
+      "skill": "doc-review",
+      "skillDir": "skills/doc-review",
+      "order": 20,
+      "terminal": false,
+      "checkpoints": [
+        "review_in_progress",
+        "review_done"
+      ],
+      "inputs": [
+        {
+          "id": "draft",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "id": "review",
+          "required": true
+        }
+      ],
+      "validate": "${python} ${skillPath}/scripts/check_review.py --feature-dir ${featureDir}"
+    }
+  ],
+  "dynamicStages": [],
+  "skip": null,
+  "checkpoints": {
+    "chain": [
+      "draft_in_progress",
+      "draft_done",
+      "review_in_progress",
+      "review_done"
+    ],
+    "initial": "draft_in_progress",
+    "labels": {
+      "draft_in_progress": "起草进行中",
+      "draft_done": "起草完成",
+      "review_in_progress": "评审进行中",
+      "review_done": "评审完成"
+    }
+  }
+}

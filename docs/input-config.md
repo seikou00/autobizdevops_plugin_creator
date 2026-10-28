@@ -11,7 +11,7 @@
 | 插件基础信息 | `plugin.scaffold.json` | 名称、版本、描述 | 收集信息，生成基础配置 | 插件清单 `plugin.json`、工程结构 |
 | 核心流程 | `workflow.json` | 节点、技能绑定、执行顺序、输入输出、可选校验命令、终态节点；`rules` 中按需开启的流程规则（动态阶段、跳过节点） | 创建配置骨架，辅助选择已有技能 | 编译后的流程契约及状态规则 `runtime/config/flow.json` |
 | 技能资源 | `skills/<skill>/` 或 `skills/<分组>/<skill>/` | 技能正文、模板、执行脚本、业务校验器 | 导入已有资源或创建空骨架 | 带状态接入说明的交付技能及资源 |
-| 看板模块配置 | `modules/board.json` | 目标平台、展示设置、可选能力 | 生成接入脚本和平台命令映射 | 看板 adapter `runtime/adapters/*`、固定看板配置 `board_core/board_config.json` |
+| 看板模块配置 | `modules/board.json` | 目标平台、展示设置、可选能力 | 生成接入脚本和平台命令映射 | 看板 adapter `runtime/adapters/*`、宿主接口 `board_core/board_config.json`、`board_core/modules.json`，看板文案 `runtime/config/board.json` |
 | 会话与 Agent 配置 | `modules/session.json`；`agents/` | 运行策略、外挂资源 | 提供默认会话入口及配置骨架 | 会话模块 `runtime/session/*`、策略配置 `runtime/config/session.json`、资源引用 |
 | 知识模块配置 | `modules/knowledge.json` | 清单解析方式、组装方选择 | 引导启用和选择 | `runtime/knowledge/*`：清单解析、发布单元查询、内置组装脚本 |
 | 产物同步模块配置 | `modules/artifactSync.json` | 允许同步的阶段、要上传的产物 | 引导启用 | 同步技能 `skills/<skillName>/`、看板同步入口 `artifact_sync` |
@@ -25,7 +25,7 @@
 
 | | 核心配置 | 编译配置 |
 |---|---|---|
-| 文件 | `workflow.json`、`plugin.scaffold.json`、`modules/*.json` | `runtime/config/*.json`、`board_core/board_config.json` |
+| 文件 | `workflow.json`、`plugin.scaffold.json`、`modules/*.json` | `runtime/config/*.json`、`board_core/*.json` |
 | 谁写 | 开发者与 agent 共同维护 | 只由 `autobiz-plugin build` 写入 |
 | 内容 | 只写决策；能推导或有默认值的都不写 | 填好全部默认值，展开引用，算出 checkpoint、标签、产物类型 |
 | 谁读 | 脚手架 | 运行框架与 DevClaw |
@@ -367,7 +367,7 @@
 | `dialogTips` | `当前为{workflowLabel}插件：{节点 name 以 " → " 连接}。请描述目标与验收标准。` |
 | `systemPromptInject` | `当前 Feature 为 ${feature}。产物目录 FEATURE_DIR=${pluginWorkspace}/${projectDir}/{metaDir}/features/${feature}。插件根目录 PLUGIN_ROOT=${pluginPath}。`，其中 `{metaDir}` 在构建时替换：`isolated` 布局为 `.autobizdevops/<plugin.id>`，`legacy` 布局为 `.autobizdevops` |
 | `stateLabels` | `{"not_started":"未开始","in_progress":"进行中","done":"已完成","skipped":"已跳过","archived":"已归档"}`；后两项只在开启 `rules.skip` 或有终态节点时使用 |
-| `checkpointLabels.<checkpoint>` | 覆写看板阶段标签（board_config 的 `stageLabels`）。默认 `_in_progress` 为 `{name}进行中`、`_done` 为 `{name}完成`、`archived` 为 `stateLabels.archived` |
+| `checkpointLabels.<checkpoint>` | 覆写看板阶段标签（`flow.json` 的 `checkpoints.labels`，即 `dynamic_workflow` 输出的 `stageLabels`）。默认 `_in_progress` 为 `{name}进行中`、`_done` 为 `{name}完成`、`archived` 为 `stateLabels.archived` |
 | `artifacts.<产物 id>` | 产物显示名；默认取该产物的第一个路径（例如 `PRD.md`），git 产物默认为产物 id |
 | `nodes.<nodeId>.description` | 节点描述；默认 `{name}；产物：{输出路径以 "、" 连接}`。key 可以是动态阶段中的节点 |
 | `nodes.<nodeId>.nextAction.active` | 覆写该节点 not_started 和 in_progress 状态的 `slashSkill`/`userMessage`/`dialogTips` |
@@ -381,7 +381,7 @@
 
 #### 4.1.3 capabilities.knowledgeSedimentation：知识沉淀入口
 
-在看板上生成知识沉淀入口（board_config 顶层 `knowledge_config`），带出 DevClaw 提供的 `knowledge-sync` 技能。它只是看板入口，不依赖知识模块是否启用。
+在看板上生成知识沉淀入口（`board_core/modules.json` 顶层 `knowledge_config`），带出 DevClaw 提供的 `knowledge-sync` 技能。它只是看板入口，不依赖知识模块是否启用。
 
 ```json
 "knowledgeSedimentation": { "enabled": true }
@@ -415,7 +415,7 @@
 | 字段 | 默认值 | 说明 |
 |---|---|---|
 | `policies.default` | `{"agentMode":"solo"}` | 全局默认运行策略 |
-| `policies.nodes.<nodeId>` | — | 节点运行策略，原样写入 board_config 中对应节点的 `runtimePolicy` |
+| `policies.nodes.<nodeId>` | — | 节点运行策略，原样写入 `runtime/config/session.json`，看板数据中对应节点的 `runtimePolicy` 即此值 |
 
 运行策略字段：
 
@@ -452,7 +452,6 @@
 | `source.url` | 声明 `source` 时必填 | 知识仓库 HTTPS 地址 |
 | `source.sshUrl` | `""` | HTTPS 克隆失败时回退的 SSH 地址 |
 | `source.ref` | `main` | 分支、标签或 commit |
-| `supportedDeployUnits` | `[]` | board_config `supported_deploy_units` 的初始值。声明 `source` 时，运行期由 `pull_knowledge` 回写，打包时重置为此值 |
 
 文件内容可以只有 `$schema`：此时清单解析、组装方都取默认值，用内置组装脚本组装知识，也不拉取知识仓库。
 
@@ -489,7 +488,7 @@
 | 字段 | 默认值 | 说明 |
 |---|---|---|
 | `skillName` | `autobizdevops-artifact-sync` | 生成的技能目录名和技能名 |
-| `entry.enabled` | `true` | 是否在看板上生成产物同步入口（board_config 顶层 `artifact_sync`，`slashSkill` 为 `skillName`） |
+| `entry.enabled` | `true` | 是否在看板上生成产物同步入口（`board_core/modules.json` 顶层 `artifact_sync`，`slashSkill` 为 `skillName`） |
 | `entry.syncType` / `entry.userMessage` / `entry.dialogTips` | `invoke_session` / `请针对${projectCode}项目的${feature}特性发起产物同步` / `发起产物同步` | 入口文案 |
 | `allowedFrom` | 与 `allowedCheckpoints` 二选一 | `<nodeId>:<in_progress\|done>` 或 checkpoint 名；从这里到流程末尾都允许同步。只沿主干 checkpoint 链推导（含 `archived`），动态阶段节点的 checkpoint 不在其中，需要时写进 `allowedCheckpoints` |
 | `excludeCheckpoints` | `[]` | 从 `allowedFrom` 推导出的列表中再剔除的 checkpoint |
@@ -513,38 +512,60 @@
 
 ## 6. 编译规则（核心配置 → 编译配置）
 
-build 把核心配置编译成 `runtime/config/flow.json`（output-spec.md §5.2）和 `board_core/board_config.json`。两者来自同一份中间表示，下表以 board_config 为例。设主干节点按数组顺序为 `N[0..k]`，`P[i]` 为 `N[i].id` 的最后一段；“下一节点”指流程上紧随其后的节点（动态阶段默认执行时为阶段第一个节点，阶段最后一个节点的下一节点是 `insertAfter` 之后的主干节点）；未引用的模块按默认值计算。
+build 把核心配置编译成两类文件（output-spec.md §3、§5），都来自同一份中间表示：
+
+| 文件 | 谁读 | 内容 |
+|---|---|---|
+| `board_core/board_config.json` | DevClaw | `apiVersion`、`inspectCommands` |
+| `board_core/modules.json` | DevClaw | 已开启的模块、`boardEvents`、看板入口 |
+| `runtime/config/flow.json` | 运行框架 | 流程、checkpoint、产物、阶段标签 |
+| `runtime/config/board.json` | adapter | 看板文案：模板、状态名、节点描述与 `nextAction`、动态阶段选择文案 |
+| `runtime/config/session.json`、`knowledge.json`、`runtime.json` | 运行框架、模块脚本 | output-spec.md §5 |
+
+看板上的流程数据（节点、状态、`nextAction`、产物定义、checkpoint 流转）不写进 `board_core/`，由 adapter 读取 `flow.json`、`board.json`、`session.json` 后在 `project_status`、`feature_status`、`dynamic_workflow` 中输出（interfaces.md §3.3.3、§3.3.5）。
+
+设主干节点按数组顺序为 `N[0..k]`，`P[i]` 为 `N[i].id` 的最后一段；“下一节点”指流程上紧随其后的节点（动态阶段默认执行时为阶段第一个节点，阶段最后一个节点的下一节点是 `insertAfter` 之后的主干节点）；未引用的模块按默认值计算。
+
+**board_core/**：
 
 | 输出字段 | 规则 |
 |---|---|
-| `apiVersion` | `1` |
+| `apiVersion` | `1`，两个文件相同 |
 | `inspectCommands.<platform>` | 见 output-spec.md §3.2 的命令模板，平台与解释器取自 `board.target` |
-| `workflow.templates.standard` | `{kind:"profile", label: workflowLabel, description: workflowDescription}` |
-| `workflow.checkpoints.initial` | `[P[0]_in_progress]` |
-| `workflow.checkpoints.transitions` | 主干按 `P[0]_in_progress → P[0]_done → P[1]_in_progress → …` 线性排列。最后一个主干节点是终态节点时，前一个节点的 `_done → archived`，`archived: []`；否则 `P[k]_done: []`。动态阶段的流转见 `workflow.dynamicStages` |
-| `workflow.checkpoints.stageLabels` | 全部 checkpoint（含动态阶段节点、`archived`）的默认标签（§4.1.2 `checkpointLabels`），再合并 `board.display.checkpointLabels` |
-| `workflow.dynamicStages[]` | `rules.dynamicStages` 中每个动态阶段一项：`{id, phase, label, description, order, choiceCheckpoint, defaultDecision, insertAfter, enableTargetCheckpoint, skipTargetCheckpoint, enableLabel, skipLabel, enableDescription, skipDescription, nodes}`。`phase` 取阶段第一个节点的 `stage`；`label` 取 `name`；`order` 为 `insertAfter` 节点的 `order + 5`；`choiceCheckpoint` 为 `insertAfter` 节点的 `_done`；`enableTargetCheckpoint` 为阶段第一个节点的 `_in_progress`；`skipTargetCheckpoint` 为下一个主干节点的 `_in_progress`；描述和选项文案来自 `board.display.dynamicStages`（§4.1.2）；`nodes[]` 与主干节点同形，另加 `phase`（即 `group`）和 `checkpointPrefix` |
-| `workflow.skipPolicy` | 开启 `rules.skip` 时为 `{lockedNodes: rules.skip.locked}`（写 `true` 时为 `[]`）；未开启时不输出 |
-| `nodes[i].label` | `N[i].name` |
-| `nodes[i].group` | `N[i].stage`；未写时取 `board.display.workflowLabel` |
-| `nodes[i].order` | `(i + 1) * 10` |
-| `nodes[i].description` | `board.display.nodes[N[i].id].description`，未配置时为 `{name}；产物：{输出路径以 "、" 连接}`，没有输出时为 `{name}` |
-| `nodes[i].runtimePolicy` | `session.policies.nodes[N[i].id]`；未配置时不输出 |
-| `nodes[i].checkpoints` | `[P[i]_in_progress, P[i]_done]`；终态节点为 `["archived"]` |
-| `nodes[i].states[not_started/in_progress].nextAction` | `slashSkill = N[i].skill`；`userMessage = "请使用 /{skill} 处理当前 Feature，先读取现有状态和产物。"`；`dialogTips = "当前阶段：{name}。"`；再合并 `board.display.nodes[N[i].id].nextAction.active`。终态节点只有 `not_started` 这一项 |
-| `nodes[i].states[done].nextAction` | 有下一节点时：`slashSkill` 为下一节点的技能；`userMessage` 同上，但用下一节点的技能；`dialogTips = "下一阶段：{下一节点 name}。"`。没有下一节点时：`{slashSkill:"", userMessage:"", dialogTips:"{name}已完成。"}`。再合并 `nextAction.done` |
-| 终态节点的 `states[archived].nextAction` | `{slashSkill: skill, userMessage: "请使用 /{skill} 查看当前 Feature 的归档状态。", dialogTips: "{name}已完成。"}`，再合并 `nextAction.done` |
-| `nodes[i].artifacts.inputs/outputs[]` | 文件产物为 `{id, label, artifactType, path, required[, paths]}`。`label` 取 `board.display.artifacts[id]`，缺省为第一个路径；`artifactType` 按扩展名推断；`required` 为非 `optional`；路径为数组时 `path` 取首项，`paths` 给出全部。git 产物为 `{id, label, artifactType: "git", required, git: {repos, branch, require}}`，没有 `path`，`git` 填好默认值（output-spec.md §3.5） |
-| `nodes[i].validators` | `[]`（固定）。节点的 `validate` 命令只写入 `flow.json`，由运行框架执行，DevClaw 不执行 |
-| `workflow.transitions[i]` | 主干相邻节点：`{id:"P[i]-to-P[i+1]", from:{nodeId:N[i].id, state:"done"}, to:{nodeId:N[i+1].id, state:"in_progress"}}`；`N[i+1]` 是终态节点时 `to.state` 为 `"archived"` |
-| `checkpointSuffixState` | `in_progress`、`done` 两项，label 取 `stateLabels`；有终态节点时加 `archived: {nodeStatus:"archived", label: stateLabels.archived}` |
-| `inspectCommands.*.skip_node` | 仅在开启 `rules.skip` 时生成 |
-| `knowledge_config` | 仅在 `board.capabilities.knowledgeSedimentation.enabled` 时生成（output-spec.md §7.3） |
-| `artifact_sync` | 仅在引用了产物同步模块且 `artifactSync.entry.enabled` 时生成（output-spec.md §7.2） |
-| `supported_deploy_units` | 仅在引用了知识模块时生成（output-spec.md §7.1） |
-| `agentsRepo` | 仅在知识模块声明 `source` 时生成 |
 | `inspectCommands.*.knowledge_path` / `deploy_units` | 仅在引用了知识模块时生成；未引用时直接不生成（D1） |
 | `inspectCommands.*.pull_knowledge` | 仅在知识模块声明 `source` 时生成 |
+| `inspectCommands.*.skip_node` | 仅在开启 `rules.skip` 时生成 |
+| `modules.<id>` | 四个模块都列出：引用了的为 `{enabled: true, version, …}`，未引用的为 `{enabled: false}`（`board`、`session` 始终开启） |
+| `boardEvents` | 固定 `{protocol: "autobiz.board-events.v1"}` |
+| `knowledge_config` | 仅在 `board.capabilities.knowledgeSedimentation.enabled` 时生成（output-spec.md §7.3） |
+| `artifact_sync` | 仅在引用了产物同步模块且 `artifactSync.entry.enabled` 时生成（output-spec.md §7.2） |
+
+**flow.json**（字段形态见 output-spec.md §5.2）：
+
+| 输出字段 | 规则 |
+|---|---|
+| `nodes[i].stage` | `N[i].stage`；未写时取 `board.display.workflowLabel` |
+| `nodes[i].order` | `(i + 1) * 10`；动态阶段节点为 `insertAfter` 节点的 `order + 5` |
+| `nodes[i].checkpoints` | `[P[i]_in_progress, P[i]_done]`；终态节点为 `["archived"]` |
+| `artifacts.<id>` | 第一个输出它的节点为 `producer`；`label` 取 `board.display.artifacts[id]`，缺省为第一个路径，git 产物为产物 id；`type` 按扩展名推断；git 产物的 `git` 填好默认值 |
+| `checkpoints.chain` | 主干按 `P[0]_in_progress → P[0]_done → P[1]_in_progress → …` 线性排列；最后一个主干节点是终态节点时以 `archived` 结尾 |
+| `checkpoints.labels` | 全部 checkpoint（含动态阶段节点、`archived`）的默认标签（§4.1.2 `checkpointLabels`），再合并 `board.display.checkpointLabels` |
+| `dynamicStages[]` | `choiceCheckpoint` 为 `insertAfter` 节点的 `_done`；`enableTarget` 为阶段第一个节点的 `_in_progress`；`skipTarget` 为下一个主干节点的 `_in_progress` |
+| `skip` | 开启 `rules.skip` 时为 `{locked: rules.skip.locked}`（写 `true` 时为 `[]`）；未开启时为 `null` |
+
+**board.json**（字段形态见 output-spec.md §5.3）：
+
+| 输出字段 | 规则 |
+|---|---|
+| `template` | `{id: "standard", label: workflowLabel, description: workflowDescription}` |
+| `stateLabels` | `board.display.stateLabels`；`skipped` 仅在开启 `rules.skip` 时输出，`archived` 仅在有终态节点时输出 |
+| `nodes.<id>.description` | `board.display.nodes[id].description`，未配置时为 `{name}；产物：{输出路径以 "、" 连接}`，没有输出时为 `{name}` |
+| `nodes.<id>.nextAction.not_started/in_progress` | `slashSkill = skill`；`userMessage = "请使用 /{skill} 处理当前 Feature，先读取现有状态和产物。"`；`dialogTips = "当前阶段：{name}。"`；再合并 `board.display.nodes[id].nextAction.active`。终态节点只有 `not_started` |
+| `nodes.<id>.nextAction.done` | 有下一节点时：`slashSkill` 为下一节点的技能；`userMessage` 同上，但用下一节点的技能；`dialogTips = "下一阶段：{下一节点 name}。"`。没有下一节点时：`{slashSkill:"", userMessage:"", dialogTips:"{name}已完成。"}`。再合并 `nextAction.done` |
+| 终态节点的 `nextAction.archived` | `{slashSkill: skill, userMessage: "请使用 /{skill} 查看当前 Feature 的归档状态。", dialogTips: "{name}已完成。"}`，再合并 `nextAction.done` |
+| `dynamicStages.<id>` | `order` 为 `insertAfter` 节点的 `order + 5`；`description`、`enable`、`skip` 来自 `board.display.dynamicStages`，缺省值见 §4.1.2 |
+
+adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、`order`、`skill`、`checkpoints` 取自 `flow.json`，`description`、`states[].nextAction` 取自 `board.json`，`states[].label` 取 `board.json` 的 `stateLabels`，`runtimePolicy` 取 `session.policies.nodes[id]`（未配置时不输出），`artifacts` 由 `flow.json` 的节点输入输出和产物表展开成 `ArtifactDef`（interfaces.md §3.3.3）；`dynamic_workflow` 的 `checkpoints.transitions` 由 `chain` 逐项连接得到，`stageLabels` 即 `checkpoints.labels`。
 
 ## 7. 自动检测
 
@@ -655,9 +676,11 @@ build 把核心配置编译成 `runtime/config/flow.json`（output-spec.md §5.2
 - checkpoint 链为 `draft_in_progress → draft_done → review_in_progress → review_done`，产物目录为 `.autobizdevops/doc-review/features/<feature>/`；两个节点都在默认分组 `Doc-Review-Kanban` 下，产物显示名为 `DRAFT.md`、`REVIEW.md`。完整的 `flow.json` 见 output-spec.md §5.2；
 - 生成两个技能桩文件，各自带好状态接入片段；
 - 推进到 `review_done` 时，框架先检查 `DRAFT.md`、`REVIEW.md` 存在，再执行 `skills/doc-review/scripts/check_review.py`，退出码为 0 才放行。脚本尚未编写时，`lint` 报 `COMMAND_SCRIPT_MISSING`；
-- `inspectCommands` 中不含 `knowledge_path`、`deploy_units`、`pull_knowledge`；board_config 中没有 `knowledge_config` 和 `artifact_sync`；
+- `inspectCommands` 中不含 `knowledge_path`、`deploy_units`、`pull_knowledge`；`modules.json` 中 `knowledge`、`artifactSync` 为 `{"enabled": false}`，没有 `knowledge_config` 和 `artifact_sync`；
 - `session_context_inject` 返回流程上下文和默认策略的 `agentConfig`，不含知识段；
 - 不生成 `.codex-plugin/plugin.json`。
+
+全部生成内容见 [examples/minimal/output/](../examples/minimal/output/)。
 
 以后需要给产物起中文显示名或调整看板文案时，新建 `modules/board.json` 并在入口文件的 `modules.board` 中引用即可，`workflow.json` 不用动。
 
@@ -676,7 +699,7 @@ build 把核心配置编译成 `runtime/config/flow.json`（output-spec.md §5.2
 | `modules/knowledge.json` | 内置组装器和知识仓库同步 |
 | `modules/artifactSync.json` | 从 `dev.plan` 完成起同步 5 个文档产物 |
 
-产物同步是样例额外启用的，lite 本身没有这个能力。lite 中 `plan.md` 对旧文件名 `PLAN.md` 的回退在 v1 核心配置中不再表达（interfaces.md §5）。
+生成内容见 [examples/lite/output/](../examples/lite/output/)。产物同步是样例额外启用的，lite 本身没有这个能力。lite 中 `plan.md` 对旧文件名 `PLAN.md` 的回退在 v1 核心配置中不再表达（interfaces.md §5）。
 
 ### 9.2 全栈版
 
@@ -691,8 +714,11 @@ build 把核心配置编译成 `runtime/config/flow.json`（output-spec.md §5.2
 | `modules/knowledge.json` | 内置组装器和知识仓库同步 |
 | `modules/artifactSync.json` | 从 `dev.plan` 完成起同步（编码进行中除外）6 个文档产物，以及 `biz.prd` 的原始材料 |
 
+生成内容见 [examples/fullstack/output/](../examples/fullstack/output/)。
+
 与全栈版现有 `board_config.json` 的差异：
 
+- `board_config.json` 只保留 `apiVersion` 和 `inspectCommands`；`workflow`、`checkpointSuffixState` 由命令输出，`knowledge_config` 移到 `modules.json`，`supported_deploy_units`、`agentsRepo` 不再生成（output-spec.md §3）；
 - 声明式校验器清单（`validators`）、编译守卫（`guards`）、`hookDefinitions` 和回滚归档清单（`rollback.archive`）不在核心配置中，留在插件自己的文件里（README §6.8）；人工确认关卡仍是 `hooks/hooks.json` 中的宿主钩子；
 - 回流修复（`needs_fix` checkpoint 和“已阻断”状态）暂不支持，预留到 v2（README §7）；
 - 已下架的精简路线、自定义节点子集和遗留的 `profiles` 不再表达，新建 Feature 只从第一个节点开始（全栈版的 `initial` 中其余 4 个 checkpoint 只服务于已下架的模板）；

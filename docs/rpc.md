@@ -63,7 +63,7 @@ sequenceDiagram
 
 两个令牌都通过环境变量 `AUTOBIZ_RPC_TOKEN` 传递，不放在命令行参数里（`ps` 能看到命令行）。分成两个，是因为会话里的命令由模型执行，不能让它冒充常驻进程、接管 DevClaw 发来的请求。同样的原因，常驻进程执行校验命令、知识组装脚本时，要从子进程的环境变量中去掉 `AUTOBIZ_RPC_TOKEN`。
 
-**插件 ID**：取 `plugin.id`。DevClaw 从 board_config 新增的 `rpc.pluginId` 读到它（§9），并记录为每个插件生成的令牌。握手时检查：
+**插件 ID**：取 `plugin.id`。DevClaw 从 `board_core/modules.json` 新增的 `rpc.pluginId` 读到它（§9），并记录为每个插件生成的令牌。握手时检查：
 
 1. 连接后 5 秒内第一条消息必须是 `initialize`，否则断开；
 2. `pluginId` 是 DevClaw 已加载的插件，令牌与该插件、该角色对应（常量时间比较）；
@@ -169,7 +169,7 @@ JSON-RPC 错误只用于协议和系统层面的失败：
 | 方法 | 类型 | 谁发送 | 说明 |
 |---|---|---|---|
 | `board/changed` | 通知 | 常驻进程；短连接 | 参数与 [interfaces.md §3.5.2](interfaces.md) 的 `params` 相同，DevClaw 按 §3.5.4、§3.5.5 处理 |
-| `plugin/configChanged` | 通知 | 常驻进程 | 发现 `build-manifest.json` 变化并重读配置后发送，参数 `{"manifestDigest": "…"}`。DevClaw 重读 board_config，清空该插件的看板缓存 |
+| `plugin/configChanged` | 通知 | 常驻进程 | 发现 `build-manifest.json` 变化并重读配置后发送，参数 `{"manifestDigest": "…"}`。DevClaw 重读 `board_core/`，清空该插件的看板缓存 |
 | `plugin/restartRequired` | 通知 | 常驻进程 | 发现 `runtime/` 下的托管代码变了（框架升级），参数 `{"reason": "…"}`。发送后等进行中的请求完成就退出，由 DevClaw 重启 |
 | `$/progress` | 通知 | 常驻进程 | `{"token": …, "message": "…", "percent": 40}`，用于 `knowledge/pull` |
 | `$/cancelRequest` | 通知 | 双方 | §4.4 |
@@ -244,7 +244,7 @@ runtime/
 
 ## 9. 兼容与降级
 
-board_config 的顶层键 `boardEvents` 改为 `rpc`：
+`modules.json` 的顶层键 `boardEvents` 改为 `rpc`：
 
 ```json
 "rpc": { "protocol": "autobiz.rpc.v1", "pluginId": "doc-review" }
@@ -271,7 +271,7 @@ DevClaw 据此知道插件支持本协议，并取得插件 ID。
 | [interfaces.md §3.4](interfaces.md) | `AUTOBIZ_BOARD_ENDPOINT` 改为 `AUTOBIZ_RPC_ENDPOINT`，新增 `AUTOBIZ_RPC_TOKEN` |
 | [interfaces.md §4.1、§4.3](interfaces.md) | 新增入口 `runtime/rpc/serve.py`，各入口拆出 `handle`；常驻进程执行单行命令时不继承 `AUTOBIZ_RPC_TOKEN` |
 | [output-spec.md §1](output-spec.md) | 新增 `runtime/rpc/`；`adapters/board_events.py` 由 `rpc/client.py` 取代 |
-| [output-spec.md §3.1、§3.2](output-spec.md) | `boardEvents` 改为 `rpc`（带 `pluginId`）；`inspectCommands` 新增 `connect` |
+| [output-spec.md §3.2、§3.3](output-spec.md) | `modules.json` 的 `boardEvents` 改为 `rpc`（带 `pluginId`）；`inspectCommands` 新增 `connect` |
 | [mods.md](mods.md) | R6 的看板刷新改为由写入口发送 `board/changed`；§6 第 3 项不再需要，第 4 项要解决的会话外常驻部分由常驻进程承担；A5 开发挂载后的变化由 `plugin/configChanged` 通知 DevClaw |
 | [README §1](README.md) | “看板事件推送”一条改为本协议 |
 
@@ -283,7 +283,7 @@ DevClaw 据此知道插件支持本协议，并取得插件 ID。
 4. DevClaw 现在用什么标识插件（目录、`plugin.json` 的 `name`），能否改为从 `rpc.pluginId` 取得插件 ID 并按它路由；同一个插件 ID 同时有开发挂载和安装版本时怎么处理；
 5. 同一台机器开多个 DevClaw 实例时，各自启动常驻进程。两个进程写同一个 `state.json` 由 engine 的锁保证，但会话中的写入口只通知发起会话的那个实例，另一个实例的看板要等下次拉取才更新，是否可以接受；
 6. v1 是否需要插件 → DevClaw 的请求（`workspace/listProjects`、`ui/notify`），需要的话 DevClaw 提供哪些；
-7. 旧版 DevClaw 能否忽略 board_config 中未知的顶层键 `rpc` 和 `inspectCommands` 中未知的 `connect`（与原来 `boardEvents` 的问题相同，[README §9](README.md) 第 10 项）。
+7. 旧版 DevClaw 能否忽略 `modules.json` 中未知的顶层键 `rpc` 和 `inspectCommands` 中未知的 `connect`。
 
 ## 12. 不做
 

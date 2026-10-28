@@ -78,7 +78,7 @@
         // 覆盖看板阶段标签：key 是 checkpoint 名，例如 plan_in_progress、plan_done
         "checkpointLabels": {
           "type": "object",
-          "description": "checkpoint → 看板阶段标签（board_config 的 stageLabels），覆写推导出的默认值；key 必须是存在的 checkpoint（含动态阶段节点的 checkpoint 和 archived）。",
+          "description": "checkpoint → 看板阶段标签（flow.json 的 checkpoints.labels），覆写推导出的默认值；key 必须是存在的 checkpoint（含动态阶段节点的 checkpoint 和 archived）。",
           "propertyNames": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
           "additionalProperties": { "$ref": "#/definitions/nonEmpty" }
         },
@@ -160,7 +160,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["enabled"],
-      "description": "知识沉淀入口（DevClaw 提供 knowledge-sync 能力），生成 board_config 顶层 knowledge_config；不依赖知识模块。",
+      "description": "知识沉淀入口（DevClaw 提供 knowledge-sync 能力），生成 board_core/modules.json 顶层 knowledge_config；不依赖知识模块。",
       "properties": {
         "enabled": { "type": "boolean" },
         "syncType": { "type": "string", "default": "invoke_session" },

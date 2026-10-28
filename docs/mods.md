@@ -195,7 +195,7 @@ python -X utf8 runtime/workflow/auto_state.py finish                   # 主会�
 
 **同步**（声明了 `knowledge.source` 时）：
 
-- 会话开始时，运行 mod 比对知识目录记录的 ref 与远端；过期时在后台运行 `sync_knowledge.py --write-board-config`，完成后弹提示，新知识从下一个会话起生效（本会话已经注入的索引不变，按需加载的部分读到的是新内容）；
+- 会话开始时，运行 mod 比对知识目录记录的 ref 与远端；过期时在后台运行 `sync_knowledge.py`，完成后弹提示，新知识从下一个会话起生效（本会话已经注入的索引不变，按需加载的部分读到的是新内容）；
 - 比对和同步都有超时，失败只提示，不阻塞会话；同一个插件同时只跑一个同步，沿用 `.knowledge.lock`；
 - `pull_knowledge` 宿主命令保留：会话以外（例如看板刷新支持的发布单元）仍要用它。
 
@@ -610,7 +610,7 @@ flowchart TD
 ## 6. 需要 DevClaw 确认
 
 1. mods 接口与 Claude Code 有哪些差异，§0 表中的能力是否都有，特别是拦截工具调用并附加上下文、注册工具并自动放行、技能展开时改写内容、Stop 时拦下结束、面板表单，以及在 mod 中运行本机 Python；
-2. 能否从源目录挂载开发插件并监听变化（类似 Claude Code 的 `--plugin-dir`），重载时是否同时重读 `plugin.json`、`board_config.json` 和技能；
+2. 能否从源目录挂载开发插件并监听变化（类似 Claude Code 的 `--plugin-dir`），重载时是否同时重读 `plugin.json`、`board_core/` 和技能；
 3. 能否给 mod 提供看板接口，用来刷新指定项目或 Feature 的看板（替代 D21 的推送）；
 4. mod 的生命周期是只随会话加载，还是有会话以外的常驻部分。这决定看板读取能否从 inspectCommands 改为由 mod 提供；
 5. mod 能否读到会话的环境变量 `FEATURE_ID`、`PLUGIN_WORKSPACE`、`PROJECT_DIR`（[interfaces.md §3.4](interfaces.md)），自动推进（§2.3）靠它们确定 Feature；DevClaw 从看板发起会话、预载节点技能时，是否同样触发技能展开事件；

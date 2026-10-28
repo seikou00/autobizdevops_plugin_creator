@@ -1,0 +1,22 @@
+{
+  "apiVersion": 1,
+  "modules": {
+    "board": {
+      "enabled": true,
+      "version": "1.0.0"
+    },
+    "session": {
+      "enabled": true,
+      "version": "1.0.0"
+    },
+    "knowledge": {
+      "enabled": false
+    },
+    "artifactSync": {
+      "enabled": false
+    }
+  },
+  "boardEvents": {
+    "protocol": "autobiz.board-events.v1"
+  }
+}

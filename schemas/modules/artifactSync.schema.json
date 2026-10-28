@@ -34,12 +34,12 @@
       "additionalProperties": { "$ref": "#/definitions/nonEmpty" },
       "description": "要上传的产物清单：产物 id → 同步目录中的简述。只同步列出的产物，路径和归属节点从节点输出推导。"
     },
-    // 看板上的同步入口（board_config 顶层 artifact_sync）
+    // 看板上的同步入口（board_core/modules.json 顶层 artifact_sync）
     "entry": {
       "type": "object",
       "additionalProperties": false,
       "default": {},
-      "description": "看板上的产物同步入口，生成 board_config 顶层 artifact_sync（slashSkill 固定为 skillName）。",
+      "description": "看板上的产物同步入口，生成 board_core/modules.json 顶层 artifact_sync（slashSkill 固定为 skillName）。",
       "properties": {
         "enabled": { "type": "boolean", "default": true },
         "syncType": { "type": "string", "default": "invoke_session" },
