@@ -15,24 +15,24 @@
     // 允许同步的起点：<节点 id>:in_progress|done 或 checkpoint 名，从这里到流程末尾都允许；只沿主干推导，与 allowedCheckpoints 二选一
     "allowedFrom": {
       "type": "string",
-      "pattern": "^([a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*:(in_progress|done)|[a-z][a-z0-9_]*)$",
+      "pattern": "^[a-z][a-z0-9_]*(:(in_progress|done))?$",
       "description": "<nodeId>:<in_progress|done> 或 checkpoint 名；从该点到流程末尾都允许同步。"
     },
     // 从 allowedFrom 推导出的列表中再去掉的 checkpoint
     "excludeCheckpoints": { "type": "array", "items": { "type": "string" }, "default": [] },
-    // 直接列出允许同步的 checkpoint；动态阶段节点的 checkpoint 只能用这种写法
+    // 直接列出允许同步的 checkpoint
     "allowedCheckpoints": {
       "type": "array",
       "items": { "type": "string" },
       "minItems": 1,
       "description": "显式列表，与 allowedFrom 二选一。"
     },
-    // 要上传的产物：只上传列出的；key 是产物 id，值是同步目录中的简述；git 产物不能列
+    // 要上传的产物：只上传列出的；key 是 workflow.json outputs 中写的路径，值是同步目录中的简述
     "artifacts": {
       "type": "object",
-      "propertyNames": { "$ref": "#/definitions/artifactId" },
+      "propertyNames": { "type": "string", "minLength": 1 },
       "additionalProperties": { "$ref": "#/definitions/nonEmpty" },
-      "description": "要上传的产物清单：产物 id → 同步目录中的简述。只同步列出的产物，路径和归属节点从节点输出推导。"
+      "description": "要上传的产物清单：产物路径（workflow.json 某个节点 outputs 中的路径）→ 同步目录中的简述。只同步列出的产物，归属节点从节点输出推导。"
     },
     // 看板上的同步入口（board_core/modules.json 顶层 artifact_sync）
     "entry": {
@@ -51,16 +51,13 @@
     "uploadUrl": { "type": "string", "format": "uri", "default": "https://tscode-cos-plugin.paasuat.cmbchina.cn/file/upload", "description": "上传服务地址；默认值取自全栈版 sync_artifacts.py。" },
     // 超过这个大小的文件跳过并报告
     "maxFileSizeMiB": { "type": "number", "exclusiveMinimum": 0, "default": 5 },
-    // 不属于节点输出、但也要同步的文件：{ 节点 id: { 路径模式: 简述 } }
+    // 不属于节点输出、但也要同步的文件：{ 路径模式: 简述 }，不记录阶段和节点
     "extraPaths": {
       "type": "object",
       "default": {},
-      "description": "不属于节点输出但需要同步的路径：{ nodeId: { pathPattern: 简述 } }。",
-      "propertyNames": { "$ref": "#/definitions/nodeId" },
-      "additionalProperties": {
-        "type": "object",
-        "additionalProperties": { "$ref": "#/definitions/nonEmpty" }
-      }
+      "description": "不属于节点输出但需要同步的路径：{ 路径模式（相对 FEATURE_DIR）: 简述 }，不按阶段和节点归属。",
+      "propertyNames": { "type": "string", "minLength": 1 },
+      "additionalProperties": { "$ref": "#/definitions/nonEmpty" }
     }
   },
   // allowedFrom 与 allowedCheckpoints 必须且只能写一个
@@ -70,8 +67,6 @@
   ],
   "definitions": { // definitions 是可复用的片段，被上面的 $ref 引用，不是配置字段
     "nonEmpty": { "type": "string", "minLength": 1 },
-    "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
-    "artifactId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
     "skillName": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 64 }
   }
 }

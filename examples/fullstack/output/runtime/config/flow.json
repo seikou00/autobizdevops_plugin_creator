@@ -1,7 +1,7 @@
 {
   "schema": "autobiz.flow.v1",
   "source": {
-    "workflow.json": "sha256:eb6b9acbc0f1baea598e1a4df6f82a2ea32ca1c313282e490af5ee25adb34a63"
+    "workflow.json": "sha256:7f2f74261a68160f62ac325c331a152022d792a139df08b24d330120f3f3f5ca"
   },
   "stages": [
     "Biz",
@@ -10,123 +10,102 @@
   ],
   "artifacts": {
     "prd": {
-      "label": "PRD文档",
+      "label": "PRD.md",
       "type": "file",
       "paths": [
         "PRD.md"
       ],
-      "producer": "biz.prd"
+      "producer": "prd"
     },
     "ui_context_json": {
-      "label": "UI范围机器事实源",
+      "label": "UI_CONTEXT.json",
       "type": "json",
       "paths": [
         "UI_CONTEXT.json"
       ],
-      "producer": "biz.prd"
+      "producer": "prd"
     },
     "proposal": {
-      "label": "变更提案",
+      "label": "proposal.md",
       "type": "file",
       "paths": [
         "proposal.md"
       ],
-      "producer": "dev.specs"
+      "producer": "specs"
     },
     "specs": {
-      "label": "行为规格",
+      "label": "specs/**/*.md",
       "type": "file",
       "paths": [
         "specs/**/*.md"
       ],
-      "producer": "dev.specs"
+      "producer": "specs"
     },
     "design": {
-      "label": "技术设计",
+      "label": "design.md",
       "type": "file",
       "paths": [
         "design.md"
       ],
-      "producer": "dev.design"
+      "producer": "design"
     },
-    "design_contract_lock": {
-      "label": "设计契约锁",
+    "design_contract_lock_json": {
+      "label": ".design-contract.lock.json",
       "type": "json",
       "paths": [
         ".design-contract.lock.json"
       ],
-      "producer": "dev.design"
+      "producer": "design"
     },
     "plan": {
-      "label": "执行计划",
+      "label": "PLAN.md",
       "type": "file",
       "paths": [
         "PLAN.md"
       ],
-      "producer": "dev.plan"
+      "producer": "plan"
     },
     "plan_json": {
-      "label": "计划机器结构化内容",
+      "label": "plan.json",
       "type": "json",
       "paths": [
         "plan.json"
       ],
-      "producer": "dev.plan"
+      "producer": "plan"
     },
-    "detail_design": {
-      "label": "详细设计",
-      "type": "file",
-      "paths": [
-        "DETAIL_DESIGN.md"
-      ],
-      "producer": "dev.detail_design"
-    },
-    "code": {
-      "label": "代码提交",
-      "type": "git",
-      "git": {
-        "repos": "deployUnits",
-        "branch": "current",
-        "require": [
-          "commits",
-          "clean",
-          "merged"
-        ]
-      },
-      "producer": "dev.code"
-    },
-    "evidence_stream": {
-      "label": "证据流",
+    "evidence_jsonl": {
+      "label": "evidence/EVIDENCE.jsonl",
       "type": "file",
       "paths": [
         "evidence/EVIDENCE.jsonl"
       ],
-      "producer": "dev.code"
+      "producer": "code"
     },
     "cicd_checklist": {
-      "label": "CI/CD 清单",
+      "label": "CICD_CHECKLIST.md",
       "type": "file",
       "paths": [
         "CICD_CHECKLIST.md"
       ],
-      "producer": "ops.cicd"
+      "producer": "cicd"
     },
     "pr_body": {
-      "label": "PR 描述",
+      "label": "PR_BODY.md",
       "type": "file",
       "paths": [
         "PR_BODY.md"
       ],
-      "producer": "ops.cicd"
+      "producer": "cicd"
     }
   },
   "nodes": [
     {
-      "id": "biz.prd",
+      "id": "prd",
       "name": "需求澄清与 PRD",
       "stage": "Biz",
       "skill": "autobiz-requirement-discuss",
       "skillDir": "skills/autobiz-requirement-discuss",
+      "seq": 1,
       "order": 10,
       "terminal": false,
       "checkpoints": [
@@ -144,30 +123,22 @@
           "required": true
         }
       ],
-      "validate": "${python} ${pluginPath}/hooks/stage_gate.py validate --stage ${nodeId} --feature ${feature} --workspace ${projectPath}"
+      "validate": null
     },
     {
-      "id": "dev.specs",
+      "id": "specs",
       "name": "行为规格",
       "stage": "Dev",
       "skill": "autodev-specs",
       "skillDir": "skills/autodev-specs",
+      "seq": 2,
       "order": 20,
       "terminal": false,
       "checkpoints": [
         "specs_in_progress",
         "specs_done"
       ],
-      "inputs": [
-        {
-          "id": "prd",
-          "required": true
-        },
-        {
-          "id": "ui_context_json",
-          "required": true
-        }
-      ],
+      "inputs": [],
       "outputs": [
         {
           "id": "proposal",
@@ -182,80 +153,48 @@
           "required": true
         }
       ],
-      "validate": "${python} ${pluginPath}/hooks/stage_gate.py validate --stage ${nodeId} --feature ${feature} --workspace ${projectPath}"
+      "validate": null
     },
     {
-      "id": "dev.design",
+      "id": "design",
       "name": "技术设计",
       "stage": "Dev",
       "skill": "autodev-design",
       "skillDir": "skills/autodev-design",
+      "seq": 3,
       "order": 30,
       "terminal": false,
       "checkpoints": [
         "design_in_progress",
         "design_done"
       ],
-      "inputs": [
-        {
-          "id": "proposal",
-          "required": true
-        },
-        {
-          "id": "specs",
-          "required": true
-        },
-        {
-          "id": "ui_context_json",
-          "required": true
-        }
-      ],
+      "inputs": [],
       "outputs": [
         {
           "id": "design",
           "required": true
         },
         {
-          "id": "design_contract_lock",
+          "id": "design_contract_lock_json",
           "required": true
         }
       ],
-      "validate": "${python} ${pluginPath}/hooks/stage_gate.py validate --stage ${nodeId} --feature ${feature} --workspace ${projectPath}"
+      "validate": null
     },
     {
-      "id": "dev.plan",
+      "id": "plan",
       "name": "执行计划",
       "stage": "Dev",
       "skill": "autodev-plan",
       "skillDir": "skills/autodev-plan",
+      "seq": 4,
       "order": 40,
       "terminal": false,
       "checkpoints": [
         "plan_in_progress",
         "plan_done"
       ],
-      "inputs": [
-        {
-          "id": "proposal",
-          "required": true
-        },
-        {
-          "id": "specs",
-          "required": true
-        },
-        {
-          "id": "ui_context_json",
-          "required": true
-        },
-        {
-          "id": "design",
-          "required": true
-        },
-        {
-          "id": "design_contract_lock",
-          "required": true
-        }
-      ],
+      "inputs": [],
       "outputs": [
         {
           "id": "plan",
@@ -266,76 +205,44 @@
           "required": true
         }
       ],
-      "validate": "${python} ${pluginPath}/hooks/stage_gate.py validate --stage ${nodeId} --feature ${feature} --workspace ${projectPath}"
+      "validate": null
     },
     {
-      "id": "dev.code",
+      "id": "code",
       "name": "代码实现",
       "stage": "Dev",
       "skill": "autodev-code",
       "skillDir": "skills/autodev-code",
+      "seq": 5,
       "order": 50,
       "terminal": false,
       "checkpoints": [
         "code_in_progress",
         "code_done"
       ],
-      "inputs": [
-        {
-          "id": "specs",
-          "required": true
-        },
-        {
-          "id": "design",
-          "required": true
-        },
-        {
-          "id": "plan_json",
-          "required": true
-        },
-        {
-          "id": "detail_design",
-          "required": false
-        },
-        {
-          "id": "ui_context_json",
-          "required": true
-        }
-      ],
+      "inputs": [],
       "outputs": [
         {
-          "id": "code",
-          "required": true
-        },
-        {
-          "id": "evidence_stream",
+          "id": "evidence_jsonl",
           "required": true
         }
       ],
-      "validate": "${python} ${pluginPath}/hooks/stage_gate.py validate --stage ${nodeId} --feature ${feature} --workspace ${projectPath}"
+      "validate": null
     },
     {
-      "id": "ops.cicd",
+      "id": "cicd",
       "name": "CI/CD",
       "stage": "Ops",
       "skill": "autoops-cicd",
       "skillDir": "skills/autoops-cicd",
+      "seq": 6,
       "order": 60,
       "terminal": false,
       "checkpoints": [
         "cicd_in_progress",
         "cicd_done"
       ],
-      "inputs": [
-        {
-          "id": "evidence_stream",
-          "required": true
-        },
-        {
-          "id": "plan_json",
-          "required": false
-        }
-      ],
+      "inputs": [],
       "outputs": [
         {
           "id": "cicd_checklist",
@@ -349,11 +256,12 @@
       "validate": null
     },
     {
-      "id": "ops.archive",
+      "id": "archive",
       "name": "归档",
       "stage": "Ops",
       "skill": "autoops-archive",
       "skillDir": "skills/autoops-archive",
+      "seq": 7,
       "order": 70,
       "terminal": true,
       "checkpoints": [
@@ -364,60 +272,8 @@
       "validate": null
     }
   ],
-  "dynamicStages": [
-    {
-      "id": "detail_design_before_code",
-      "name": "详细设计",
-      "insertAfter": "dev.plan",
-      "defaultDecision": "pending",
-      "choiceCheckpoint": "plan_done",
-      "enableTarget": "detail_design_in_progress",
-      "skipTarget": "code_in_progress",
-      "nodes": [
-        {
-          "id": "dev.detail_design",
-          "name": "详细设计",
-          "stage": "Dev",
-          "skill": "autodev-detail-design",
-          "skillDir": "skills/autodev-detail-design",
-          "order": 45,
-          "terminal": false,
-          "checkpoints": [
-            "detail_design_in_progress",
-            "detail_design_done"
-          ],
-          "inputs": [
-            {
-              "id": "proposal",
-              "required": true
-            },
-            {
-              "id": "specs",
-              "required": true
-            },
-            {
-              "id": "design",
-              "required": true
-            },
-            {
-              "id": "plan_json",
-              "required": true
-            }
-          ],
-          "outputs": [
-            {
-              "id": "detail_design",
-              "required": true
-            }
-          ],
-          "validate": null
-        }
-      ]
-    }
-  ],
-  "skip": {
-    "locked": []
-  },
+  "dynamicStages": [],
+  "skip": null,
   "checkpoints": {
     "chain": [
       "prd_in_progress",
@@ -436,20 +292,18 @@
     ],
     "initial": "prd_in_progress",
     "labels": {
-      "prd_in_progress": "Biz / 需求澄清与 PRD",
-      "prd_done": "Biz / PRD",
-      "specs_in_progress": "Specs",
-      "specs_done": "Specs 完成",
-      "design_in_progress": "技术设计",
+      "prd_in_progress": "需求澄清与 PRD进行中",
+      "prd_done": "需求澄清与 PRD完成",
+      "specs_in_progress": "行为规格进行中",
+      "specs_done": "行为规格完成",
+      "design_in_progress": "技术设计进行中",
       "design_done": "技术设计完成",
-      "plan_in_progress": "Plan",
-      "plan_done": "Plan 完成",
-      "detail_design_in_progress": "详细设计进行中",
-      "detail_design_done": "详细设计完成",
-      "code_in_progress": "Code",
-      "code_done": "Code 完成",
-      "cicd_in_progress": "CI/CD",
-      "cicd_done": "CI/CD 完成",
+      "plan_in_progress": "执行计划进行中",
+      "plan_done": "执行计划完成",
+      "code_in_progress": "代码实现进行中",
+      "code_done": "代码实现完成",
+      "cicd_in_progress": "CI/CD进行中",
+      "cicd_done": "CI/CD完成",
       "archived": "已归档"
     }
   }

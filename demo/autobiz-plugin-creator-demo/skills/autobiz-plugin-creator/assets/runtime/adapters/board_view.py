@@ -66,6 +66,7 @@ def run_payload(project_path, feature):
     index, current, status, statuses = node_statuses(record)
     nodes = board_nodes()
     directory = relative(project_path, query.feature_dir(project_path, feature))
+    hook_log = relative(project_path, query.hook_log_path(project_path))
     current_board = nodes[index] if index >= 0 else None
     return {"workflow": workflow_shell(), "run": {
         "featureId": feature, "featureName": feature, "workflowId": "base",
@@ -77,10 +78,10 @@ def run_payload(project_path, feature):
         "nodes": [{"id": node["id"], "nodeStatus": node_status, "nodeStatusLabel": status_label(node, node_status),
                    "artifacts": [artifact_entry(project_path, feature, item) for item in node["artifacts"]["outputs"]]}
                   for node, node_status in zip(nodes, statuses)],
-        "hookLogRefs": [{"id": "default", "path": f"{directory}/hooks.ndjson", "format": "ndjson"}],
+        "hookLogRefs": [{"id": "default", "path": hook_log, "format": "ndjson"}],
         "watchRefs": [{"path": relative(project_path, query.state_path(project_path)), "purpose": "run-state"},
                       {"path": directory, "purpose": "artifacts"},
-                      {"path": f"{directory}/hooks.ndjson", "purpose": "hook-log"}],
+                      {"path": hook_log, "purpose": "hook-log"}],
     }}
 
 

@@ -1,36 +1,36 @@
 {
   "$schema": "../../schemas/workflow.schema.json",
-  "nodes": [
-    {
-      "id": "biz.prd",
-      "name": "需求清洗",
-      "stage": "Biz",
-      "skill": "autobiz-prd",
-      "outputs": { "requirements": "PRD.md" }
-    },
-    {
-      "id": "dev.specs",
-      "name": "规格生成",
-      "stage": "Dev",
-      "skill": "autodev-sepc",
-      "inputs": ["requirements"],
-      "outputs": { "proposal": "proposal.md", "specs": "specs/*/spec.md", "design": "design.md" }
-    },
-    {
-      "id": "dev.plan",
-      "name": "任务计划",
-      "stage": "Dev",
-      "skill": "autodev-plan",
-      "inputs": ["requirements", "proposal", "specs", "design"],
-      "outputs": { "plan": "plan.md" }
-    },
-    {
-      "id": "dev.code",
-      "name": "增量编码",
-      "stage": "Dev",
-      "skill": "autodev-code",
-      "inputs": ["requirements", "proposal", "specs", "design", "plan"],
-      "outputs": { "code": { "git": { "repos": "deployUnits" } } }
-    }
-  ]
+  "nodes": {
+    "biz": [
+      {
+        "id": "prd",
+        "seq": 1,
+        "name": "需求清洗",
+        "skill": "autobiz-prd",
+        "outputs": ["PRD.md"]
+      }
+    ],
+    "dev": [
+      {
+        "id": "specs",
+        "seq": 2,
+        "name": "规格生成",
+        "skill": "autodev-sepc",
+        "outputs": ["proposal.md", "specs/*/spec.md", "design.md"]
+      },
+      {
+        "id": "plan",
+        "seq": 3,
+        "name": "任务计划",
+        "skill": "autodev-plan",
+        "outputs": ["plan.md"]
+      },
+      {
+        "id": "code",
+        "seq": 4,
+        "name": "增量编码",
+        "skill": "autodev-code"
+      }
+    ]
+  }
 }

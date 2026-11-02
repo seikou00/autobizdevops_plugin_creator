@@ -7,7 +7,7 @@
 | 1 | 插件开发者 → 脚手架 | `autobiz-plugin` CLI、初始化向导、插件开发技能 |
 | 2 | 脚手架 → 模块；运行框架 → 模块 | 模块契约（构建期 `Module`、运行期知识组装） |
 | 3 | DevClaw ↔ 插件 | `inspectCommands` 命令协议（DevClaw → 插件）；看板事件推送（插件 → DevClaw） |
-| 4 | 模型 → 插件；运行框架 → 开发者命令；框架入口 → 内部库 | `update_state.py`、校验命令、知识组装脚本、`query.py` / `engine.py` |
+| 4 | 模型 → 插件；运行框架 → 开发者命令；框架入口 → 内部库 | `update_state.py`（技能的状态维护片段调用）、校验命令、知识组装脚本、`query.py` / `engine.py` |
 
 静态文件格式见 [output-spec.md](output-spec.md)，输入配置字段见 [input-config.md](input-config.md)。下文的“宿主”均指 DevClaw；`board.*`、`session.*`、`knowledge.*`、`artifactSync.*` 分别指 `modules/board.json`、`modules/session.json`、`modules/knowledge.json`、`modules/artifactSync.json` 中的字段。
 
@@ -20,11 +20,12 @@
 | 命令 | 作用 |
 |---|---|
 | `autobiz-plugin new <dir> [--from blank\|lite\|fullstack] [--yes]` | 初始化向导：按 §1.4 的七类输入问答，生成入口文件 `plugin.scaffold.json`、`workflow.json`、需要的 `modules/*.json` 和工程目录，随后执行 build |
-| `autobiz-plugin add node <id> --name <name> --skill <skill> [--stage <name>] [--after <nodeId>] [--input <artifactId> …] [--output <artifactId>=<path>[,<path>…] …] [--template <path> …] [--validate "<command>"]` | 在 `workflow.json` 中添加节点（同时生成技能桩文件）；`--output` 中写多个路径即为数组 |
-| `autobiz-plugin add skill <skill> [--from <dir>]` | 导入已有技能资源（正文、模板、脚本、校验器），或创建空骨架 |
+| `autobiz-plugin add node <id> --name <name> --skill <skill> --stage biz\|dev\|ops --seq <n> [--output <path> …]` | 在 `workflow.json` 的 `nodes.<stage>` 中添加节点，按 `seq` 插到组内对应位置；不改其他节点的 `seq`，冲突时报 `SEQ_DUP`。每个 `--output` 是一个文件名，追加到 `outputs` 列表。写完后执行 doctor（技能不存在时生成空白 `SKILL.md`） |
+| `autobiz-plugin add skill <skill> [--from <dir>]` | 导入已有技能资源（正文、模板、脚本、校验器）；不带 `--from` 时创建空白 `SKILL.md`（只有 frontmatter 和状态维护片段，技能已绑定节点时才有片段） |
 | `autobiz-plugin module list` | 列出可用模块与可选能力、版本及启用状态 |
-| `autobiz-plugin module enable <id> [--set key=value …]` / `disable <id>` | 启用或关闭 `knowledge`、`artifactSync`、`knowledgeSedimentation`。`enable knowledge` / `enable artifactSync` 在 `modules/knowledge.json` / `modules/artifactSync.json` 不存在时创建骨架，并在入口文件中引用；`disable` 只去掉引用，文件保留。`enable artifactSync` 会把当前全部文件类产物连同显示名预填进 `artifacts`，开发者删掉不需要上传的即可。`knowledgeSedimentation` 写入 `modules/board.json` 的 `capabilities`（文件不存在时创建并引用） |
-| `autobiz-plugin build [--dry-run] [--force]` | 输入 → 标准化输出 |
+| `autobiz-plugin module enable <id> [--set key=value …]` / `disable <id>` | 启用或关闭 `knowledge`、`artifactSync`（看板能力固定开启，不能用这个命令关闭）。`enable knowledge` / `enable artifactSync` 在 `modules/knowledge.json` / `modules/artifactSync.json` 不存在时创建骨架，并在入口文件中引用；`disable` 只去掉引用，文件保留。`enable artifactSync` 会把当前全部文件类产物的路径预填进 `artifacts`，开发者删掉不需要上传的、补上简述即可 |
+| `autobiz-plugin build [--dry-run] [--force]` | 输入 → 标准化输出，包括各节点技能 `SKILL.md` 中的状态维护片段。`new` 和 `doctor` 都调用它 |
+| `autobiz-plugin doctor [--dry-run] [--force]` | 修改核心配置（`workflow.json`、`modules/*.json`、入口文件）后重新生成插件：lint → 与上次构建比较并列出影响 → build → 复查（§1.7） |
 | `autobiz-plugin lint [--strict]` | 只检查核心配置（`workflow.json`、入口文件、`modules/*.json`）的结构和语义规则，以及编译配置是否过期（input-config.md §7.2）。只读、不联网，通常在 1 秒内完成 |
 | `autobiz-plugin check [--strict]` | `lint` 加上技能内容、生成文件漂移检查，并运行契约测试，只读（input-config.md §7.3） |
 | `autobiz-plugin git-hook install` | 把本仓库的 `core.hooksPath` 指向 `.githooks/`，之后每次提交前自动运行 `lint` |
@@ -34,9 +35,9 @@
 
 所有命令都支持 `-C <plugin-dir>`（默认为当前目录）和 `--json`（机器可读输出）。
 
-`add` 和 `module` 只是修改配置文件的便捷入口，效果与手改配置后执行 build 相同：`add node` 写 `workflow.json`，`module` 写入口文件的 `modules` 引用和对应的 `modules/*.json`。
+`add` 和 `module` 只是修改配置文件的便捷入口，效果与手改配置后执行 doctor 相同：`add node` 写 `workflow.json`，`module` 写入口文件的 `modules` 引用和对应的 `modules/*.json`，写完都自动执行 doctor。
 
-同一套命令还以技能形式提供：`autobiz-plugin-creator`（借鉴 Codex plugin-creator，见 README §2.3；规格见 §1.6）。技能负责与开发者对话、梳理流程、编写配置文件、生成技能展示文案；生成和校验仍然只通过上面的 CLI 完成。技能必须在 `build` 之后运行 `check`，并把 Issue 原样转述给开发者，不能自己修改 generated 或 managed 文件来绕过问题。
+同一套命令还以技能形式提供：`autobiz-plugin-creator`（借鉴 Codex plugin-creator，见 README §2.3；规格见 §1.6）。技能负责与开发者对话、梳理流程、编写配置文件、生成技能展示文案；生成和校验仍然只通过上面的 CLI 完成。技能每次修改核心配置后必须运行 `doctor` 重新生成插件，再运行 `check`，并把 Issue 原样转述给开发者，不能自己修改 generated 或 managed 文件来绕过问题。
 
 ### 1.2 通用约定
 
@@ -46,7 +47,7 @@
 | `1` | 存在 error 级问题（校验失败、漂移、契约测试失败），没有写入任何文件 |
 | `2` | 用法错误（参数不合法、找不到 `plugin.scaffold.json` 或 `workflow.json`） |
 
-`build` 是事务性的：先在内存中完成全部生成和校验，再统一写盘。任何 error 都不会导致只写了一半。
+`build` 和 `doctor` 是事务性的：先在内存中完成全部生成和校验，再统一写盘。任何 error 都不会导致只写了一半。
 
 ### 1.3 问题（Issue）格式
 
@@ -58,11 +59,11 @@
   "issues": [
     {
       "level": "error",
-      "code": "INPUT_FORWARD",
+      "code": "ARTIFACT_ID_CONFLICT",
       "file": "workflow.json",
-      "pointer": "/nodes/1/inputs/0",
-      "message": "dev.specs 的输入 plan 由后续节点 dev.plan 产出",
-      "hint": "调整节点顺序，让 dev.plan 排在 dev.specs 之前，或从 dev.specs 的 inputs 中去掉 plan"
+      "pointer": "/nodes/dev/1/outputs/0",
+      "message": "节点 plan 的输出 PLAN.md 与节点 specs 的输出 plan.md 推导出同一个产物 id plan",
+      "hint": "修改其中一个文件名，让两者推导出不同的产物 id"
     }
   ],
   "written": []
@@ -70,7 +71,7 @@
 ```
 
 - `file` 标明问题所在的文件（`workflow.json`、`plugin.scaffold.json`、`modules/board.json`，或 `skills/autodev-plan/SKILL.md` 这类资源文件）；`pointer` 是该文件内的 JSON Pointer，问题出在文件层面时为空；
-- `code` 的取值见 input-config.md §7.2、§7.3，此外还有 `MODULE_CONFLICT`（§2.3）；
+- `code` 的取值见 input-config.md §7.2、§7.3，此外还有 `MODULE_CONFLICT`（§2.3）和 doctor 的 `CHECKPOINT_REMOVED`（§1.7）；
 - 不加 `--json` 时输出同样内容的可读文本，按文件和位置分组。
 
 ### 1.4 初始化向导（new）
@@ -85,18 +86,16 @@
 ── 2 核心流程（workflow.json）──
   节点 1
 ? 节点 id / 显示名                      › draft / 起草
-? 所属阶段（可空）                      ›
+? 所属阶段（biz / dev / ops）           › biz
+? 编排顺序 seq                          › 1             ← 默认取已有最大 seq + 1
 ? 绑定技能                              › （新建）doc-draft     ← 同时列出 skills/ 中已有的技能（含分组目录下的）
-? 产出产物（id=路径，逗号分隔）        › draft=DRAFT.md
-? 读取哪些前序产物（多选）              › （无）
-? 完成时的校验命令（可空）              ›
+? 产出产物（文件名，逗号分隔）          › DRAFT.md
 ? 继续添加节点？                        › Y
   …
 ── 3 技能资源 ──
-? doc-draft：导入已有目录 / 创建空骨架  › 创建空骨架
+? doc-draft：导入已有目录 / 不提供      › 不提供        ← 不提供时生成空白 SKILL.md
 ── 4 看板 ──
 ? 目标平台                              › [x] darwin  [x] linux  [x] win32
-? 可选能力                              › [ ] 知识沉淀入口
 ── 5 会话与 Agent ──
 ? 默认运行策略                          › solo
 ? 为节点单独配置策略？                  › N
@@ -107,9 +106,9 @@
   已创建 hooks/（agents/ 可选，需要外挂子代理时再创建）
 ```
 
-- 产物只写路径时，id 由路径推导（`DRAFT.md` → `draft`，`specs/*/spec.md` → `specs`），冲突时追问；
+- 产物 id 由路径推导（`DRAFT.md` → `draft`，`specs/*/spec.md` → `spec`），冲突时追问改文件名；`seq` 重复或与阶段先后不一致时当场追问；
 - 向导写完配置后先运行 `lint`，有 error 时回到对应问题重新回答，再执行 build；
-- “创建空骨架”会生成 SKILL.md 桩文件和 `scripts/`；模板由技能自己维护，向导不问、不生成（D29）；节点填写了校验命令且脚本不存在时，追问是否生成校验器骨架；
+- 选择“不提供”时，build 生成空白 `SKILL.md`：只有 frontmatter 和状态维护片段，正文由开发者自行填写（output-spec.md §6.1）；导入已有目录时，build 只在 `SKILL.md` 开头插入状态维护片段。模板由技能自己维护，向导不问、不生成（D29）；
 - 看板一类会生成接入脚本（`runtime/adapters/*`）和三平台命令映射；会话一类会生成默认会话入口和策略骨架；
 - 第 4–6 类的回答分别写入 `modules/board.json`、`modules/session.json`、`modules/knowledge.json` 和 `modules/artifactSync.json`，并在入口文件的 `modules` 中引用。全部取默认值的类别不生成文件，所以入口文件只有基础信息和真正用到的引用；
 - `--yes` 时不提问，缺少的必填项报用法错误（退出码 2）。
@@ -121,7 +120,7 @@
 在临时目录中创建 `<tmp>/ws/<project>`，按与宿主相同的方式替换占位符并执行命令：
 
 1. `create_project`、`create_feature`；启用知识模块时再执行 `deploy_units`；
-2. 对每个节点依次执行：`session_context_inject` → 推进 `_in_progress` → 为必需输出写入桩内容 → 推进 `_done`（执行节点校验命令）→ `feature_status`；
+2. 对每个节点依次执行：`session_collector_context_inject` → 推进 `_in_progress` → 为必需输出写入桩内容 → 推进 `_done`（执行节点校验命令）→ `feature_status`；
 3. 用 §3 的结构校验每次输出，打印节点状态表和失败原因。
 
 桩内容通常过不了业务校验，所以 `--skip-validate` 可以跳过校验命令；跳过时报告中会标明。`--to` 指定停在哪个 checkpoint，`--keep` 保留临时目录便于排查。simulate 只依赖本插件，不访问网络（知识组装只读本地知识目录）。
@@ -148,20 +147,72 @@ frontmatter 中的 `description` 要写明触发场景，例如“新建看板�
 | 步骤 | agent 做什么 | 调用 |
 |---|---|---|
 | 1. 定位 | 确认是新建还是修改；新建时确认插件放在哪个目录、插件 ID（提示发布后不可修改）、插件名 | `new --yes`（参数齐全后才调用） |
-| 2. 建模 | 让开发者用自然语言描述流程，整理成“节点 → 阶段 → 技能 → 输入/输出产物 → 完成校验”表格回显，开发者确认后才写入 | 编辑 `workflow.json`，或调用 `add node`；写完运行 `lint` |
-| 3. 技能资源 | 对每个节点确认是导入已有技能还是创建空骨架 | `add skill` |
+| 2. 建模 | 让开发者用自然语言描述流程，整理成“seq → 阶段（biz/dev/ops）→ 节点 → 技能 → 输出产物”表格回显，开发者确认后才写入；每个节点一个技能 | 编辑 `workflow.json`，或调用 `add node`；写完运行 `lint` |
+| 3. 技能资源 | 对每个节点确认是导入已有技能，还是先不提供（由 build 生成空白 `SKILL.md`） | `add skill` |
 | 4. 模块 | 询问看板可选能力（知识沉淀入口）、节点运行策略、是否需要知识模块（组装方由谁担任）、是否需要产物同步模块（从哪个节点起允许同步、上传哪些产物） | 编辑 `modules/*.json` 和入口文件的引用，或 `module enable` |
-| 5. 生成 | 执行构建；对新生成的技能桩，与开发者确认触发场景后填写 `description`，并生成 `openai.yaml` 文案 | `build` |
+| 5. 生成 | 生成插件；对新生成的空白 `SKILL.md`，与开发者确认触发场景后填写 `description`，并生成 `openai.yaml` 文案 | 新建时 `build`，修改时 `doctor` |
 | 6. 校验 | 执行完整校验，把 Issue 按原文转述给开发者，修改输入后重试 | `check` |
 | 7. 演示 | 在临时工作区走一遍完整流程，展示每个节点的状态和产物路径 | `simulate` |
 
 规则：
 
 - 只修改 `workflow.json`、`plugin.scaffold.json`、`modules/*.json` 和 seeded/developer 文件，不得修改 generated、managed、module 文件来绕过校验，也不得直接修改编译配置 `runtime/config/*`；
-- 每次修改核心配置后都运行 `lint`，没有 error 才继续下一步；
+- 每次修改核心配置后都运行 `lint`，没有 error 才继续下一步；修改完成后运行 `doctor` 重新生成插件，不能只改配置不重新生成；
+- 不修改 `SKILL.md` 中 `<!-- plugin workflow: begin state -->` 到 `<!-- plugin workflow: end state -->` 之间的内容，节点或 checkpoint 变了就运行 `doctor`；
 - 插件已经发布后，不得修改 `plugin.id` 和 `runtime.layout`；
 - 涉及节点业务逻辑的技能正文和校验器由开发者负责，agent 只能起草，不能把未经确认的流程或校验规则写进去；
 - 所有判断以 CLI 的退出码和 Issue 为准，不得自行宣称“校验通过”。
+
+### 1.7 doctor（修改核心配置后重新生成插件）
+
+开发者或 agent 改了 `workflow.json`、`modules/*.json` 或入口文件之后，用 doctor 重新生成插件。build 只管“输入 → 输出”；doctor 在它前后加上诊断：先说明这次改动影响了什么，再生成，最后复查，保证核心配置、编译配置和各技能 `SKILL.md` 中的状态维护片段三者一致。
+
+```text
+autobiz-plugin doctor [-C <plugin-dir>] [--dry-run] [--force] [--json]
+```
+
+| 步骤 | 做什么 | 失败时 |
+|---|---|---|
+| 1. 检查 | 执行 lint（input-config.md §7.2；`BUILD_STALE` 不报，过期正是要重新生成的原因） | 有 error 时退出码 1，不写任何文件 |
+| 2. 比较 | 按 build-manifest 的 `inputs` 找出改过的核心配置；在内存中编译新流程，与当前的 `runtime/config/flow.json` 和 build-manifest 记录的技能片段比较，列出影响（下表） | — |
+| 3. 生成 | 执行 build：重写编译配置和 `board_core/`；同步技能：缺失的技能生成空白 `SKILL.md`，已有技能插入或更新状态维护片段，不再绑定节点的技能删掉片段（output-spec.md §6.1） | managed 文件被手改时报 `DRIFT_MANAGED`，确认要覆盖时加 `--force` |
+| 4. 复查 | 重新 lint（不应再有 `BUILD_STALE`），并检查每个节点技能的片段与推导结果一致（`SKILL_STATE_BLOCK`） | 报出问题，退出码 1 |
+
+`--dry-run` 只执行前两步，打印将要发生的变化，不写文件。核心配置与记录一致、技能片段也都正确时，doctor 不写任何文件，报告插件已是最新。核心配置没改、只是有人手改或删掉了技能中的片段时，doctor 同样会把片段修好。
+
+影响报告：
+
+| 变化 | 举例 | doctor 怎么做 |
+|---|---|---|
+| 改了哪些核心配置 | `workflow.json`、`modules/board.json` | 列出文件 |
+| 新增节点 | 加了 `design` | 技能已存在：在它的 `SKILL.md` 开头插入片段；不存在：生成空白 `SKILL.md` |
+| 删除节点，或节点换了技能 | 删了 `detail_design` | 删掉原技能 `SKILL.md` 中的片段，技能目录保留，按开发者资源交付 |
+| 节点改了 id | `specs` → `spec` | 按删除加新增处理，片段中的 checkpoint 换成新 id |
+| 调整顺序 | 改了 `seq` | 重算 `order`、checkpoint 链和各节点的 `nextAction`；只改号、先后不变时编译配置中只有 `seq` 变化 |
+| 改了输出或模块配置 | `outputs`、`board.display`、`session.policies` | 只重新生成编译配置，技能不变 |
+| checkpoint 消失 | 上次构建的 checkpoint 在新流程中不存在（删除或改名了节点） | 报 `CHECKPOINT_REMOVED`（warning）：已有 Feature 停在这些 checkpoint 上时无法继续推进。doctor 只读插件目录，不知道哪些项目在用这个插件，不检查也不迁移已有 Feature 的状态 |
+
+`--json` 输出在 §1.3 的基础上增加 `changes`：
+
+```json
+{
+  "ok": true,
+  "issues": [
+    { "level": "warning", "code": "CHECKPOINT_REMOVED", "file": "workflow.json", "pointer": "",
+      "message": "上次构建的 detail_design_in_progress、detail_design_done 在新流程中不存在",
+      "hint": "停在这些 checkpoint 上的已有 Feature 需要人工处理" }
+  ],
+  "changes": {
+    "inputs": ["workflow.json"],
+    "nodes": { "added": ["design"], "removed": ["detail_design"], "reordered": false },
+    "skills": { "created": ["skills/autodev-design/SKILL.md"], "stateInserted": [], "stateUpdated": [],
+                "stateRemoved": ["skills/autodev-detail-design/SKILL.md"] }
+  },
+  "written": ["runtime/config/flow.json", "runtime/config/board.json", "skills/autodev-design/SKILL.md", "…"]
+}
+```
+
+触发方式：开发者手动执行；插件开发技能每次修改核心配置后执行（§1.6）；`add`、`module` 写完配置后自动执行。提交前钩子和 CI 只检查不生成，发现 `BUILD_STALE` 或 `SKILL_STATE_BLOCK` 时提示执行 doctor。
 
 ---
 
@@ -204,7 +255,7 @@ from typing import Optional, Protocol, Union
 @dataclass(frozen=True)
 class ArtifactIR:
     id: str
-    label: str                     # board.display.artifacts[id]，缺省为第一个路径
+    label: str                     # 路径本身（用户不配置产物名称）
     paths: tuple[str, ...]         # 核心配置中为字符串时只有一项
     type: str                      # "file" | "json"，按扩展名推断
     producer: str                  # 第一个输出该产物的节点 id
@@ -213,10 +264,11 @@ class ArtifactIR:
 class NodeIR:
     id: str
     name: str
-    stage: str                             # 未写时为默认分组名
+    stage: str                             # 节点所在分组：Biz、Dev、Ops
     skill: str
-    prefix: str                            # id 的最后一段
-    order: int
+    prefix: str                            # 即 id（id 不含阶段前缀）
+    seq: int                               # workflow.json 中手动填写的编排顺序
+    order: int                             # 按 seq 排列后的位置 (i + 1) * 10
     inputs: tuple[ArtifactIR, ...]         # v1 中输入输出都是必需的
     outputs: tuple[ArtifactIR, ...]
     validate: Optional[str]                # 单行命令原文，占位符未替换
@@ -229,11 +281,11 @@ class NodeIR:
 class PluginIR:
     plugin: dict
     runtime: dict
-    board: dict                            # target / display / capabilities，已填默认值
+    board: dict                            # target / display，已填默认值
     session: dict                          # policies，已填默认值
     knowledge: dict                        # 未启用时为 {"enabled": False}
     stages: tuple[str, ...]                # 阶段名，按首次出现的顺序
-    nodes: tuple[NodeIR, ...]
+    nodes: tuple[NodeIR, ...]              # 按 seq 从小到大排列
     artifacts: dict[str, ArtifactIR]
     checkpoint_chain: tuple[str, ...]      # 按流转顺序排列的全部 checkpoint
 
@@ -324,8 +376,8 @@ DevClaw 负责展示看板、发起会话、传入运行上下文、调用插件
 
 - 宿主先替换占位符，再执行命令，不保证工作目录。脚本必须通过 `__file__` 定位插件根目录；
 - **stdout** 输出且只输出一个 UTF-8 JSON 对象，**stderr** 用于日志；
-- 退出码：`0` 表示成功；`1` 表示业务失败，此时 stdout 为 `{"ok": false, "errors": ["…"]}`。`session_context_inject` 和 `pull_knowledge` 例外：始终以 `0` 退出，用 `ok` 字段表示结果（兼容现有宿主）；
-- 只读命令（`project_status`、`feature_status`、`dynamic_workflow`、`session_context_inject`、`deploy_units`）不得创建或修改任何文件；
+- 退出码：`0` 表示成功；`1` 表示业务失败，此时 stdout 为 `{"ok": false, "errors": ["…"]}`。`session_collector_context_inject` 和 `pull_knowledge` 例外：始终以 `0` 退出，用 `ok` 字段表示结果（兼容现有宿主）；
+- 只读命令（`project_status`、`feature_status`、`dynamic_workflow`、`session_collector_context_inject`、`deploy_units`）不得创建或修改任何文件；
 - `create_project`、`create_feature` 是幂等的，重复执行不会丢失已有进度；
 - 写命令（`create_project`、`create_feature`、`skip_node`）和模型调用的 `update_state.py` 提交成功后推送看板事件（§3.5）。推送结果不影响 stdout 和退出码。
 
@@ -339,9 +391,9 @@ DevClaw 负责展示看板、发起会话、传入运行上下文、调用插件
 | `${pluginWorkspace}` | 项目集合工作区 | 所有命令、`plugin_dir_hook`、`system_prompt_inject`、`dialog_tips` |
 | `${projectDir}` | 项目目录名 | 同上 |
 | `${projectDirs...}` | 多个项目目录名，宿主逐个转义后展开 | `project_status` |
-| `${feature}` | 当前 Feature | `feature_status`、`create_feature`、`session_context_inject`、`system_prompt_inject`、技能正文 |
-| `${selectedDeployUnits}` | 所选发布单元，JSON 数组，宿主作为一个参数整体转义 | `create_feature`、`session_context_inject` |
-| `${sessionWorkspacePath}` | 会话工作区目录 | `session_context_inject` |
+| `${feature}` | 当前 Feature | `feature_status`、`create_feature`、`session_collector_context_inject`、`system_prompt_inject`、技能正文 |
+| `${selectedDeployUnits}` | 所选发布单元，JSON 数组，宿主作为一个参数整体转义 | `create_feature`、`session_collector_context_inject` |
+| `${sessionWorkspacePath}` | 会话工作区目录 | `session_collector_context_inject` |
 | `${projectCode}` | 项目编码 | `dialog_tips`、`modules.json` 的 `knowledge_config.nextAction`、`artifact_sync.nextAction` |
 | `${leanToken}` | 知识沉淀 token | `modules.json` 的 `knowledge_config.nextAction` |
 | `${nodeId}` | 用户在看板上选中的节点 | `skip_node` |
@@ -380,7 +432,7 @@ runtime/adapters/init_feature.py --workspace <dir> --project <name> --feature <n
 
 - 处理宿主参数后调用 `engine.init_feature`；项目尚未初始化时先初始化项目；
 - 新 Feature 的 checkpoint 为 `flow.json` 的 `checkpoints.initial`；
-- `--selected-deployUnit` 中每个单元的 `deployUnitId`、`localRepoPath` 记入 Feature 记录的 `deployUnits`，git 产物（input-config.md §2.9）按它找仓库。重复执行时用新传入的列表更新 `deployUnits`，已记录的基线不变。会话中宿主仍会重新传入发布单元，`session_context_inject` 发现与记录不一致时只在 `message` 中提示，不改记录；
+- `--selected-deployUnit` 中每个单元的 `deployUnitId`、`localRepoPath` 记入 Feature 记录的 `deployUnits`。重复执行时用新传入的列表更新 `deployUnits`。会话中宿主仍会重新传入发布单元，`session_collector_context_inject` 发现与记录不一致时只在 `message` 中提示，不改记录；
 - Feature 目录已存在但 `state.json` 中没有对应记录时，返回 `ok:false`，避免覆盖未知产物。
 
 #### 3.3.3 project_status（inspect_state.py）
@@ -393,9 +445,9 @@ runtime/adapters/inspect_state.py --mode project --workspace <dir> --projects <n
 {
   "workflow": { "nodes": [ WorkflowNode ], "dynamicStages": [ DynamicStage ] },
   "projects": {
-    "<project>": { "runs": [ { "featureId": "f1", "featureName": "f1", "currentNodeId": "dev.plan",
+    "<project>": { "runs": [ { "featureId": "f1", "featureName": "f1", "currentNodeId": "plan",
                                "currentNodeStatus": "in_progress", "currentNodeStatusLabel": "进行中",
-                               "nodeIds": ["biz.prd", "dev.specs", "dev.plan", "dev.code"] } ] }
+                               "nodeIds": ["prd", "specs", "plan", "code"] } ] }
   }
 }
 ```
@@ -406,7 +458,7 @@ runtime/adapters/inspect_state.py --mode project --workspace <dir> --projects <n
 
 ```jsonc
 {
-  "id": "dev.plan", "label": "任务计划", "group": "Dev", "order": 40, "skill": "autodev-plan",
+  "id": "plan", "label": "任务计划", "group": "Dev", "order": 40, "skill": "autodev-plan",
   "description": "…",
   "runtimePolicy": { "agentMode": "multi", "subagentConfig": { … } },   // 仅在节点配置了时输出
   "checkpoints": ["plan_in_progress", "plan_done"],
@@ -427,30 +479,27 @@ runtime/adapters/inspect_state.py --mode project --workspace <dir> --projects <n
 `ArtifactDef`（产物定义）：
 
 ```json
-{ "id": "plan", "label": "实施计划", "artifactType": "file", "path": "plan.md", "required": true }
+{ "id": "plan", "label": "plan.md", "artifactType": "file", "path": "plan.md", "required": true }
 { "id": "spec_bundle", "label": "proposal.md", "artifactType": "file", "path": "proposal.md",
   "paths": ["proposal.md", "specs/*/spec.md"], "required": true }
-{ "id": "code", "label": "代码提交", "artifactType": "git", "required": true,
-  "git": { "repos": "deployUnits", "branch": "current", "require": ["commits", "clean", "merged"] } }
 ```
 
 | 字段 | 必有 | 语义 |
 |---|---|---|
-| `id` / `artifactType` / `required` | 是 | 文件产物的 `artifactType` 按扩展名推断为 `file` 或 `json`，代码提交为 `git`；`required` 为核心配置中 `optional` 的反面 |
-| `path` | 文件产物 | 核心配置中路径为数组时取首项，保证只认 `path` 的旧版宿主仍能工作。git 产物没有 `path` |
-| `label` | 是 | 取 `board.display.artifacts[id]`，未配置时为第一个路径，git 产物为产物 id |
+| `id` / `artifactType` / `required` | 是 | `artifactType` 按扩展名推断为 `file` 或 `json`；`required` 为核心配置中 `optional` 的反面 |
+| `path` | 是 | 核心配置中路径为数组时取首项，保证只认 `path` 的旧版宿主仍能工作 |
+| `label` | 是 | 产物卡片标题，为核心配置中写的路径本身（用户不配置产物名称，D39） |
 | `paths` | 否 | 仅在核心配置中路径为数组时输出，给出全部项 |
-| `git` | git 产物 | 填好默认值的 `{repos, branch, require}`（input-config.md §2.9） |
 
-`DynamicStage`（有动态阶段时）：
+`DynamicStage`（有动态阶段时；v1 的 `flow.json` 中 `dynamicStages` 固定为 `[]`，不会输出）：
 
 ```json
 {
   "id": "detail_design_before_code", "phase": "Dev", "label": "详细设计", "description": "…", "order": 45,
-  "choiceCheckpoint": "plan_done", "defaultDecision": "pending", "insertAfter": "dev.plan",
+  "choiceCheckpoint": "plan_done", "defaultDecision": "pending", "insertAfter": "plan",
   "enableTargetCheckpoint": "detail_design_in_progress", "skipTargetCheckpoint": "code_in_progress",
   "enableLabel": "…", "skipLabel": "…", "enableDescription": "…", "skipDescription": "…",
-  "nodes": [ { "id": "dev.detail_design", "phase": "Dev", "checkpointPrefix": "detail_design", "…": "其余字段同 WorkflowNode" } ]
+  "nodes": [ { "id": "detail_design", "phase": "Dev", "checkpointPrefix": "detail_design", "…": "其余字段同 WorkflowNode" } ]
 }
 ```
 
@@ -472,26 +521,20 @@ runtime/adapters/inspect_state.py --mode run --workspace <dir> --project <name> 
     "workflowId": "base", "workflowProfile": "standard", "workflowTemplate": "standard",
     "workflowDecisions": {}, "workflowSkippedNodes": [],
     "pendingChoice": null,
-    "currentNodeId": "dev.plan", "currentNodeStatus": "in_progress", "currentNodeStatusLabel": "进行中",
+    "currentNodeId": "plan", "currentNodeStatus": "in_progress", "currentNodeStatusLabel": "进行中",
     "nodes": [
-      { "id": "dev.specs", "nodeStatus": "done", "nodeStatusLabel": "已完成",
+      { "id": "specs", "nodeStatus": "done", "nodeStatusLabel": "已完成",
         "artifacts": [
-          { "id": "proposal", "artifactLabel": "变更提案", "artifactStatus": "generated", "artifactStatusLabel": "已生成",
+          { "id": "proposal", "artifactLabel": "proposal.md", "artifactStatus": "generated", "artifactStatusLabel": "已生成",
             "path": ".autobizdevops/<pluginId>/features/f1/proposal.md" },
-          { "id": "specs", "artifactLabel": "行为规格", "artifactStatus": "missing", "artifactStatusLabel": "未生成",
+          { "id": "specs", "artifactLabel": "specs/*/spec.md", "artifactStatus": "missing", "artifactStatusLabel": "未生成",
             "paths": [".autobizdevops/<pluginId>/features/f1/specs/*/spec.md"] } ] },
-      { "id": "dev.code", "nodeStatus": "in_progress", "nodeStatusLabel": "进行中",
-        "artifacts": [
-          { "id": "code", "artifactLabel": "代码提交", "artifactType": "git", "artifactStatus": "missing", "artifactStatusLabel": "未生成",
-            "git": { "repos": [ { "key": "LF39.18_wg_flow", "path": "/Users/u/code/wg_flow", "branch": "feature/f1",
-                                  "currentBranch": "feature/f1", "base": "a1b2c3d", "head": "9f8e7d6", "commits": 5,
-                                  "uncommitted": ["src/Foo.java"], "unmergedWorktrees": [] } ],
-                     "reasons": ["wg_flow 有 1 个文件未提交"] } } ] } ],
-    "hookLogRefs": [ { "id": "default", "path": ".autobizdevops/<pluginId>/features/f1/hooks.ndjson", "format": "ndjson" } ],
+      { "id": "code", "nodeStatus": "in_progress", "nodeStatusLabel": "进行中", "artifacts": [] } ],
+    "hookLogRefs": [ { "id": "default", "path": ".autobizdevops/<pluginId>/hooks.ndjson", "format": "ndjson" } ],
     "watchRefs": [
       { "path": ".autobizdevops/<pluginId>/state.json", "purpose": "run-state" },
       { "path": ".autobizdevops/<pluginId>/features/f1", "purpose": "artifacts" },
-      { "path": ".autobizdevops/<pluginId>/features/f1/hooks.ndjson", "purpose": "hook-log" } ]
+      { "path": ".autobizdevops/<pluginId>/hooks.ndjson", "purpose": "hook-log" } ]
   }
 }
 ```
@@ -501,8 +544,7 @@ runtime/adapters/inspect_state.py --mode run --workspace <dir> --project <name> 
 - `pendingChoice` 在 Feature 停在某个动态阶段的选择点且尚未选择时给出，否则为 `null`：`{"stageId", "stageLabel", "choiceCheckpoint", "defaultDecision", "options": [{"decision": "enabled", "label", "description", "targetCheckpoint", "slashSkill"}, {"decision": "skipped", …}]}`；
 - 示例为 isolated 布局，`<pluginId>` 为实际插件 ID；legacy 布局下没有这一层；
 - 产物路径相对项目目录。单项且不含 glob 的产物用 `path`；含 glob 或 `path` 为数组的产物用 `paths`，列出实际匹配的文件，某一项没有匹配时给出该项的模式本身；
-- `artifactStatus` 只表示文件是否存在（空文件也算已生成），不判断内容质量，也不代表节点已完成；
-- git 产物（`artifactType: "git"`）没有 `path`，改为 `git`：每个仓库的基线与当前状态，以及不满足齐全条件的原因 `reasons`。节点已经开始时按记录的基线实时查仓库，满足全部齐全条件才算 `generated`；节点还没开始时没有基线，只列出仓库，状态为 `missing`。
+- `artifactStatus` 只表示文件是否存在（与完成判定一致，空文件不算已生成），不判断内容质量，也不代表节点已完成。
 
 #### 3.3.5 dynamic_workflow（inspect_workflow_templates.py）
 
@@ -510,26 +552,28 @@ runtime/adapters/inspect_state.py --mode run --workspace <dir> --project <name> 
 {
   "ok": true, "schemaVersion": "autobizdevops.workflow.templates.v2", "mode": "templates",
   "templates": [ { "id": "standard", "templateType": "classical", "label": "需求开发", "description": "…",
-                   "nodes": ["biz.prd", "dev.specs", "dev.plan", "dev.code"] } ],
-  "nodes": [ { "id": "dev.plan", "label": "任务计划", "group": "Dev", "skill": "autodev-plan", "description": "…",
+                   "nodes": ["prd", "specs", "plan", "code"] } ],
+  "nodes": [ { "id": "plan", "label": "任务计划", "group": "Dev", "skill": "autodev-plan", "description": "…",
                "inputs": [ ArtifactDef ], "outputs": [ ArtifactDef ] } ],
   "checkpoints": {
     "initial": ["prd_in_progress"],
     "transitions": { "prd_in_progress": ["prd_done"], "prd_done": ["specs_in_progress"], "…": [], "cicd_done": ["archived"], "archived": [] },
     "stageLabels": { "prd_in_progress": "需求澄清与 PRD进行中", "…": "…", "archived": "已归档" }
   },
-  "transitions": [ { "id": "prd-to-specs", "from": { "nodeId": "biz.prd", "state": "done" }, "to": { "nodeId": "dev.specs", "state": "in_progress" } } ],
+  "transitions": [ { "id": "prd-to-specs", "from": { "nodeId": "prd", "state": "done" }, "to": { "nodeId": "specs", "state": "in_progress" } } ],
   "skipPolicy": { "lockedNodes": [] }
 }
 ```
 
-通过 `query.py` 查询流程定义，返回宿主需要的模板结构。`ArtifactDef` 见 §3.3.3；全栈版现有入口只输出 `{path, label}`，宿主应能兼容两种形态。全栈版 board_config 中 `workflow` 下的 `checkpoints`、`transitions`、`skipPolicy` 改由这里输出：`checkpoints.transitions` 只描述主干，最后一个主干节点是终态节点时前一节点的 `_done → archived`；`transitions` 是主干相邻节点的流转；`skipPolicy` 仅在开启 `rules.skip` 时输出。`templates` 只有 `standard` 一项（精简路线、自定义节点子集预留到 v2）；`nodes` 只列主干节点。
+通过 `query.py` 查询流程定义，返回宿主需要的模板结构。`ArtifactDef` 见 §3.3.3；全栈版现有入口只输出 `{path, label}`，宿主应能兼容两种形态。全栈版 board_config 中 `workflow` 下的 `checkpoints`、`transitions`、`skipPolicy` 改由这里输出：`checkpoints.transitions` 只描述主干，最后一个主干节点是终态节点时前一节点的 `_done → archived`；`transitions` 是主干相邻节点的流转；`skipPolicy` 仅在`flow.json` 的 `skip` 不为 `null`（v1 不会出现） 时输出。`templates` 只有 `standard` 一项（精简路线、自定义节点子集预留到 v2）；`nodes` 只列主干节点。
 
 #### 3.3.6 system_prompt_inject / dialog_tips / plugin_dir_hook / knowledge_path
 
 这些是模板字符串，宿主替换占位符后直接使用，不执行。
 
-#### 3.3.7 session_context_inject（render_session_context.py）
+#### 3.3.7 session_collector_context_inject（render_session_context.py）
+
+会话入口在 `board_config.json` 中的键默认为 `session_collector_context_inject`，取代旧插件使用的 `session_context_inject`（D40）；脚本和下面的输入输出协议不变。
 
 ```text
 runtime/session/render_session_context.py --platform <p> --plugin-workspace <dir> --project <name> --feature <name>
@@ -545,8 +589,8 @@ runtime/session/render_session_context.py --platform <p> --plugin-workspace <dir
   "agentmdLoadStatus": [ { "deployUnitId": "LF39.18_wg_flow", "path": "…", "loaded": true, "source": "remote", "message": "…" } ],
   "flow": {
     "featureDir": "/…/<project>/.autobizdevops/<pluginId>/features/f1",
-    "currentNodeId": "dev.plan", "currentNodeStatus": "in_progress",
-    "targetNodeId": "dev.plan", "nextNodeId": "dev.code", "skill": "autodev-plan",
+    "currentNodeId": "plan", "currentNodeStatus": "in_progress",
+    "targetNodeId": "plan", "nextNodeId": "code", "skill": "autodev-plan",
     "inputs":  [ { "id": "requirements", "required": true, "exists": true } ],
     "outputs": [ { "id": "plan", "required": true, "exists": false } ],
     "pendingChoice": null
@@ -574,7 +618,7 @@ runtime/session/render_session_context.py --platform <p> --plugin-workspace <dir
 
 因此 not_started 和 in_progress 状态下取的是当前节点的策略，done 状态下取的是下一个节点的策略。`--node-id` 只用于本地调试，会直接指定节点。
 
-**运行策略 → agentConfig 的映射**（目标节点的 `session.policies.nodes` 与 `policies.default` 深合并后映射）：
+**运行策略 → agentConfig 的映射**（按 `id` 在 `session.policies.nodes` 的分组中找到目标节点的策略，与 `policies.default` 深合并后映射）：
 
 | agentConfig | 来源 | 内置默认值 |
 |---|---|---|
@@ -622,7 +666,7 @@ runtime/knowledge/inspect_deploy_units.py [--knowledge-path <dir>] [--system <sy
 
 只更新知识目录，不回写任何配置文件。DevClaw 需要最新的发布单元时，读本输出的 `supported_deploy_units` 或再执行 `deploy_units`。失败时返回 `{"ok": false, "schemaVersion": "…", "message": "…", "errors": ["…"]}`，已有的知识目录保持不变。
 
-#### 3.3.10 skip_node（skip_node.py，开启 rules.skip 时）
+#### 3.3.10 skip_node（skip_node.py，skip 不为 null 时，v1 不生成）
 
 看板上用户选中节点并选择跳过时调用。此时不在会话中，没有 `PLUGIN_WORKSPACE`、`FEATURE_ID` 等环境变量，所以全部通过参数定位：
 
@@ -632,7 +676,7 @@ runtime/adapters/skip_node.py --workspace <dir> --project <name> --feature <name
 ```
 
 ```json
-{ "ok": true, "changed": true, "feature": "f1", "skipped": ["dev.design"],
+{ "ok": true, "changed": true, "feature": "f1", "skipped": ["design"],
   "oldCheckpoint": "design_in_progress", "checkpoint": "plan_in_progress", "statePath": "…", "warnings": [] }
 ```
 
@@ -683,8 +727,8 @@ runtime/adapters/skip_node.py --workspace <dir> --project <name> --feature <name
     "pluginWorkspace": "/abs/workspace", "projectDir": "p1",
     "seq": 12, "reason": "update_state", "sessionId": "…",
     "feature": "f1",
-    "projectRuns": [ { "featureId": "f1", "currentNodeId": "dev.plan", "currentNodeStatus": "in_progress", "…": "…" } ],
-    "run": { "featureId": "f1", "currentNodeId": "dev.plan", "nodes": [ "…" ], "…": "…" } } }
+    "projectRuns": [ { "featureId": "f1", "currentNodeId": "plan", "currentNodeStatus": "in_progress", "…": "…" } ],
+    "run": { "featureId": "f1", "currentNodeId": "plan", "nodes": [ "…" ], "…": "…" } } }
 ```
 
 | 字段 | 说明 |
@@ -735,7 +779,7 @@ runtime/adapters/skip_node.py --workspace <dir> --project <name> --feature <name
 | 鉴权 | DevClaw 每次运行生成一个随机 token，通过 `AUTOBIZ_BOARD_TOKEN` 注入，插件请求时带上 `Authorization: Bearer <token>`。服务端校验 token 和 `Host` 头，防止浏览器页面发起跨站请求。服务只接受 `board/*` 通知，不提供任何执行操作的方法 |
 | 产物实时刷新 | 不监听文件，改用 DevClaw 掌握的会话事件：模型写文件的工具调用落在 `run.watchRefs` 中 `purpose: artifacts` 的目录下时，防抖 1～2 秒后拉取一次 `feature_status` |
 | 静态结果预生成 | `dynamic_workflow`、`deploy_units` 在 build 和 `pull_knowledge` 时预先写成文件，DevClaw 读一次后缓存 |
-| 会话入口提速 | 根据 `session_context_inject` 的实测耗时，决定是否需要单独优化 |
+| 会话入口提速 | 根据 `session_collector_context_inject` 的实测耗时，决定是否需要单独优化 |
 
 P0 不做鉴权，本机任何进程都可以向 DevClaw 发送伪造的看板事件。因此推送只用于刷新显示，有疑问时以读取命令的结果为准；在鉴权实现之前，服务不得监听回环地址以外的地址。
 
@@ -747,19 +791,21 @@ P0 不做鉴权，本机任何进程都可以向 DevClaw 发送伪造的看板�
 
 | 入口 | 调用方 | 主要职责 |
 |---|---|---|
-| `runtime/workflow/update_state.py` | 模型 | 接收状态更新请求，通过 `engine.py` 检查并修改 `state.json` |
+| `runtime/workflow/update_state.py` | 模型（按技能 `SKILL.md` 开头的状态维护片段）、人工操作 | 接收状态更新请求，通过 `engine.py` 检查并修改 `state.json` |
 | `runtime/adapters/init_workspace.py` | DevClaw 的 `create_project` | 处理宿主参数，通过引擎初始化项目 |
 | `runtime/adapters/init_feature.py` | DevClaw 的 `create_feature` | 处理宿主参数，通过引擎初始化 Feature |
 | `runtime/adapters/inspect_state.py` | DevClaw 的项目和 Feature 查询 | 调用查询库，将结果转换为看板接口数据 |
 | `runtime/adapters/inspect_workflow_templates.py` | DevClaw 的动态工作流能力 | 查询流程定义，返回宿主需要的模板结构 |
-| `runtime/adapters/skip_node.py` | DevClaw 的 `skip_node`（开启 `rules.skip` 时） | 处理宿主参数，通过引擎跳过节点 |
+| `runtime/adapters/skip_node.py` | DevClaw 的 `skip_node`（`flow.json` 的 `skip` 不为 `null`（v1 不会出现） 时） | 处理宿主参数，通过引擎跳过节点 |
 | `runtime/session/render_session_context.py` | DevClaw 的会话机制 | 获取流程上下文，结合会话策略及知识组装结果生成会话内容 |
 | `runtime/knowledge/inspect_deploy_units.py` | 知识模块接入方 | 解析知识清单，提供支持的系统和发布单元信息 |
 | `runtime/knowledge/sync_knowledge.py` | DevClaw 的 `pull_knowledge` | 拉取知识仓库并回写运行期字段（仅声明 `knowledge.source` 时） |
 
 `update_state.py`、`init_workspace.py`、`init_feature.py`、`skip_node.py` 四个写入口在提交成功后，通过 `runtime/adapters/board_events.py` 推送看板事件（§3.5）。
 
-### 4.2 update_state.py（模型推进状态的唯一入口）
+### 4.2 update_state.py（状态变更入口）
+
+模型按技能 `SKILL.md` 开头的状态维护片段调用它：技能开始时 `--checkpoint <id>_in_progress`，技能完成时 `--checkpoint <id>_done`，终态节点完成时 `--checkpoint archived`（output-spec.md §6.1）。片段由 build 写入，技能正文不另写状态命令。重开等例外操作由人执行。
 
 ```text
 python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp> | --skip-node <nodeId> [--skip-node …]
@@ -770,12 +816,12 @@ python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp
 | 场景 | 规则 |
 |---|---|
 | 正常推进 | `<cp>` 必须等于当前 checkpoint，或是状态规则允许的下一个 |
-| 推进到 `_in_progress` | 检查本节点的必需输入是否存在（optional、生产者被跳过或未执行的输入除外）；本节点有 git 产物时记录各仓库的基线，找不到仓库时拒绝推进。重开时沿用原基线 |
-| 推进到 `_done` | 检查本节点的必需输入和必需输出是否存在，git 产物按齐全条件检查，再执行节点校验命令（§4.4），全部通过才写入，并记下各仓库完成时的 HEAD。git 条件不满足时 `errors` 中逐条列出原因（例如“wg_flow 有 3 个文件未提交”“工作树 ../wg_flow-sub 的分支 agent/t2 还有 2 个提交未合并”），不执行校验命令 |
+| 推进到 `_in_progress` | 检查本节点的必需输入是否存在（optional、生产者被跳过或未执行的输入除外；v1 的 `inputs` 固定为 `[]`） |
+| 推进到 `_done` | 检查本节点的必需输入和必需输出都存在且非空（output-spec.md §4.4），`validate` 不为 `null` 时再执行节点校验命令（§4.4），全部通过才写入。不满足时 `errors` 中逐条列出缺少或为空的产物 |
 | 推进到 `archived` | 只能从终态节点前一个节点的 `_done` 推进；检查终态节点的必需输入，不执行校验命令。之后不能再推进或重开 |
 | 动态阶段选择 | 当前 checkpoint 是选择点时，推进到阶段第一个节点的 `_in_progress` 记为执行，推进到下一个主干节点的 `_in_progress` 记为跳过，写入 `workflowDecisions`。阶段执行时，最后一个节点 `_done` 的下一个是下一个主干节点的 `_in_progress` |
 | 重开 | 必须加 `--reopen` 和非空的 `--reason`；只能回到当前或之前节点的 `_in_progress`（含已执行的动态阶段节点）。下游节点在看板上显示为未开始，旧产物保留；回到选择点之前时清除该阶段的决定，回到被跳过节点之前时恢复这些节点。重开不执行校验命令 |
-| 跳过节点 | 开启 `rules.skip` 时，`--skip-node` 加非空的 `--reason`，不能与 `--checkpoint` 同时使用；规则见 input-config.md §2.8，与 `skip_node.py` 共用 `engine.skip_nodes` |
+| 跳过节点 | `flow.json` 的 `skip` 不为 `null`（v1 不会出现） 时，`--skip-node` 加非空的 `--reason`，不能与 `--checkpoint` 同时使用；规则见 input-config.md §2.8，与 `skip_node.py` 共用 `engine.skip_nodes` |
 | `--dry-run` | 执行全部检查（包括校验命令），但不写 `state.json`、不写变更日志 |
 | 定位 | 省略 `--workspace` 时，使用 `PLUGIN_WORKSPACE` + `PROJECT_DIR`；省略 `--feature` 时，使用 `FEATURE_ID` |
 
@@ -789,7 +835,7 @@ python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp
 
 状态实际改变时（`changed: true` 且不是 `--dry-run`），提交后推送一条 `reason = update_state` 的看板事件（§3.5）。输出格式不变。
 
-不再提供 `update_checkpoint.py` 别名：迁移进来的技能由托管片段统一指向新入口，正文中残留的旧路径由 `check` 报 `LEGACY_ENTRY_REF`。
+不再提供 `update_checkpoint.py` 别名：迁移进来的技能由状态维护片段统一指向新入口（旧版 `scaffold` 状态片段由 build 原地替换），正文中残留的状态命令和旧路径由 `check` 报 `LEGACY_ENTRY_REF`。
 
 ### 4.3 单行命令约定
 
@@ -807,9 +853,7 @@ python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp
    | `${featureDir}` | 当前 Feature 的产物目录；尚无 Feature 时为空字符串 |
    | `${feature}` | 当前 Feature；尚无 Feature 时为空字符串 |
    | `${nodeId}` | 被完成的节点 |
-   | `${repos}` | 本节点 git 产物涉及的仓库（或子目录）绝对路径，JSON 数组；没有 git 产物时为 `[]` |
-   | `${gitRanges}` | 本节点每个仓库的提交范围 `<base>..<当前 HEAD>`，JSON 对象；没有 git 产物时为 `{}` |
-
+   
 3. 不经过 shell 直接执行（`shell=False`），所以不支持管道、重定向和 `&&`。Windows 上 `.cmd`/`.bat` 需要写成 `cmd /c …`；
 4. 追加环境变量 `PLUGIN_ROOT`、`PROJECT_PATH`、`FEATURE_DIR`、`FEATURE_ID`、`NODE_ID`、`PYTHONIOENCODING=utf-8`，其余环境变量（包括 `SESSION_ID`）原样继承；
 5. stdout 和 stderr 按 UTF-8 解码（无法解码的字节替换）。
@@ -828,7 +872,7 @@ python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp
 | 输出 | stdout 与 stderr 合并后截取末尾 2000 个字符，作为错误信息返回给模型；写给人看的原因应打印在输出末尾 |
 | 变更日志 | 无论是否通过，都写一条 `node-validate` 事件（output-spec.md §4.3）；`--dry-run` 时不写 |
 
-校验器负责判断空文件、格式、内容是否合格（D13）。它应当只读：不得修改产物、`state.json` 或插件目录。
+校验器负责判断格式、内容是否合格（D13），非空由框架检查。它应当只读：不得修改产物、`state.json` 或插件目录。
 
 ### 4.5 知识组装脚本（render_collected_session_context.py）
 
@@ -847,7 +891,7 @@ python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp
   `selectedDeployUnits` 已解析并校验；`knowledgePath` 为 `knowledge.root` 的绝对路径，调用方传了 `--knowledge-path` 时以它为准；`featureDir` 在 Feature 尚未创建时为空字符串；
 - **stdout**：`{"sessionContext": "…", "agentmdLoadStatus": [ … ], "message": "…"}`，三个字段都可以省略。`sessionContext` 是知识段，追加在流程上下文之后；`agentmdLoadStatus` 的条目格式见 §3.3.7；
 - 工作目录为插件根目录，超时为 `knowledge.assembly.timeoutSec`（默认 30 秒）；
-- 退出码非 0、超时或输出不是合法 JSON 时，本次会话不含知识段，`agentmdLoadStatus` 为 `[]`，在 `message` 中追加 `"知识组装失败: <原因>"`，`session_context_inject` 仍然返回 `ok:true`；
+- 退出码非 0、超时或输出不是合法 JSON 时，本次会话不含知识段，`agentmdLoadStatus` 为 `[]`，在 `message` 中追加 `"知识组装失败: <原因>"`，`session_collector_context_inject` 仍然返回 `ok:true`；
 - 只负责知识段：不能修改 `agentConfig` 和 `flow`，流程上下文和运行策略始终由默认入口给出；
 - stdout 只用于协议 JSON，日志写 stderr；不得修改项目文件和知识目录，知识仓库同步是 `pull_knowledge` 的职责。
 
@@ -893,8 +937,7 @@ query.checkpoint_chain() -> list[str]
 
 # —— query：产物存在情况 ——
 query.artifact_presence(project_path: Path, feature: str, artifact_id: str) -> dict
-    # 文件产物：{"exists": bool, "files": [Path], "missing": [pattern]}；拒绝越界符号链接
-    # git 产物：{"exists": bool, "repos": [ … ], "reasons": [str]}，按 Feature 记录中的基线实时查仓库，只读
+    # {"exists": bool, "files": [Path], "missing": [pattern], "empty": [Path]}；空文件不算存在；拒绝越界符号链接
 
 # —— engine：初始化与状态变更 ——
 engine.init_project(project_path: Path) -> dict
@@ -942,8 +985,8 @@ class engine.BoardError(ValueError): ...                          # 所有业务
 
 由 lite 迁移时的行为差异：
 
-- 入口从 `hooks/`、根目录迁到 `runtime/`，board_config 中的命令随之重新生成；board_config 只剩 `inspectCommands`，流程定义改由命令输出，看板入口移到 `modules.json`；技能托管片段中的状态命令也会更新；
-- 框架不再检查产物是否为空。lite 现在“去除空白后非空”的判定，如需保留，要写成节点的校验命令；
-- 会话内容新增流程上下文段；
-- 节点描述、产物显示名移到 `modules/board.json`，编译结果不变；
+- 入口从 `hooks/`、根目录迁到 `runtime/`，board_config 中的命令随之重新生成；board_config 只剩 `inspectCommands`，流程定义改由命令输出，看板入口移到 `modules.json`；技能中旧的 `scaffold` 状态片段原地替换成 `plugin workflow` 状态维护片段，`artifacts` 托管片段删除；
+- 框架不再检查产物是否为空，v1 也不能配置校验命令，lite 现在“去除空白后非空”的判定由技能自己保证；
+- 会话内容新增流程上下文段；会话入口的键由 `session_context_inject` 改为 `session_collector_context_inject`；宿主命令统一加 `-X utf8`（lite 原来没有）；
+- 产物显示名不再配置，取路径本身（lite 的“结构化需求”“实施计划”等名称不再保留）；节点描述改为取技能的 `description`、`nextAction` 改用默认文案，lite 的节点文案覆写不再保留；产物 id 改由路径推导（`requirements` → `prd`、`specs` → `spec`）；
 - `plan.md` 对旧文件名 `PLAN.md` 的回退不再支持。macOS、Windows 默认文件系统不区分大小写，不受影响；Linux 上的旧 Feature 需要把文件改名。

@@ -26,11 +26,9 @@ DEFAULT_DOCS = [REPO / "docs" / "input-config.md",
                 / "input-config.md"]
 # 章节编号 → (Schema 文件, Schema 内的起点)。起点是 #/definitions/<名> 或用 . 连接的属性路径，空串为根
 SECTIONS = {
-    "2.9": ("workflow.schema.json", "#/definitions/gitOutput"),
     "3.4": ("plugin-scaffold.schema.json", "runtime"),
     "4.1.1": ("modules/board.schema.json", "target"),
     "4.1.2": ("modules/board.schema.json", "display"),
-    "4.1.3": ("modules/board.schema.json", "capabilities.knowledgeSedimentation"),
     "4.2": ("modules/session.schema.json", ""),
     "4.3": ("modules/knowledge.schema.json", ""),
     "4.5": ("modules/artifactSync.schema.json", ""),

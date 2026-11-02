@@ -1,10 +1,10 @@
 {
   "schema": "autobiz.flow.v1",
   "source": {
-    "workflow.json": "sha256:58d3169de11e756d1b088b13098415e06fc89ef73ad66e6c8ee5bca6a5b21328"
+    "workflow.json": "sha256:2e57ad627387c9866d4f5fd77373f0cefe8f27b106ed6e8f6ca97d5336e2d3d0"
   },
   "stages": [
-    "Doc-Review-Kanban"
+    "Biz"
   ],
   "artifacts": {
     "draft": {
@@ -28,9 +28,10 @@
     {
       "id": "draft",
       "name": "起草",
-      "stage": "Doc-Review-Kanban",
+      "stage": "Biz",
       "skill": "doc-draft",
       "skillDir": "skills/doc-draft",
+      "seq": 1,
       "order": 10,
       "terminal": false,
       "checkpoints": [
@@ -49,28 +50,24 @@
     {
       "id": "review",
       "name": "评审",
-      "stage": "Doc-Review-Kanban",
+      "stage": "Biz",
       "skill": "doc-review",
       "skillDir": "skills/doc-review",
+      "seq": 2,
       "order": 20,
       "terminal": false,
       "checkpoints": [
         "review_in_progress",
         "review_done"
       ],
-      "inputs": [
-        {
-          "id": "draft",
-          "required": true
-        }
-      ],
+      "inputs": [],
       "outputs": [
         {
           "id": "review",
           "required": true
         }
       ],
-      "validate": "${python} ${skillPath}/scripts/check_review.py --feature-dir ${featureDir}"
+      "validate": null
     }
   ],
   "dynamicStages": [],

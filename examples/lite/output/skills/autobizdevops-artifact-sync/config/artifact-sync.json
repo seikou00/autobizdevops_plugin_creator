@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "allowedCheckpoints": [
     "plan_done",
     "code_in_progress",
@@ -9,19 +9,20 @@
   "maxFileSizeMiB": 5,
   "stages": {
     "Biz": {
-      "biz.prd": {
+      "prd": {
         "PRD.md": "结构化需求。"
       }
     },
     "Dev": {
-      "dev.specs": {
+      "specs": {
         "proposal.md": "变更提案。",
         "specs/*/spec.md": "行为规格。",
         "design.md": "技术设计。"
       },
-      "dev.plan": {
+      "plan": {
         "plan.md": "实施计划。"
       }
     }
-  }
+  },
+  "extraPaths": {}
 }

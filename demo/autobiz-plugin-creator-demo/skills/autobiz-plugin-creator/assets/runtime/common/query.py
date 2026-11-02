@@ -138,6 +138,10 @@ def state_path(project_path):
     return metadata_dir(project_path) / "state.json"
 
 
+def hook_log_path(project_path):
+    return metadata_dir(project_path) / "hooks.ndjson"
+
+
 def empty_state():
     return {"schemaVersion": 1, "pluginId": plugin_id(), "features": {}}
 

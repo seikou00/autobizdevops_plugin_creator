@@ -1,75 +1,62 @@
 {
   "schema": "autobiz.flow.v1",
   "source": {
-    "workflow.json": "sha256:ba4a81b2d46afa584e50e28197d3616237edec51bd8613fdd626884f5fbe1829"
+    "workflow.json": "sha256:066b01948341326bf2656c5c0cc22873d388c409e6906e03022291eede64e301"
   },
   "stages": [
     "Biz",
     "Dev"
   ],
   "artifacts": {
-    "requirements": {
-      "label": "结构化需求",
+    "prd": {
+      "label": "PRD.md",
       "type": "file",
       "paths": [
         "PRD.md"
       ],
-      "producer": "biz.prd"
+      "producer": "prd"
     },
     "proposal": {
-      "label": "变更提案",
+      "label": "proposal.md",
       "type": "file",
       "paths": [
         "proposal.md"
       ],
-      "producer": "dev.specs"
+      "producer": "specs"
     },
-    "specs": {
-      "label": "行为规格",
+    "spec": {
+      "label": "specs/*/spec.md",
       "type": "file",
       "paths": [
         "specs/*/spec.md"
       ],
-      "producer": "dev.specs"
+      "producer": "specs"
     },
     "design": {
-      "label": "技术设计",
+      "label": "design.md",
       "type": "file",
       "paths": [
         "design.md"
       ],
-      "producer": "dev.specs"
+      "producer": "specs"
     },
     "plan": {
-      "label": "实施计划",
+      "label": "plan.md",
       "type": "file",
       "paths": [
         "plan.md"
       ],
-      "producer": "dev.plan"
-    },
-    "code": {
-      "label": "代码提交",
-      "type": "git",
-      "git": {
-        "repos": "deployUnits",
-        "branch": "current",
-        "require": [
-          "commits",
-          "clean",
-          "merged"
-        ]
-      },
-      "producer": "dev.code"
+      "producer": "plan"
     }
   },
   "nodes": [
     {
-      "id": "biz.prd",
+      "id": "prd",
       "name": "需求清洗",
       "stage": "Biz",
       "skill": "autobiz-prd",
       "skillDir": "skills/autobiz-prd",
+      "seq": 1,
       "order": 10,
       "terminal": false,
       "checkpoints": [
@@ -79,37 +66,33 @@
       "inputs": [],
       "outputs": [
         {
-          "id": "requirements",
+          "id": "prd",
           "required": true
         }
       ],
       "validate": null
     },
     {
-      "id": "dev.specs",
+      "id": "specs",
       "name": "规格生成",
       "stage": "Dev",
       "skill": "autodev-sepc",
       "skillDir": "skills/autodev-sepc",
+      "seq": 2,
       "order": 20,
       "terminal": false,
       "checkpoints": [
         "specs_in_progress",
         "specs_done"
       ],
-      "inputs": [
-        {
-          "id": "requirements",
-          "required": true
-        }
-      ],
+      "inputs": [],
       "outputs": [
         {
           "id": "proposal",
           "required": true
         },
         {
-          "id": "specs",
+          "id": "spec",
           "required": true
         },
         {
@@ -120,35 +103,19 @@
       "validate": null
     },
     {
-      "id": "dev.plan",
+      "id": "plan",
       "name": "任务计划",
       "stage": "Dev",
       "skill": "autodev-plan",
       "skillDir": "skills/autodev-plan",
+      "seq": 3,
       "order": 30,
       "terminal": false,
       "checkpoints": [
         "plan_in_progress",
         "plan_done"
       ],
-      "inputs": [
-        {
-          "id": "requirements",
-          "required": true
-        },
-        {
-          "id": "proposal",
-          "required": true
-        },
-        {
-          "id": "specs",
-          "required": true
-        },
-        {
-          "id": "design",
-          "required": true
-        }
-      ],
+      "inputs": [],
       "outputs": [
         {
           "id": "plan",
@@ -158,45 +125,20 @@
       "validate": null
     },
     {
-      "id": "dev.code",
+      "id": "code",
       "name": "增量编码",
       "stage": "Dev",
       "skill": "autodev-code",
       "skillDir": "skills/autodev-code",
+      "seq": 4,
       "order": 40,
       "terminal": false,
       "checkpoints": [
         "code_in_progress",
         "code_done"
       ],
-      "inputs": [
-        {
-          "id": "requirements",
-          "required": true
-        },
-        {
-          "id": "proposal",
-          "required": true
-        },
-        {
-          "id": "specs",
-          "required": true
-        },
-        {
-          "id": "design",
-          "required": true
-        },
-        {
-          "id": "plan",
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "id": "code",
-          "required": true
-        }
-      ],
+      "inputs": [],
+      "outputs": [],
       "validate": null
     }
   ],

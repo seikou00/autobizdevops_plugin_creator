@@ -5,36 +5,41 @@
       "agentMode": "solo"
     },
     "nodes": {
-      "dev.specs": {
-        "agentMode": "multi",
-        "toolCustomConfig": {
-          "task": {
-            "enabled": true
+      "dev": [
+        {
+          "id": "specs",
+          "agentMode": "multi",
+          "toolCustomConfig": {
+            "task": {
+              "enabled": true
+            }
+          },
+          "subagentConfig": {}
+        },
+        {
+          "id": "plan",
+          "agentMode": "multi",
+          "toolCustomConfig": {
+            "task": {
+              "enabled": true
+            }
+          },
+          "subagentConfig": {
+            "disabledBuiltinSubagents": [
+              "Explore",
+              "critic"
+            ],
+            "customSubagentFiles": [
+              "agents/explore.md",
+              "agents/critic_autodev_plan_zh.md"
+            ]
           }
         },
-        "subagentConfig": {}
-      },
-      "dev.plan": {
-        "agentMode": "multi",
-        "toolCustomConfig": {
-          "task": {
-            "enabled": true
-          }
-        },
-        "subagentConfig": {
-          "disabledBuiltinSubagents": [
-            "Explore",
-            "critic"
-          ],
-          "customSubagentFiles": [
-            "agents/explore.md",
-            "agents/critic_autodev_plan_zh.md"
-          ]
+        {
+          "id": "code",
+          "agentMode": "agent_team"
         }
-      },
-      "dev.code": {
-        "agentMode": "agent_team"
-      }
+      ]
     }
   },
   "knowledgeAssembly": {

@@ -4,22 +4,17 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.module.board.v1",
   "title": "AutoBiz 看板模块配置 v1（modules/board.json）",
-  "description": "看板模块：目标平台、展示设置、可选能力（知识沉淀入口）。产物同步是单独的模块（modules/artifactSync.json）。不引用此文件时全部取默认值。语义校验见 input-config.md §7。",
+  "description": "看板模块：目标平台、展示设置。知识沉淀入口默认开启，不可配置。产物同步是单独的模块（modules/artifactSync.json）。不引用此文件时全部取默认值。语义校验见 input-config.md §7。",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string" },
     // 目标平台和解释器：决定生成哪些平台的宿主命令 win32 darwin linux
     "target": { "$ref": "#/definitions/target" },
-    // 看板文案：都能推导，只写要覆盖的
-    "display": { "$ref": "#/definitions/display" },
-    // 看板可选能力：知识沉淀入口；不写就不开启。产物同步是单独的模块 modules/artifactSync.json
-    "capabilities": { "$ref": "#/definitions/capabilities" }
+    // 看板文案：都能推导，只写要覆盖的；节点文案和看板能力（知识沉淀入口）不由用户配置，见 input-config.md §4.1
+    "display": { "$ref": "#/definitions/display" }
   },
   "definitions": {
-    "nonEmpty": { "type": "string", "minLength": 1 },
-    "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
-    "artifactId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
     "target": {
       "type": "object",
       "additionalProperties": false,
@@ -42,12 +37,6 @@
             "posix": { "type": "string", "default": "python3" },
             "win32": { "type": "string", "default": "python" }
           }
-        },
-        // 宿主命令是否加 -X utf8；新插件保持 true，lite 复刻样例为 false
-        "utf8Mode": {
-          "type": "boolean",
-          "default": true,
-          "description": "宿主命令是否加 -X utf8。新插件建议保持 true；lite 复刻样例为 false。"
         }
       }
     },
@@ -71,102 +60,10 @@
             "not_started": { "type": "string", "default": "未开始" },
             "in_progress": { "type": "string", "default": "进行中" },
             "done": { "type": "string", "default": "已完成" },
-            "skipped": { "type": "string", "default": "已跳过", "description": "被跳过节点的状态名（开启 rules.skip 时使用）。" },
+            "skipped": { "type": "string", "default": "已跳过", "description": "被跳过节点的状态名（flow.json 的 skip 不为 null 时使用）。" },
             "archived": { "type": "string", "default": "已归档", "description": "终态节点完成后的状态名（有终态节点时使用）。" }
           }
-        },
-        // 覆盖看板阶段标签：key 是 checkpoint 名，例如 plan_in_progress、plan_done
-        "checkpointLabels": {
-          "type": "object",
-          "description": "checkpoint → 看板阶段标签（flow.json 的 checkpoints.labels），覆写推导出的默认值；key 必须是存在的 checkpoint（含动态阶段节点的 checkpoint 和 archived）。",
-          "propertyNames": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-          "additionalProperties": { "$ref": "#/definitions/nonEmpty" }
-        },
-        // 动态阶段选择点上的文案：key 是 workflow.json 中的动态阶段 id
-        "dynamicStages": {
-          "type": "object",
-          "description": "按动态阶段 id 覆写描述和选择文案；key 必须是 workflow.json 的 rules.dynamicStages 中的动态阶段。",
-          "propertyNames": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "description": { "type": "string", "description": "缺省：在{下一主干节点 name}之前执行{name}。" },
-              "enable": { "$ref": "#/definitions/choiceText", "description": "缺省 label：需要，执行{name}；description：先执行{节点 name 以“ → ”连接}，再进入{下一主干节点 name}。" },
-              "skip": { "$ref": "#/definitions/choiceText", "description": "缺省 label：不需要，直接进入{下一主干节点 name}；description：不执行{name}，直接进入{下一主干节点 name}。" }
-            }
-          }
-        },
-        // 产物显示名：key 是产物 id，默认取它的第一个路径
-        "artifacts": {
-          "type": "object",
-          "description": "产物 id → 看板显示名；缺省取该产物的第一个路径。",
-          "propertyNames": { "$ref": "#/definitions/artifactId" },
-          "additionalProperties": { "$ref": "#/definitions/nonEmpty" }
-        },
-        // 按节点覆盖看板描述和下一步提示：key 是节点 id（含动态阶段的节点）
-        "nodes": {
-          "type": "object",
-          "description": "按节点 id 覆写看板描述和提示文案；key 必须是 workflow.json 中的节点（含动态阶段的节点）。",
-          "propertyNames": { "$ref": "#/definitions/nodeId" },
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "description": { "type": "string", "description": "缺省：{name}；产物：{输出路径以、连接}。" },
-              // active 作用于未开始和进行中，done 作用于完成后（默认指向下一节点的技能）；只写要改的子字段
-              "nextAction": {
-                "type": "object",
-                "additionalProperties": false,
-                "description": "局部覆写。active 作用于 not_started 与 in_progress；done 作用于本节点完成后（默认指向下一节点技能）。",
-                "properties": {
-                  "active": { "$ref": "#/definitions/actionText" },
-                  "done": { "$ref": "#/definitions/actionText" }
-                }
-              }
-            }
-          }
         }
-      }
-    },
-    // slashSkill：看板带出的技能名；userMessage：发起会话时预填的消息；dialogTips：对话框提示
-    "actionText": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "slashSkill": { "type": "string" },
-        "userMessage": { "type": "string" },
-        "dialogTips": { "type": "string" }
-      }
-    },
-    "choiceText": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "label": { "$ref": "#/definitions/nonEmpty" },
-        "description": { "$ref": "#/definitions/nonEmpty" }
-      }
-    },
-    "capabilities": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "看板可选能力。",
-      "properties": {
-        "knowledgeSedimentation": { "$ref": "#/definitions/knowledgeSedimentation" }
-      }
-    },
-    // 知识沉淀入口：在看板上带出 DevClaw 的 knowledge-sync 技能；一般只写 enabled，其余是 DevClaw 协议常量，不要改
-    "knowledgeSedimentation": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["enabled"],
-      "description": "知识沉淀入口（DevClaw 提供 knowledge-sync 能力），生成 board_core/modules.json 顶层 knowledge_config；不依赖知识模块。",
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "syncType": { "type": "string", "default": "invoke_session" },
-        "slashSkill": { "type": "string", "default": "knowledge-sync" },
-        "userMessage": { "type": "string", "default": "请针对${projectCode}项目发起知识沉淀，这个是 token：${leanToken}" },
-        "dialogTips": { "type": "string", "default": "发起知识沉淀" }
       }
     }
   }

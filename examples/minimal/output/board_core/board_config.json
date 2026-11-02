@@ -10,7 +10,7 @@
       "plugin_dir_hook": "${pluginWorkspace}/${projectDir}",
       "dialog_tips": "当前为Doc-Review-Kanban插件：起草 → 评审。请描述目标与验收标准。",
       "system_prompt_inject": "当前 Feature 为 ${feature}。产物目录 FEATURE_DIR=${pluginWorkspace}/${projectDir}/.autobizdevops/doc-review/features/${feature}。插件根目录 PLUGIN_ROOT=${pluginPath}。",
-      "session_context_inject": "python3 -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform darwin --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\""
+      "session_collector_context_inject": "python3 -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform darwin --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\""
     },
     "linux": {
       "project_status": "python3 -X utf8 \"${pluginPath}/runtime/adapters/inspect_state.py\" --mode project --workspace \"${pluginWorkspace}\" --projects ${projectDirs...}",
@@ -21,7 +21,7 @@
       "plugin_dir_hook": "${pluginWorkspace}/${projectDir}",
       "dialog_tips": "当前为Doc-Review-Kanban插件：起草 → 评审。请描述目标与验收标准。",
       "system_prompt_inject": "当前 Feature 为 ${feature}。产物目录 FEATURE_DIR=${pluginWorkspace}/${projectDir}/.autobizdevops/doc-review/features/${feature}。插件根目录 PLUGIN_ROOT=${pluginPath}。",
-      "session_context_inject": "python3 -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform linux --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\""
+      "session_collector_context_inject": "python3 -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform linux --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\""
     },
     "win32": {
       "project_status": "python -X utf8 \"${pluginPath}/runtime/adapters/inspect_state.py\" --mode project --workspace \"${pluginWorkspace}\" --projects ${projectDirs...}",
@@ -32,7 +32,7 @@
       "plugin_dir_hook": "${pluginWorkspace}/${projectDir}",
       "dialog_tips": "当前为Doc-Review-Kanban插件：起草 → 评审。请描述目标与验收标准。",
       "system_prompt_inject": "当前 Feature 为 ${feature}。产物目录 FEATURE_DIR=${pluginWorkspace}/${projectDir}/.autobizdevops/doc-review/features/${feature}。插件根目录 PLUGIN_ROOT=${pluginPath}。",
-      "session_context_inject": "python -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform win32 --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\""
+      "session_collector_context_inject": "python -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform win32 --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\""
     }
   }
 }

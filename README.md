@@ -2,11 +2,11 @@
 
 AutoBiz 看板插件脚手架。三方分工如下：
 
-- **插件开发者**：用 `workflow.json` 定义流程（阶段、节点、技能绑定、输入输出、可选校验命令），在入口文件 `plugin.scaffold.json` 中填写基础信息并引用 `modules/` 下的看板、会话、知识、产物同步模块配置，再提供技能、模板、业务校验器和自定义扩展；
+- **插件开发者**：用 `workflow.json` 定义流程（按 biz/dev/ops 分组的节点、技能绑定、输出），在入口文件 `plugin.scaffold.json` 中填写基础信息并引用 `modules/` 下的看板、会话、知识、产物同步模块配置，再提供技能、模板、业务校验器和自定义扩展；
 - **脚手架与运行框架**：生成固定入口和编译配置，提供流程查询、状态管理及宿主适配；
 - **DevClaw**：展示看板、发起会话、传入运行上下文、调用插件入口。
 
-配置可以由初始化向导问答生成；不改默认值的模块不需要写配置文件，所以入口文件很短。这些核心配置只写决策，由 `autobiz-plugin lint` 在提交前、构建前和 CI 中自动检测；插件运行时只读 build 编译出来的配置。看板配置、三平台宿主命令、状态机、插件清单和模块文件都由脚手架生成。
+配置可以由初始化向导问答生成；不改默认值的模块不需要写配置文件，所以入口文件很短。这些核心配置只写决策，由 `autobiz-plugin lint` 在提交前、构建前和 CI 中自动检测；改了 `workflow.json` 或模块配置后，用 `autobiz-plugin doctor` 重新生成插件。插件运行时只读 build 编译出来的配置。看板配置、三平台宿主命令、状态机、插件清单、模块文件，以及每个技能 `SKILL.md` 开头的状态维护片段都由脚手架生成；开发者没有提供技能时，生成只带状态维护片段的空白 `SKILL.md`。
 
 当前状态：**设计阶段（v1 草案）**，尚无实现代码。
 
@@ -18,6 +18,7 @@ AutoBiz 看板插件脚手架。三方分工如下：
 | [docs/input-config.md](docs/input-config.md) | 用户输入：输入分类、`workflow.json`、入口文件与模块配置文件的字段、默认值、推导规则、校验规则 |
 | [docs/output-spec.md](docs/output-spec.md) | 插件标准化输出：目录、清单、宿主接口 board_core、内部配置、运行期数据、技能格式 |
 | [docs/interfaces.md](docs/interfaces.md) | 接口：CLI 与初始化向导、模块契约、宿主命令协议、看板事件推送、运行框架入口与内部库 |
+| [docs/scaffold.md](docs/scaffold.md) | 草案（待评审）：脚手架自身的模块拆分与模块间接口 |
 | [docs/diagrams.md](docs/diagrams.md) | 框架图与核心机制图（Mermaid） |
 | [docs/mods.md](docs/mods.md) | 草案：mods 机制下的插件初始化与热更新 |
 | [docs/rpc.md](docs/rpc.md) | 草案：DevClaw 与插件的 JSON-RPC 双向通信 |

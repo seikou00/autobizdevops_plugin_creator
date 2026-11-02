@@ -13,7 +13,7 @@
 
 ### 1. 三方职责与整体架构
 
-上面一行是开发期：插件开发者写核心配置和技能资源，脚手架检测并编译，生成插件。下面一行是运行期：DevClaw 读取看板配置、调用插件入口、拉起会话，模型执行技能并通过 `update_state.py` 提交状态。两条线汇合到同一个插件。见 [README §1、§3](README.md)。
+上面一行是开发期：插件开发者写核心配置和技能资源，脚手架检测并编译，生成插件。下面一行是运行期：DevClaw 读取看板配置、调用插件入口、拉起会话，模型执行技能，并按技能 `SKILL.md` 开头的状态维护片段调用 `update_state.py` 提交状态（[output-spec.md §6.1](output-spec.md)）。两条线汇合到同一个插件。见 [README §1、§3](README.md)。
 
 ```mermaid
 flowchart LR
@@ -29,7 +29,7 @@ flowchart LR
     direction TB
     W["初始化向导<br/>autobiz-plugin-creator"]
     L["lint<br/>结构 + 语义检测"]
-    B["build<br/>编译 · 生成 · 托管"]
+    B["build / doctor<br/>编译 · 生成 · 托管"]
     W --> L --> B
   end
 
@@ -45,7 +45,7 @@ flowchart LR
     direction TB
     P1["plugin.json<br/>board_core/board_config.json · modules.json"]
     P2["runtime/<br/>固定入口 · query/engine · 编译配置"]
-    P3["skills/（含状态接入说明）<br/>hooks/ · agents/"]
+    P3["skills/（开头是状态维护片段）<br/>hooks/ · agents/"]
   end
 
   DEV -->|"核心配置与技能资源"| SCF
@@ -58,7 +58,7 @@ flowchart LR
 
 ### 2. 运行期调用关系
 
-DevClaw 只调用 `runtime/` 下的固定入口；入口通过 import 使用内部库 `query.py`（只读）和 `engine.py`（初始化与状态变更）；模型通过 `update_state.py` 提交状态变更；三个写入口提交后把看板事件推送给 DevClaw（虚线，见图 11）。会话入口内部如何组装知识和调用自定义入口见图 8。见 [interfaces.md §4](interfaces.md)。
+DevClaw 只调用 `runtime/` 下的固定入口；入口通过 import 使用内部库 `query.py`（只读）和 `engine.py`（初始化与状态变更）；模型按技能 `SKILL.md` 开头的状态维护片段，在技能开始和完成时通过 `update_state.py` 提交状态变更；三个写入口提交后把看板事件推送给 DevClaw（虚线，见图 11）。会话入口内部如何组装知识和调用自定义入口见图 8。见 [interfaces.md §4](interfaces.md)。
 
 ```mermaid
 flowchart LR
@@ -68,7 +68,7 @@ flowchart LR
     C2["create_feature"]
     C3["project_status<br/>feature_status"]
     C4["dynamic_workflow"]
-    C5["session_context_inject"]
+    C5["session_collector_context_inject"]
     C6["deploy_units"]
     EV["看板事件服务<br/>127.0.0.1"]
   end
@@ -106,7 +106,7 @@ flowchart LR
   C4 --> A4
   C5 --> S1
   C6 --> K1
-  MODEL --> WF
+  MODEL -->|"技能开始 · 完成<br/>（状态维护片段）"| WF
   A3 & A4 & S1 --> Q
   A1 & A2 & WF --> E
   Q -->|"只读"| CFG & ST
@@ -117,7 +117,7 @@ flowchart LR
 
 ### 3. 核心配置与编译配置
 
-人和 agent 只维护左边的核心配置；右边的编译配置只由 build 写入，插件运行时只读它们。build-manifest 记录各核心配置的摘要，lint 发现核心配置改了却没重新 build 时报 `BUILD_STALE`（见图 5）。见 [input-config.md §1.2、§6](input-config.md)、[output-spec.md §5](output-spec.md)。
+人和 agent 只维护左边的核心配置；右边的编译配置只由 build 写入，插件运行时只读它们。各技能 `SKILL.md` 开头的状态维护片段也由 build 写入。build-manifest 记录各核心配置的摘要，lint 发现核心配置改了却没重新生成时报 `BUILD_STALE`，提示执行 `doctor`（见图 5）。见 [input-config.md §1.2、§6](input-config.md)、[output-spec.md §5](output-spec.md)。
 
 ```mermaid
 flowchart LR
@@ -131,7 +131,7 @@ flowchart LR
     I6["modules/artifactSync.json"]
   end
 
-  BUILD{{"autobiz-plugin build<br/>lint 通过才编译"}}
+  BUILD{{"autobiz-plugin doctor / build<br/>lint 通过才编译"}}
 
   subgraph COMP["编译配置（只由 build 写入，随插件发布）"]
     direction TB
@@ -142,24 +142,27 @@ flowchart LR
     O7["runtime/config/board.json<br/>看板文案"]
     O5["board_core/board_config.json · modules.json<br/>宿主命令 · 模块与入口"]
     O6["runtime/build-manifest.json<br/>输入摘要 · 文件哈希"]
+    O8["skills/*/SKILL.md 开头<br/>状态维护片段"]
   end
 
   I1 & I2 & I3 & I4 & I5 & I6 --> BUILD
-  BUILD --> O1 & O2 & O3 & O4 & O5 & O6 & O7
+  BUILD --> O1 & O2 & O3 & O4 & O5 & O6 & O7 & O8
   O1 & O2 & O3 & O4 & O7 --> RTR["运行框架读取"]
+  O8 --> MDL["模型在技能开始 · 完成时执行"]
   O5 --> DCR["DevClaw 读取"]
   O6 --> LNT["lint 比对摘要<br/>不一致时报 BUILD_STALE"]
 ```
 
 | 编译配置 | 主要来自 |
 |---|---|
-| `flow.json` | `workflow.json`，加上 `board.display` 中的产物显示名 |
+| `flow.json` | `workflow.json`（产物 `label` 取路径） |
 | `session.json` | `modules/session.json`，加上知识模块写入的知识组装脚本 |
 | `knowledge.json` | `modules/knowledge.json` |
 | `runtime.json` | `plugin.scaffold.json` 的 `plugin.id`、`runtime` |
 | `board.json` | `modules/board.json` 的 `display`，按节点展开 `nextAction` |
 | `board_config.json` | `modules/board.json` 的 `target` 与文案模板，加上知识模块、跳过节点的命令 |
 | `modules.json` | 入口文件 `modules` 的引用情况，加上知识沉淀入口和产物同步模块的入口 `artifact_sync` |
+| `SKILL.md` 状态维护片段 | `workflow.json` 的节点 id（推出 checkpoint）与技能绑定 |
 
 ---
 
@@ -167,7 +170,7 @@ flowchart LR
 
 ### 4. 构建流水线
 
-前三步单独执行就是 `lint`；任何一步出现 error 都不写文件。见 [README §5](README.md)。
+前三步单独执行就是 `lint`；任何一步出现 error 都不写文件。修改核心配置后执行的 `doctor` 在这条流水线前后各加一步：先与上次构建比较、列出影响，生成后再复查（[interfaces.md §1.7](interfaces.md)）。见 [README §5](README.md)。
 
 ```mermaid
 flowchart LR
@@ -181,7 +184,7 @@ flowchart LR
 
   S4["compile<br/>生成 PluginIR"]
   S5["contribute<br/>board · session<br/>knowledge · artifactSync"]
-  S6["emit<br/>按归属写文件<br/>检查漂移"]
+  S6["emit<br/>按归属写文件<br/>同步 SKILL.md 状态片段<br/>检查漂移"]
   S7["manifest<br/>写 build-manifest.json"]
   X["退出码 1<br/>不写任何文件"]
 
@@ -204,7 +207,7 @@ flowchart TB
   CI["合并时：CI 运行 check --strict<br/>lint + 技能 + 漂移 + 契约测试"]
   PKG["package 发布"]
   RUN["运行时：加载 flow.json<br/>校验不变量"]
-  FIX["按 Issue 修正<br/>或重新 build"]
+  FIX["按 Issue 修正<br/>再运行 doctor 重新生成"]
 
   EDIT --> IDE & AG
   IDE & AG --> BLD
@@ -220,7 +223,7 @@ flowchart TB
 
 ### 6. 状态推进与完成判定
 
-模型调用 `update_state.py` 推进到 `_done` 时，框架先检查必需产物是否存在（空文件也算存在），再执行节点的单行校验命令，退出码为 0 才写入状态。见 [output-spec.md §4.4](output-spec.md)、[interfaces.md §4.2–§4.4](interfaces.md)。
+模型执行到技能完成时，按状态维护片段调用 `update_state.py` 推进到 `_done`：框架先检查必需产物都存在且非空，`validate` 不为 `null` 时再执行节点的单行校验命令（v1 固定为 `null`），全部通过才写入状态。不满足时拒绝推进并列出原因，模型补齐产物后重试。技能开始时推进到 `_in_progress` 同样由片段中的命令完成。见 [output-spec.md §4.4、§6.1](output-spec.md)、[interfaces.md §4.2–§4.4](interfaces.md)。
 
 ```mermaid
 sequenceDiagram
@@ -231,31 +234,28 @@ sequenceDiagram
   participant FS as 项目目录
   participant V as 校验命令（开发者）
 
-  M->>U: --checkpoint plan_done
+  M->>U: 技能完成执行：--checkpoint plan_done
   U->>E: transition(project, feature, plan_done)
   E->>FS: 读取 state.json
   E->>E: 状态转移检查（plan_in_progress → plan_done）
-  E->>FS: 存在性检查：必需输入与输出
-  alt 有产物缺失
-    E-->>U: ok:false，列出缺失的产物
-  else 全部存在
-    E->>V: 拆分参数 → 替换占位符 → 不经 shell 执行
-    V-->>E: 退出码与输出
-    alt 退出码非 0 或超时
-      E->>FS: 写 node-validate 失败事件
-      E-->>U: ok:false，附输出末尾 2000 字符
-    else 退出码为 0
-      E->>FS: 在 .state.lock 内读取、校验、原子替换 state.json
-      E->>FS: 写 node-validate、update-state 事件
-      E-->>U: ok:true
+  E->>FS: 检查必需输入与输出都存在且非空
+  alt 有产物缺失或为空
+    E-->>U: ok:false，列出缺少或为空的产物
+  else 全部满足
+    opt validate 不为 null（v1 不会出现）
+      E->>V: 拆分参数 → 替换占位符 → 不经 shell 执行
+      V-->>E: 退出码与输出（非 0 或超时则 ok:false）
     end
+    E->>FS: 在 .state.lock 内读取、校验、原子替换 state.json
+    E->>FS: 写 update-state 事件
+    E-->>U: ok:true
   end
   U-->>M: JSON 结果
 ```
 
 ### 7. checkpoint 状态机
 
-以最小示例为例：每个节点有 `<前缀>_in_progress`、`<前缀>_done` 两个 checkpoint，前缀取节点 id 的最后一段，按节点顺序线性推进。重开只能回到当前或之前节点的 `_in_progress`，不执行校验命令。见 [input-config.md §2.2](input-config.md)、[interfaces.md §4.2](interfaces.md)。
+以最小示例为例：每个节点有 `<前缀>_in_progress`、`<前缀>_done` 两个 checkpoint，前缀就是节点 id，按节点顺序线性推进。重开只能回到当前或之前节点的 `_in_progress`，不执行校验命令。见 [input-config.md §2.2](input-config.md)、[interfaces.md §4.2](interfaces.md)。
 
 ```mermaid
 stateDiagram-v2
@@ -283,7 +283,7 @@ sequenceDiagram
   participant P as 会话策略
   participant K as 知识组装脚本（内置，插件可替换）
 
-  D->>R: session_context_inject（项目、Feature、发布单元、会话工作区）
+  D->>R: session_collector_context_inject（项目、Feature、发布单元、会话工作区）
   R->>Q: 查询当前节点、目标节点、输入输出及存在情况
   Q-->>R: 流程上下文 flow
   R->>P: 目标节点 → 当前节点 → 默认，三级降级
@@ -351,7 +351,7 @@ sequenceDiagram
 
   D->>D: 启动服务（127.0.0.1 随机端口）
   D->>M: 拉起会话（注入 AUTOBIZ_BOARD_ENDPOINT）
-  M->>U: --checkpoint plan_done
+  M->>U: --checkpoint plan_done（技能状态维护片段）
   U->>E: transition(...)
   E->>E: 锁内提交 state.json，boardSeq + 1
   E-->>U: ok:true，boardSeq = 12

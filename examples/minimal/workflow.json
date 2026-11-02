@@ -1,19 +1,21 @@
 {
   "$schema": "../../schemas/workflow.schema.json",
-  "nodes": [
-    {
-      "id": "draft",
-      "name": "起草",
-      "skill": "doc-draft",
-      "outputs": { "draft": "DRAFT.md" }
-    },
-    {
-      "id": "review",
-      "name": "评审",
-      "skill": "doc-review",
-      "inputs": ["draft"],
-      "outputs": { "review": "REVIEW.md" },
-      "validate": "${python} ${skillPath}/scripts/check_review.py --feature-dir ${featureDir}"
-    }
-  ]
+  "nodes": {
+    "biz": [
+      {
+        "id": "draft",
+        "seq": 1,
+        "name": "起草",
+        "skill": "doc-draft",
+        "outputs": ["DRAFT.md"]
+      },
+      {
+        "id": "review",
+        "seq": 2,
+        "name": "评审",
+        "skill": "doc-review",
+        "outputs": ["REVIEW.md"]
+      }
+    ]
+  }
 }

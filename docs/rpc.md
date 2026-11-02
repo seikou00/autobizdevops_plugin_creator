@@ -155,7 +155,7 @@ JSON-RPC 错误只用于协议和系统层面的失败：
 | `workflow/templates` | `dynamic_workflow` | 无 | §3.3.5 |
 | `project/create` | `create_project` | `workspace`、`project` | §3.3.1 |
 | `feature/create` | `create_feature` | `workspace`、`project`、`feature`、`selectedDeployUnits`，可选 `workflowTemplate`、`owner`、`iteration` | §3.3.2 |
-| `session/context` | `session_context_inject` | `platform`、`workspace`、`project`、`feature`、`selectedDeployUnits`、`sessionWorkspacePath` | §3.3.7 |
+| `session/context` | `session_collector_context_inject` | `platform`、`workspace`、`project`、`feature`、`selectedDeployUnits`、`sessionWorkspacePath` | §3.3.7 |
 | `knowledge/deployUnits` | `deploy_units` | 可选 `system` | §3.3.8 |
 | `knowledge/pull` | `pull_knowledge` | 可选 `progressToken` | §3.3.9；进行中发送 `$/progress` |
 | `state/update` | 无（新增） | `workspace`、`project`、`feature`、`checkpoint`，可选 `reopen`、`reason`、`owner`、`iteration`、`dryRun` | 与 `update_state.py` 的输出相同（§4.2）。供看板上的人工操作使用，例如重开；人工关口（mods.md §2.3）定稿后再增加参数 |

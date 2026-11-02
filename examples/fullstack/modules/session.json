@@ -2,42 +2,51 @@
   "$schema": "../../../schemas/modules/session.schema.json",
   "policies": {
     "nodes": {
-      "biz.prd": {
-        "agentMode": "multi",
-        "toolCustomConfig": { "task": { "enabled": true } }
-      },
-      "dev.specs": {
-        "agentMode": "multi",
-        "toolCustomConfig": { "task": { "enabled": true } },
-        "subagentConfig": {
-          "disabledBuiltinSubagents": ["Explore", "critic"],
-          "customSubagentFiles": ["agents/explore.md", "agents/critic.md"]
+      "biz": [
+        {
+          "id": "prd",
+          "agentMode": "multi",
+          "toolCustomConfig": { "task": { "enabled": true } }
         }
-      },
-      "dev.design": {
-        "agentMode": "multi",
-        "toolCustomConfig": { "task": { "enabled": true } },
-        "subagentConfig": {
-          "disabledBuiltinSubagents": ["Explore", "critic"],
-          "customSubagentFiles": ["agents/explore.md", "agents/critic_autodev_design_zh.md"]
+      ],
+      "dev": [
+        {
+          "id": "specs",
+          "agentMode": "multi",
+          "toolCustomConfig": { "task": { "enabled": true } },
+          "subagentConfig": {
+            "disabledBuiltinSubagents": ["Explore", "critic"],
+            "customSubagentFiles": ["agents/explore.md", "agents/critic.md"]
+          }
+        },
+        {
+          "id": "design",
+          "agentMode": "multi",
+          "toolCustomConfig": { "task": { "enabled": true } },
+          "subagentConfig": {
+            "disabledBuiltinSubagents": ["Explore", "critic"],
+            "customSubagentFiles": ["agents/explore.md", "agents/critic_autodev_design_zh.md"]
+          }
+        },
+        {
+          "id": "plan",
+          "agentMode": "multi",
+          "toolCustomConfig": { "task": { "enabled": true } },
+          "subagentConfig": {
+            "disabledBuiltinSubagents": ["Explore", "critic"],
+            "customSubagentFiles": ["agents/explore.md", "agents/critic_autodev_plan_zh.md"]
+          }
+        },
+        {
+          "id": "code",
+          "agentMode": "workflow",
+          "toolCustomConfig": { "task": { "enabled": true } },
+          "subagentConfig": {
+            "disabledBuiltinSubagents": ["verification"],
+            "customSubagentFiles": ["agents/verification.md"]
+          }
         }
-      },
-      "dev.plan": {
-        "agentMode": "multi",
-        "toolCustomConfig": { "task": { "enabled": true } },
-        "subagentConfig": {
-          "disabledBuiltinSubagents": ["Explore", "critic"],
-          "customSubagentFiles": ["agents/explore.md", "agents/critic_autodev_plan_zh.md"]
-        }
-      },
-      "dev.code": {
-        "agentMode": "workflow",
-        "toolCustomConfig": { "task": { "enabled": true } },
-        "subagentConfig": {
-          "disabledBuiltinSubagents": ["verification"],
-          "customSubagentFiles": ["agents/verification.md"]
-        }
-      }
+      ]
     }
   }
 }

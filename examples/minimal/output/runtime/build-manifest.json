@@ -11,7 +11,7 @@
   },
   "inputs": {
     "plugin.scaffold.json": "sha256:b99b8694bbd3110cc46159d17e85f071705f1737649f0ed3af885eab31c4f542",
-    "workflow.json": "sha256:58d3169de11e756d1b088b13098415e06fc89ef73ad66e6c8ee5bca6a5b21328"
+    "workflow.json": "sha256:2e57ad627387c9866d4f5fd77373f0cefe8f27b106ed6e8f6ca97d5336e2d3d0"
   },
   "files": {
     "runtime/workflow/update_state.py": {
@@ -80,11 +80,11 @@
     },
     "board_core/board_config.json": {
       "ownership": "generated",
-      "sha256": "sha256:867182b6407880d0879f44c4418815c1555758eb627c0241b85fcb3e51c017c9"
+      "sha256": "sha256:dcd5c1f84544f9f7359886b0a57fe6461c4cff159175c6ebda8c9eb3a69cb9ca"
     },
     "board_core/modules.json": {
       "ownership": "generated",
-      "sha256": "sha256:f78457b8b51bb3aa2ea797b34f9b81658779d940d79e2cb587287533fcc97721"
+      "sha256": "sha256:9706e28be0833c488c8d6e14c549034335b2b5a7903ce2ade3269a213d1006ca"
     },
     "plugin.json": {
       "ownership": "generated",
@@ -92,11 +92,11 @@
     },
     "runtime/config/board.json": {
       "ownership": "generated",
-      "sha256": "sha256:88db09f6ca2e6784bf6b514d1a59dfc5453772912dbb46db2e32cf1b70e09d9c"
+      "sha256": "sha256:d345dbcd5e743bc2dc2b3bc0d7029507f9cfc57bb99a41c195fd03eb98722693"
     },
     "runtime/config/flow.json": {
       "ownership": "generated",
-      "sha256": "sha256:7ee66c2dad68098aa2f9bdbe823ba3385d7a4936dbec6ada15bd987ff0678538"
+      "sha256": "sha256:c3875744bff37b1838e1b847a333ab6d20c9a1a6e0b50c54b44de4b18e89d528"
     },
     "runtime/config/runtime.json": {
       "ownership": "generated",
@@ -109,15 +109,13 @@
     "skills/doc-draft/SKILL.md": {
       "ownership": "seeded",
       "regions": {
-        "state": "sha256:ab4b5fad331eb1f9131c80452b9d72f1f650963f0ed7750d139b1265494b027f",
-        "artifacts": "sha256:fa6248f0560cb63d511606a837ca16c598b58e00b03600735c4b00523a0b50fc"
+        "state": "sha256:9e9e5754bb185bd49fadda63d410d45a4168b8d69a380607fabc469ebcb68e98"
       }
     },
     "skills/doc-review/SKILL.md": {
       "ownership": "seeded",
       "regions": {
-        "state": "sha256:4908210a80de1058fefece18d29229651c273e909dc613b571d4408e663f148c",
-        "artifacts": "sha256:fdd9bc401eabc119706f2ed9454c7274cbf053c36cfd7af4eb6b63b8a396b57f"
+        "state": "sha256:1cec2b21036e17d819495b22811abbcb00cd68ded79ed7960496fbcce5fb3ad2"
       }
     },
     ".githooks/pre-commit": {

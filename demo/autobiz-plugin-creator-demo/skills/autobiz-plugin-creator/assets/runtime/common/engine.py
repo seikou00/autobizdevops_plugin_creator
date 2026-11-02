@@ -88,9 +88,8 @@ def persist(project_path, payload):
 
 
 def ensure_feature_files(project_path, feature):
-    directory = query.feature_dir(project_path, feature)
-    directory.mkdir(parents=True, exist_ok=True)
-    log = directory / "hooks.ndjson"
+    query.feature_dir(project_path, feature).mkdir(parents=True, exist_ok=True)
+    log = query.hook_log_path(project_path)
     if not log.exists():
         log.touch()
 
@@ -100,7 +99,7 @@ def append_event(project_path, feature, event_id, status, message, **extra):
              "sessionId": os.environ.get("SESSION_ID", ""), "featureId": feature,
              "eventId": event_id, "eventStatus": status, "message": message, **extra}
     ensure_feature_files(project_path, feature)
-    with (query.feature_dir(project_path, feature) / "hooks.ndjson").open("a", encoding="utf-8") as handle:
+    with query.hook_log_path(project_path).open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(event, ensure_ascii=False) + "\n")
 
 
