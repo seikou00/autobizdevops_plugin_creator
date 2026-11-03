@@ -22,6 +22,7 @@ AutoBiz 看板插件脚手架。三方分工如下：
 | [docs/diagrams.md](docs/diagrams.md) | 框架图与核心机制图（Mermaid） |
 | [docs/mods.md](docs/mods.md) | 草案：mods 机制下的插件初始化与热更新 |
 | [docs/rpc.md](docs/rpc.md) | 草案：DevClaw 与插件的 JSON-RPC 双向通信 |
+| [docs/priorities.md](docs/priorities.md) | 草案：v1 功能分期（P0 / P1） |
 | [schemas/](schemas/) | `workflow.schema.json`、`plugin-scaffold.schema.json`、`modules/*.schema.json` |
 | [examples/](examples/) | `minimal/`、`lite/`（复刻 autobizdevops_lite）、`fullstack/`（全栈版）；每个示例的 `output/` 是 build 应生成的内容 |
 

@@ -46,6 +46,7 @@ v1 范围：
 | [diagrams.md](diagrams.md) | 框架图与核心机制图（Mermaid）：整体架构、运行期调用、配置分层、构建、自动检测、状态推进、会话组成、知识模块、多插件隔离 |
 | [mods.md](mods.md) | 草案：DevClaw mods 机制下的插件初始化与热更新（开发 mod、运行 mod、变更等级、状态迁移） |
 | [rpc.md](rpc.md) | 草案：DevClaw 与插件的 JSON-RPC 双向通信（常驻进程、握手与鉴权、方法、降级） |
+| [priorities.md](priorities.md) | 草案：按截至 D59 的评审结论划分的 v1 功能分期（P0 / P1） |
 | [schemas/workflow.schema.json](../schemas/workflow.schema.json) | 核心流程 JSON Schema |
 | [schemas/plugin-scaffold.schema.json](../schemas/plugin-scaffold.schema.json) | 入口文件 JSON Schema |
 | [schemas/modules/](../schemas/modules/) | 看板、会话、知识模块配置的 JSON Schema |

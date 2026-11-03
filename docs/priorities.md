@@ -1,0 +1,121 @@
+# v1 功能分期：P0 / P1（草案，待确认）
+
+按 [README §8](README.md) 中截至 D59 的评审结论划分（2026-11-04）。P0、P1 都在 v1 范围内，只是交付先后不同；v2 预留和尚未评审的草案见 §4。
+
+已确认（2026-11-04）：知识模块和产物同步模块都在 P0。
+
+mods.md 中的 P0/P1/P2 是 mod 能力自己的分档，与本文无关。
+
+## 1. 划分标准
+
+| 档 | 标准 |
+|---|---|
+| P0 | 第一个交付版本必须有：开发者以样例或手写的核心配置为起点，用 CLI 生成、检查、打包插件，DevClaw 导入后能展示看板、发起会话、推进状态；lite 能迁入并通过金样测试。缺了会有正确性风险的检查也放在这一档 |
+| P1 | 在 P0 之后交付：降低上手门槛（向导、插件开发技能、编辑命令），补齐全栈版迁入（产物同步等），以及脚手架发布第二个版本之前才需要的升级处理。不做时有替代做法，例如手写配置、手工操作 |
+
+## 2. P0
+
+### 2.1 构建流水线（scaffold.md 单元 1–8）
+
+| 功能点 | 依据 |
+|---|---|
+| 公共基础：Issue 格式与稳定排序、只支持 18 个关键字的 Schema 校验、UTF-8 读写、生成文件固定为 LF、摘要前把 CRLF 换成 LF、`sha256:` 摘要 | D42、D43 |
+| 读取与补全：入口文件及其引用的文件、按 Schema 补默认值、重复键报错、接受 BOM | D27、D46 |
+| lint：input-config.md §7.2 的核心规则和模块规则，分两段输出（版本类规则见 P1） | D47 |
+| 编译：按 `seq` 排序、产物 id 推导、checkpoint 链、终态节点、可选输出、节点描述取技能 `description` | D33、D38、D49 |
+| 模块契约与合并：`module.json`、`Contribution`、按固定顺序合并、`MODULE_CONFLICT` | D50 |
+| 技能同步：状态维护片段的插入、更新、删除，空白 `SKILL.md`，旧 `scaffold` 片段原地替换 | D38、D45、output-spec.md §6.1 |
+| 写盘：归属规则、`DRIFT_MANAGED` 与 `--force`、逐个文件原子替换、build-manifest 最后写（记录脚手架、运行框架和模块版本） | D52、output-spec.md §8 |
+| 改 `plugin.id`、`runtime.metaRoot` 的保护：`PLUGIN_ID_CHANGED`、`LAYOUT_CHANGED` 与 `--allow-id-change`、`--allow-layout-change` | D47、D48 |
+
+### 2.2 CLI
+
+| 功能点 | 依据 |
+|---|---|
+| `doctor`：lint → build → 复查，同步技能的状态维护片段（影响报告见 P1） | D38、D54 |
+| `lint`、`check`：技能内容规则（`SKILL_FRONTMATTER`、`SKILL_STATE_BLOCK`、`LEGACY_ENTRY_REF`、`TODO_PLACEHOLDER` 等）、`DRIFT_GENERATED`、契约测试 | D51、D54、D55 |
+| `package`：打包规则、zip 只有一个顶层目录 `<plugin.id>/`、可重复 | D57 |
+| `new --from blank\|lite\|fullstack --yes`：以样例为起点，安装包带种子 | D24、D56 |
+| `add skill --from`：导入已有技能，`version`、`author` 迁入 `metadata`，内容问题报 warning | D51、D56 |
+| `autobiz-plugin.pyz`：用 zipapp 发布成一个文件 | D57 |
+
+### 2.3 运行框架（scaffold.md 单元 15）
+
+| 功能点 | 依据 |
+|---|---|
+| `query.py`、`engine.py`：线性推进、终态节点、重开、必需产物存在且非空、加锁提交、变更日志 `hooks.ndjson` | D17、D37、D59 |
+| 多插件隔离：`metaRoot`、state.json 中 `pluginId` 校验、Feature 名路径安全 | D48、README §6.5 |
+| 入口：`update_state.py`、`init_workspace.py`、`init_feature.py`、`inspect_state.py`、`inspect_workflow_templates.py`（只返回 `standard`） | interfaces.md §4.1 |
+| 入口共用的 `cli.py`，看板数据拼装 `board_view.py` | D59 |
+| 看板事件推送的插件侧：`board_events.py`、`boardSeq`；未设置端点时静默跳过，读取命令照常兜底 | D21 |
+
+### 2.4 模块（scaffold.md 单元 9）
+
+| 功能点 | 依据 |
+|---|---|
+| board：三平台 `inspectCommands`（一律 `-X utf8`）、`modules.json`（含 `boardEvents` 和固定开启的知识沉淀入口 `knowledge_config`）、`runtime/config/board.json` | D31、D33、D40 |
+| session：默认会话入口 `render_session_context.py`（流程上下文、`agentConfig`、知识段），`session.policies`，宿主命令键 `session_collector_context_inject` | D35、D40、D44 |
+| knowledge：`inspect_deploy_units.py`（`deploy_units`）、内置组装脚本和 `collect-knowledge.js`、声明 `source` 时的 `sync_knowledge.py`（`pull_knowledge`）、`${knowledge-path}`；没有 Node 时退回清单映射和 `AGENTS.md` | D26、D53 |
+| artifactSync：按节点生成 `stages`、同步配置 `artifact-sync.json`（`schemaVersion: 3`，兼容读取 v1、v2）、同步技能、看板入口 `artifact_sync`、工号确认；通过 `runtime.common.query` 定位 Feature 目录，不再写死 `.autobizdevops` | D30、D35、README §6.3 |
+
+### 2.5 测试
+
+| 功能点 | 依据 |
+|---|---|
+| `tests/unit/`、`tests/contract/`（含看板事件推送规则）、`tests/golden/` 的 lite 基线、`tests/check_schema_defaults.py` | README §3.1、D27、D55 |
+
+## 3. P1
+
+### 3.1 降低上手门槛
+
+| 功能点 | 依据 | 不做时 |
+|---|---|---|
+| 初始化向导的交互问答、`new --answers` | interfaces.md §1.4、D56 | 从样例拷贝后手改 |
+| `add node`、`module list`、`module enable`/`disable`、`--set`，以及保留键序和缩进的配置编辑 | D56 | 手改核心配置后执行 doctor |
+| 插件开发技能 `autobiz-plugin-creator` 和它的 DevClaw 插件包；依赖 `new --answers`、doctor 的 `changes`、`simulate` | D9、D58 | 开发者直接用 CLI |
+| `simulate` 命令：复用 check 的契约测试流程 | D55 | `check` 中的契约测试 |
+| doctor 的影响报告：`--dry-run`、`changes`、`CHECKPOINT_REMOVED`、`DOCTOR_BASELINE_MISSING` | D54 | 生成后对比文件 |
+| `.scaffold/` 下的 Schema 拷贝（IDE 补全；插件开发技能也靠它查字段） | D51、D55、D58 | 直接看仓库中的 Schema |
+| 模块关闭后的遗留文件处理：标 `inactive`、`MODULE_INACTIVE_FILES` | D52 | 关闭模块后手动删除它生成的文件 |
+
+### 3.2 全栈版迁入
+
+| 功能点 | 依据 | 不做时 |
+|---|---|---|
+| `plugin.mcpServers`、`plugin.hooks` 透传与 `PLUGIN_REF_MISSING` | D38、D57 | — |
+| 全栈版金样测试 | README §3.1 | — |
+| 全栈版已有项目的状态接续（`autobizdevops.state.v3`） | README §9 第 3 条（待定） | — |
+
+### 3.3 运行框架的保留能力
+
+| 功能点 | 依据 | 不做时 |
+|---|---|---|
+| `inputs` 检查与 `validate` 校验命令的执行：v1 的 build 固定写 `[]`、`null`，由契约测试手写 `flow.json` 覆盖 | D59、interfaces.md §4.3、§4.4 | 节点只做存在且非空检查，与 v1 的 build 结果一致 |
+
+### 3.4 版本与升级（脚手架发布第二个版本之前完成）
+
+| 功能点 | 依据 | 不做时 |
+|---|---|---|
+| 版本比较：`SCAFFOLD_OUTDATED`、`CORE_MAJOR_CHANGED`、`SCAFFOLD_VERSION_CHANGED`、`doctor --allow-major-upgrade`、`changes.versions`；同一主版本内 doctor 替换 managed、module 文件 | D57 | 第一个版本没有可比较的旧版本；P0 的 build-manifest 已经记下版本号 |
+
+## 4. 不在 v1
+
+| 内容 | 依据 |
+|---|---|
+| v2 预留：回流修复、模板子集、动态阶段与跳过节点（含 `skip_node.py`）、外部输入、旧文件名回退、checkpoint 前缀覆写、模块自带宿主钩子 | README §7、D52、D59 |
+| 看板事件的后续项：鉴权、产物实时刷新、静态结果预生成、会话入口提速 | interfaces.md §3.5.6 |
+| `migrate` 命令 | D57 |
+| 尚未评审的草案：mods.md（有自己的 P0/P1/P2 分档和分期）、rpc.md | — |
+
+## 5. 依赖 DevClaw 确认的事项
+
+| 事项 | README §9 | 影响 |
+|---|---|---|
+| `deploy_units` 的键名 | 第 6 条 | P0（知识模块） |
+| DevClaw 不读根目录的 `board.json` | 第 8 条 | P0 |
+| 看板数据中的产物路径数组 `paths` | 第 9 条 | P0 |
+| 看板事件服务、`AUTOBIZ_BOARD_ENDPOINT` 注入、读取 `boardEvents` | 第 10 条 | P0；插件侧不依赖它也能工作 |
+| zip 的顶层目录作为安装目录名 | 第 11 条 | P0 |
+| 内置组装脚本的 Node 依赖 | 第 7 条 | P0（知识模块） |
+| 产物同步的服务端路径是否加 `pluginId` | 第 1 条 | P0（产物同步模块） |
+| 全栈版已有项目的状态接续 | 第 3 条 | P1 |
