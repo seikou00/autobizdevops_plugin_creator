@@ -51,7 +51,19 @@
       "ownership": "generated",
       "sha256": "sha256:b1be45a4456d75d80a7c2957a8306d09fc48bc46969f5ea7f3eba530f6519a0a"
     },
+    "runtime/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
     "runtime/adapters/board_events.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/board_view.py": {
       "ownership": "managed",
       "sha256": "…"
     },
@@ -68,6 +80,14 @@
       "sha256": "…"
     },
     "runtime/adapters/inspect_workflow_templates.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/cli.py": {
       "ownership": "managed",
       "sha256": "…"
     },
@@ -95,7 +115,15 @@
       "ownership": "generated",
       "sha256": "sha256:89e5a67097380edb31d779edcac912f17bdc0caef1e45528da5b0856d351c3e5"
     },
+    "runtime/session/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
     "runtime/session/render_session_context.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/workflow/__init__.py": {
       "ownership": "managed",
       "sha256": "…"
     },

@@ -1,0 +1,8 @@
+{
+  "id": "session",
+  "title": "会话与 Agent",
+  "description": "默认会话入口与运行策略",
+  "schema": "modules/session.schema.json",
+  "core": true,
+  "entry": "module:SessionModule"
+}

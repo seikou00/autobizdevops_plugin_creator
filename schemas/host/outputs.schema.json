@@ -1,0 +1,326 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "autobiz.host.outputs.v1",
+  "title": "宿主命令的输出结构（interfaces.md §3.3、§4.2）",
+  "description": "每个命令一个 definitions 项，供 check 的契约测试和 simulate 校验输出结构，同时作为给 DevClaw 的协议文档。只校验结构，不写 additionalProperties: false：宿主应忽略不认识的字段（D55）。不拷进插件。",
+  "definitions": {
+    "failure": {
+      "type": "object",
+      "required": ["ok", "errors"],
+      "properties": {
+        "ok": { "const": false },
+        "errors": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "nextAction": {
+      "type": "object",
+      "required": ["slashSkill", "userMessage", "dialogTips"],
+      "properties": {
+        "slashSkill": { "type": "string" },
+        "userMessage": { "type": "string" },
+        "dialogTips": { "type": "string" }
+      }
+    },
+    "ArtifactDef": {
+      "type": "object",
+      "required": ["id", "label", "artifactType", "path", "required"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "artifactType": { "enum": ["file", "json"] },
+        "path": { "type": "string", "minLength": 1 },
+        "paths": { "type": "array", "items": { "type": "string" } },
+        "required": { "type": "boolean" }
+      }
+    },
+    "WorkflowNode": {
+      "type": "object",
+      "required": ["id", "label", "group", "order", "skill", "description", "checkpoints", "states", "artifacts"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "group": { "enum": ["Biz", "Dev", "Ops"] },
+        "order": { "type": "integer" },
+        "skill": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "runtimePolicy": { "type": "object" },
+        "checkpoints": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "states": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["nodeStatus", "id", "label", "nextAction"],
+            "properties": {
+              "nodeStatus": { "enum": ["not_started", "in_progress", "done", "archived"] },
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "nextAction": { "$ref": "#/definitions/nextAction" }
+            }
+          }
+        },
+        "artifacts": {
+          "type": "object",
+          "required": ["inputs", "outputs"],
+          "properties": {
+            "inputs": { "type": "array", "items": { "$ref": "#/definitions/ArtifactDef" } },
+            "outputs": { "type": "array", "items": { "$ref": "#/definitions/ArtifactDef" } }
+          }
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "required": ["nodes", "dynamicStages"],
+      "properties": {
+        "nodes": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/WorkflowNode" } },
+        "dynamicStages": { "type": "array" }
+      }
+    },
+    "nodeStatus": { "enum": ["not_started", "in_progress", "done", "archived", "skipped", "unknown"] },
+    "runSummary": {
+      "type": "object",
+      "required": ["featureId", "featureName", "currentNodeId", "currentNodeStatus", "currentNodeStatusLabel", "nodeIds"],
+      "properties": {
+        "featureId": { "type": "string" },
+        "featureName": { "type": "string" },
+        "currentNodeId": { "type": "string" },
+        "currentNodeStatus": { "$ref": "#/definitions/nodeStatus" },
+        "currentNodeStatusLabel": { "type": "string" },
+        "nodeIds": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "runArtifact": {
+      "type": "object",
+      "required": ["id", "artifactLabel", "artifactStatus", "artifactStatusLabel"],
+      "properties": {
+        "id": { "type": "string" },
+        "artifactLabel": { "type": "string" },
+        "artifactStatus": { "enum": ["generated", "missing"] },
+        "artifactStatusLabel": { "type": "string" },
+        "path": { "type": "string" },
+        "paths": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "ref": {
+      "type": "object",
+      "required": ["path"],
+      "properties": { "path": { "type": "string" } }
+    },
+    "run": {
+      "type": "object",
+      "required": ["featureId", "featureName", "workflowId", "workflowProfile", "workflowTemplate", "workflowDecisions",
+                   "workflowSkippedNodes", "pendingChoice", "currentNodeId", "currentNodeStatus",
+                   "currentNodeStatusLabel", "nodes", "hookLogRefs", "watchRefs"],
+      "properties": {
+        "featureId": { "type": "string" },
+        "featureName": { "type": "string" },
+        "workflowId": { "type": "string" },
+        "workflowProfile": { "type": "string" },
+        "workflowTemplate": { "type": "string" },
+        "workflowDecisions": { "type": "object" },
+        "workflowSkippedNodes": { "type": "array", "items": { "type": "string" } },
+        "pendingChoice": { "type": ["object", "null"] },
+        "currentNodeId": { "type": "string" },
+        "currentNodeStatus": { "$ref": "#/definitions/nodeStatus" },
+        "currentNodeStatusLabel": { "type": "string" },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "nodeStatus", "nodeStatusLabel", "artifacts"],
+            "properties": {
+              "id": { "type": "string" },
+              "nodeStatus": { "$ref": "#/definitions/nodeStatus" },
+              "nodeStatusLabel": { "type": "string" },
+              "artifacts": { "type": "array", "items": { "$ref": "#/definitions/runArtifact" } }
+            }
+          }
+        },
+        "hookLogRefs": { "type": "array", "items": { "$ref": "#/definitions/ref" } },
+        "watchRefs": { "type": "array", "items": { "$ref": "#/definitions/ref" } }
+      }
+    },
+    "create_project": {
+      "type": "object",
+      "required": ["ok", "initialized", "created", "statePath", "warnings"],
+      "properties": {
+        "ok": { "const": true },
+        "initialized": { "const": true },
+        "created": { "type": "boolean" },
+        "statePath": { "type": "string", "minLength": 1 },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "create_feature": {
+      "type": "object",
+      "required": ["ok", "created", "checkpoint", "statePath", "featureDir", "warnings"],
+      "properties": {
+        "ok": { "const": true },
+        "created": { "type": "boolean" },
+        "checkpoint": { "type": "string", "minLength": 1 },
+        "statePath": { "type": "string", "minLength": 1 },
+        "featureDir": { "type": "string", "minLength": 1 },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "project_status": {
+      "type": "object",
+      "required": ["workflow", "projects"],
+      "properties": {
+        "workflow": { "$ref": "#/definitions/workflow" },
+        "projects": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["runs"],
+            "properties": { "runs": { "type": "array", "items": { "$ref": "#/definitions/runSummary" } } }
+          }
+        }
+      }
+    },
+    "feature_status": {
+      "type": "object",
+      "required": ["workflow", "run"],
+      "properties": {
+        "workflow": { "$ref": "#/definitions/workflow" },
+        "run": { "$ref": "#/definitions/run" }
+      }
+    },
+    "dynamic_workflow": {
+      "type": "object",
+      "required": ["ok", "schemaVersion", "mode", "templates", "nodes", "checkpoints", "transitions"],
+      "properties": {
+        "ok": { "const": true },
+        "schemaVersion": { "const": "autobizdevops.workflow.templates.v2" },
+        "mode": { "const": "templates" },
+        "templates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "templateType", "label", "description", "nodes"],
+            "properties": {
+              "id": { "type": "string" },
+              "templateType": { "type": "string" },
+              "label": { "type": "string" },
+              "description": { "type": "string" },
+              "nodes": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "group", "skill", "description", "inputs", "outputs"],
+            "properties": {
+              "inputs": { "type": "array", "items": { "$ref": "#/definitions/ArtifactDef" } },
+              "outputs": { "type": "array", "items": { "$ref": "#/definitions/ArtifactDef" } }
+            }
+          }
+        },
+        "checkpoints": {
+          "type": "object",
+          "required": ["initial", "transitions", "stageLabels"],
+          "properties": {
+            "initial": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "transitions": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+            "stageLabels": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "transitions": { "type": "array" }
+      }
+    },
+    "session_collector_context_inject": {
+      "type": "object",
+      "required": ["ok", "message", "sessionContext", "agentmdLoadStatus", "flow", "agentConfig"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "message": { "type": "string" },
+        "sessionContext": { "type": "string" },
+        "agentmdLoadStatus": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["deployUnitId", "path", "loaded", "source", "message"],
+            "properties": {
+              "deployUnitId": { "type": "string" },
+              "path": { "type": "string" },
+              "loaded": { "type": "boolean" },
+              "source": { "type": "string" },
+              "message": { "type": "string" }
+            }
+          }
+        },
+        "flow": {
+          "type": "object",
+          "required": ["featureDir", "currentNodeId", "currentNodeStatus", "targetNodeId", "nextNodeId", "skill",
+                       "inputs", "outputs", "pendingChoice"],
+          "properties": {
+            "featureDir": { "type": "string" },
+            "currentNodeId": { "type": "string" },
+            "currentNodeStatus": { "$ref": "#/definitions/nodeStatus" },
+            "targetNodeId": { "type": ["string", "null"] },
+            "nextNodeId": { "type": ["string", "null"] },
+            "skill": { "type": ["string", "null"] },
+            "inputs": { "type": "array" },
+            "outputs": { "type": "array" },
+            "pendingChoice": { "type": ["object", "null"] }
+          }
+        },
+        "agentConfig": {
+          "type": "object",
+          "required": ["agentMode", "subagentConfig"],
+          "properties": {
+            "agentMode": { "enum": ["solo", "multi", "agent_team", "workflow"] },
+            "subagentConfig": {
+              "type": "object",
+              "required": ["disabledBuiltinSubagents", "customSubagentFiles"],
+              "properties": {
+                "disabledBuiltinSubagents": { "type": "array", "items": { "type": "string" } },
+                "customSubagentFiles": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "toolCustomConfig": { "type": "object" }
+          }
+        }
+      }
+    },
+    "deploy_units": {
+      "type": "object",
+      "required": ["ok", "schemaVersion", "knowledgePath", "manifest", "manifestFormat", "systems", "supportedDeployUnits"],
+      "properties": {
+        "ok": { "const": true },
+        "schemaVersion": { "const": "autobizdevops.deploy-units.v1" },
+        "knowledgePath": { "type": "string" },
+        "manifest": { "type": "string" },
+        "manifestFormat": { "type": "string" },
+        "systems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["systemId", "systemName", "agentsReady", "agentsPath", "deployUnits"],
+            "properties": { "deployUnits": { "type": "array", "items": { "type": "object", "required": ["deployUnitId"] } } }
+          }
+        },
+        "supportedDeployUnits": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "update_state": {
+      "type": "object",
+      "required": ["ok", "changed", "feature", "oldCheckpoint", "checkpoint", "statePath", "dryRun", "warnings"],
+      "properties": {
+        "ok": { "const": true },
+        "changed": { "type": "boolean" },
+        "feature": { "type": "string" },
+        "oldCheckpoint": { "type": "string" },
+        "checkpoint": { "type": "string" },
+        "statePath": { "type": "string" },
+        "dryRun": { "type": "boolean" },
+        "warnings": { "type": "array", "items": { "type": "string" } },
+        "validation": { "type": "object" }
+      }
+    }
+  }
+}

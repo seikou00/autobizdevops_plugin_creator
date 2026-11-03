@@ -1,0 +1,9 @@
+{
+  "id": "artifactSync",
+  "version": "1.0.0",
+  "title": "产物同步",
+  "description": "把节点产物上传到外部服务，并在看板上生成同步入口",
+  "schema": "modules/artifactSync.schema.json",
+  "core": false,
+  "entry": "module:ArtifactSyncModule"
+}

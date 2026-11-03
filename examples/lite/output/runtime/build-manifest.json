@@ -59,7 +59,19 @@
       "ownership": "generated",
       "sha256": "sha256:b8118fa9408aeba2f9fc7e61c14dc567bf89c043aa16a2143e0dbdde035de318"
     },
+    "runtime/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
     "runtime/adapters/board_events.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/board_view.py": {
       "ownership": "managed",
       "sha256": "…"
     },
@@ -76,6 +88,14 @@
       "sha256": "…"
     },
     "runtime/adapters/inspect_workflow_templates.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/cli.py": {
       "ownership": "managed",
       "sha256": "…"
     },
@@ -107,6 +127,10 @@
       "ownership": "generated",
       "sha256": "sha256:e96a99cc44e0217c056dd1518c79983bc63c0aa0cef98f2ccd51c73389f1ab56"
     },
+    "runtime/knowledge/__init__.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
     "runtime/knowledge/collect-knowledge.js": {
       "ownership": "module",
       "sha256": "…"
@@ -123,7 +147,15 @@
       "ownership": "module",
       "sha256": "…"
     },
+    "runtime/session/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
     "runtime/session/render_session_context.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/workflow/__init__.py": {
       "ownership": "managed",
       "sha256": "…"
     },
@@ -144,6 +176,10 @@
     "skills/autobizdevops-artifact-sync/config/artifact-sync.json": {
       "ownership": "generated",
       "sha256": "sha256:b1f548dba05d80fd71e6dc8754472d26c249c67a1115dc5fc4cbd1142d1ba454"
+    },
+    "skills/autobizdevops-artifact-sync/references/ask-user-question.md": {
+      "ownership": "module",
+      "sha256": "…"
     },
     "skills/autobizdevops-artifact-sync/references/feature-api-detail.md": {
       "ownership": "module",

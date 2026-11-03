@@ -1,0 +1,9 @@
+{
+  "id": "knowledge",
+  "version": "1.0.0",
+  "title": "知识",
+  "description": "知识清单解析、发布单元查询、内置知识组装与可选的知识仓库同步",
+  "schema": "modules/knowledge.schema.json",
+  "core": false,
+  "entry": "module:KnowledgeModule"
+}
