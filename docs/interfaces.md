@@ -612,7 +612,7 @@ runtime/adapters/inspect_state.py --mode run --workspace <dir> --project <name> 
 }
 ```
 
-- `nodeStatus` 取值：当前节点之前的为 `done`；当前节点为 `in_progress` 或 `done`；之后的为 `not_started`；被跳过的为 `skipped`；终态节点到达后为 `archived`。Feature 不存在时，`currentNodeId` 为 `"unknown"`，状态为 `unknown`；
+- `nodeStatus` 取值：当前节点之前的为 `done`；当前节点为 `in_progress` 或 `done`；之后的为 `not_started`；被跳过的为 `skipped`；终态节点到达后为 `archived`。Feature 不存在时，`currentNodeId` 为 `"unknown"`，状态为 `unknown`；Feature 停在当前流程没有的 checkpoint 上时同样为 `unknown`，并带 `readOnly: true` 和说明原因的 `readOnlyReason`（D60，`project_status` 的 `runs` 中也一样）；
 - `run.nodes` 按流程顺序列出：动态阶段已决定执行时，它的节点出现在插入位置；尚未选择（`pending`）时也列出，`nodeStatus` 为 `not_started`；已决定跳过时不列出；
 - `pendingChoice` 在 Feature 停在某个动态阶段的选择点且尚未选择时给出，否则为 `null`：`{"stageId", "stageLabel", "choiceCheckpoint", "defaultDecision", "options": [{"decision": "enabled", "label", "description", "targetCheckpoint", "slashSkill"}, {"decision": "skipped", …}]}`；
 - 示例中的 `.autobizdevops` 是默认的 `runtime.metaRoot`；
@@ -1054,7 +1054,7 @@ class query.BoardError(ValueError): ...                           # 所有业务
 
 - 由 lite 迁移过来的插件只要保持 `plugin.id` 和默认的 `metaRoot` 不变，已有项目的 `state.json` 可以直接继续使用；
 - 现有全栈版插件的产物同步 v1 配置，在新模块中仍可读取；
-- 全栈版迁入后保持默认的 `metaRoot`；它已有项目的 `state.json`（`autobizdevops.state.v3`，不带 `pluginId`）怎么接续，见 README §9。
+- 全栈版迁入后保持默认的 `metaRoot`；它已有项目的 `state.json`（`autobizdevops.state.v3`，不带 `pluginId`）可以直接读取，第一次写入时备份并升级，停在当前流程没有的 checkpoint 上的 Feature 只读（D60，output-spec.md §4.2）。
 
 由 lite 迁移时的行为差异：
 

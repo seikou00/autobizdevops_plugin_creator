@@ -1,6 +1,6 @@
-"""doctor：修改核心配置后重新生成插件——lint → 与上次构建比较并列出影响 → build → 复查（interfaces.md §1.7）。
+"""doctor：修改核心配置或更新脚手架后重新生成插件——lint → 与上次构建比较并列出影响 → build → 复查（interfaces.md §1.7）。
 
-版本比较与跨版本升级（SCAFFOLD_OUTDATED、CORE_MAJOR_CHANGED）在后续版本提供，changes.versions 目前恒为空。
+脚手架更新后同一主版本内直接替换 managed、module 文件，changes.versions 列出版本变化（D57）。
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def doctor(root, *, dry_run: bool = False, force: bool = False, allow: frozenset
     if result.report.failed():
         return CommandResult(report)
     changes["skills"] = result.skills.to_json()
-    changes["versions"] = {"scaffold": None, "core": None, "modules": {}}
+    changes["versions"] = analysis.versions.to_json()
     extra = {"changes": changes}
     if dry_run:
         pending = emit.changed_files(result.plan, tree)
@@ -113,6 +113,12 @@ def _summary(changes: dict, files: list, *, dry_run: bool = False) -> str:
         lines.append("删除节点：" + "、".join(nodes["removed"]))
     if nodes["reordered"]:
         lines.append("节点顺序有变化")
+    versions = changes.get("versions") or {}
+    moved = [f"{key} {value['from']} → {value['to']}" for key, value in (("脚手架", versions.get("scaffold")),
+                                                                          ("运行框架", versions.get("core"))) if value]
+    moved += [f"模块 {key} {value['from']} → {value['to']}" for key, value in (versions.get("modules") or {}).items()]
+    if moved:
+        lines.append("版本变化：" + "、".join(moved))
     for key, label in (("created", "生成空白 SKILL.md"), ("stateInserted", "插入状态维护片段"),
                        ("stateUpdated", "更新状态维护片段"), ("stateRemoved", "删除状态维护片段")):
         if changes["skills"][key]:

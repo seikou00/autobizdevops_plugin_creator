@@ -122,30 +122,30 @@ mods.md 中的 P0/P1/P2 是 mod 能力自己的分档，与本文无关。
 
 ## 6. 实现状态（2026-11-04）
 
-P0 已全部实现，代码在 `scaffold/`（CLI 与构建流水线）、`runtime/`（运行框架模板）、`scaffold/modules/`（四个模块）、`schemas/host/outputs.schema.json`（命令输出结构）和 `tools/make_pyz.py`（发布）中。`tests/` 下 38 个测试在 Python 3.9 和 3.14 上通过：
+P0、P1 已全部实现。代码在 `scaffold/`（CLI、构建流水线、初始化向导）、`runtime/`（运行框架模板）、`scaffold/modules/`（四个模块）、`skills/autobiz-plugin-creator/`（插件开发技能）、`schemas/host/outputs.schema.json`（命令输出结构）和 `tools/make_pyz.py`（发布 `.pyz` 与插件开发技能的插件包）中。`tests/` 下 51 个测试在 Python 3.9 和 3.14 上通过：
 
 | 测试 | 内容 |
 |---|---|
-| `tests/golden/` | 三个示例 build 后与 `examples/*/output/` 逐字节一致，重复 build 不写文件 |
-| `tests/contract/` | 运行框架的状态推进、存在且非空检查、重开、终态节点、`pluginId` 隔离、只读命令、保留字段拒绝加载、校验命令；看板事件用模拟的 DevClaw 服务验证 |
+| `tests/golden/test_examples.py` | 三个示例 build 后与 `examples/*/output/` 逐字节一致，重复 build 不写文件 |
+| `tests/golden/test_reference.py` | 命令输出的看板数据与 lite、全栈版现有 `board_config.json` 比较；lite 全部一致，全栈版只有文件开头列出的有意差异（参考仓库不在时跳过） |
+| `tests/contract/` | 状态推进、存在且非空检查、重开、终态节点、`pluginId` 隔离、只读命令、保留字段拒绝加载、校验命令；看板事件用模拟的 DevClaw 服务验证 |
 | `tests/test_cli.py` | `new` → `check`（含契约测试）→ `package`，lint 核心规则，改 `plugin.id` 的放行，doctor 删节点，`add skill --from` 导入 lite 技能 |
+| `tests/test_p1.py` | 初始化向导、`add node`、`module list/enable/disable --set`、`simulate`、版本升级、全栈版 v3 状态接续、插件开发技能的插件包 |
 | `tests/unit/` | 推导规则、SKILL.md 片段（含 CRLF）、Schema 子集与关键字限制、JSON 重复键与 BOM |
 
-实现时顺手做了的 P1 项（体量小，与 P0 代码在同一处）：
-
-- `inputs`、`validate` 的执行（D59 ③），契约测试手写 `flow.json` 覆盖；
-- `new --answers`：没有它 `--from blank` 无法使用；交互式问答仍未实现，不加 `--yes` 时报用法错误；
-- doctor 的影响报告（`--dry-run`、`changes`、`CHECKPOINT_REMOVED`、`DOCTOR_BASELINE_MISSING`）；
-- `plugin.mcpServers`、`plugin.hooks` 透传与 `PLUGIN_REF_MISSING`，模块关闭后的 `inactive` 记录与 `MODULE_INACTIVE_FILES`。
+P1 中定下的新决策：全栈版已有项目的状态接续（D60，README §9 第 3 条）。
 
 与设计文档不同、需要确认的地方：
 
 | 位置 | 做法 | 原因 |
 |---|---|---|
-| `BUILD_STALE` | 在模块规则之后报，不再挡住模块规则 | 改完配置后最常见的就是过期；按 D47 的两段式，lint 此时只报“过期”，模块配置的问题要等 doctor 才看得到。过期不影响 IR 是否可靠 |
+| `BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` | 在模块规则之后报，不挡住模块规则 | 改完配置后最常见的就是过期；按 D47 的两段式，lint 此时只报“过期”，模块配置的问题要等 doctor 才看得到。过期不影响 IR 是否可靠 |
 | `add skill --from` | 目标目录里只有 doctor 生成的空白 `SKILL.md` 时允许覆盖导入 | `new --from lite` 会为每个节点生成空白 `SKILL.md`，否则 interfaces.md §1.4 的迁移路径（先 `new`、再 `add skill --from`）走不通 |
+| 编辑命令写入的新内容 | 跟随同级元素的写法；新写的对象逐个键换行，只含标量的数组写在一行 | 与示例的手排格式一致；原有内容的字节不变 |
+| 初始化向导 | 带 `--from lite/fullstack` 时只问基础信息，再问是否保留样例的流程和模块配置；不保留时按七类问题重新回答 | 样例的节点和模块配置较多，逐项问不如保留后用 `add node`、`module` 修改 |
 | 内置知识组装脚本 | 缺 `gray-matter` 时不执行 `npm install`，直接按清单映射加载 | 会话入口不得写文件（interfaces.md §3.1）；Node 依赖仍待定（README §9 第 7 条） |
 | 内置知识组装脚本 | 按全栈版的结构（`<SCOPE>`、`<SYSTEM>`、`<UNIT>`、`<DOMAIN_CONTEXT>`）重写，没有逐行移植 | 全栈版的脚本依赖 1100 多行的旧会话入口；已用清单映射和本地 `AGENTS.md` 验证，collector 分支还没有在装了 `gray-matter` 的环境中跑过 |
 | 产物同步技能 | 带上全栈版共享的 `references/ask-user-question.md` | 技能正文引用了它，原来在 `skills/references/` 下，单独拷出技能后链接会断 |
-| 运行框架目录 | 各级 `__init__.py`、`runtime/knowledge/__init__.py` 记入 build-manifest | 避免其他同名的 `runtime` 包遮住插件的命名空间包；三个示例的 build-manifest 已补上（摘要写作 `…`） |
+| 运行框架目录 | 各级 `__init__.py`、`runtime/knowledge/__init__.py` 记入 build-manifest | 避免其他同名的 `runtime` 包遮住插件的包；三个示例的 build-manifest 已补上（摘要写作 `…`） |
 | `examples/fullstack/` | 新增 `.mcp.json`、`hooks/hooks.json` 两个占位文件 | 入口文件引用了它们，D57 之后缺失会报 `PLUGIN_REF_MISSING` |
+| 全栈版 v3 状态 | 旧别名 `discuss_in_progress`、`discuss_done` 不做映射，停在它们上面的 Feature 只读 | 别名是全栈版自己的历史，运行框架不写死某个插件的名字 |

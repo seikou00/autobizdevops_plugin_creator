@@ -95,9 +95,15 @@ def _drop_history(payload: dict) -> None:
 
 
 def _commit(project_path: Path, payload: dict) -> int:
+    path = query.state_path(project_path)
+    if payload.pop(query.MIGRATED_FROM, None):
+        # 第一次写入全栈版 v3 状态：先备份原文件，再升级为 schemaVersion 1（D60）
+        backup = path.with_name("state.v3.bak.json")
+        if path.exists() and not backup.exists():
+            atomic_write(backup, path.read_text(encoding="utf-8-sig"))
     payload["boardSeq"] = int(payload.get("boardSeq", 0)) + 1
     _drop_history(payload)
-    atomic_write(query.state_path(project_path), json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+    atomic_write(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
     return payload["boardSeq"]
 
 
@@ -149,6 +155,8 @@ def init_feature(project_path: Path, feature: str, *, owner: str | None = None, 
         payload = query.load_state(project_path)
         record = payload["features"].get(feature)
         created = record is None
+        if record is not None and query.is_stranded(record) and deploy_units is not None:
+            raise BoardError(query.stranded_reason(record))
         if created:
             directory = query.feature_dir(project_path, feature)
             if directory.exists():
@@ -220,6 +228,8 @@ def _prepare(project_path: Path, payload: dict, feature: str, checkpoint: str, *
     record = payload["features"].get(feature)
     if record is None:
         raise BoardError(f"Feature 不存在，请先创建: {feature}")
+    if query.is_stranded(record):
+        raise BoardError(query.stranded_reason(record))
     index, node, status = query.locate(checkpoint)
     old = record["checkpoint"]
     old_index, _, old_status = query.locate(old)

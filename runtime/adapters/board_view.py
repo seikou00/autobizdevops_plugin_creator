@@ -72,7 +72,7 @@ def workflow_payload() -> dict:
 def statuses(record) -> list:
     """按流程顺序给出每个节点的状态；Feature 不存在时全部为 not_started。"""
     nodes = query.nodes()
-    if record is None:
+    if record is None or query.is_stranded(record):
         return ["not_started"] * len(nodes)
     index, _, status = query.locate(record["checkpoint"])
     return ["done" if i < index else status if i == index else "not_started" for i in range(len(nodes))]
@@ -102,7 +102,7 @@ def run_payload(project_path, feature: str) -> dict:
     record = query.feature_record(project_path, feature)
     nodes = query.nodes()
     states = statuses(record)
-    if record is None:
+    if record is None or query.is_stranded(record):
         current_id, current_status = "unknown", "unknown"
     else:
         current, current_status = query.current_node(record)
@@ -125,6 +125,8 @@ def run_payload(project_path, feature: str) -> dict:
         "watchRefs": [{"path": f"{metadata}/state.json", "purpose": "run-state"},
                       {"path": f"{metadata}/features/{feature}", "purpose": "artifacts"},
                       {"path": hook_log, "purpose": "hook-log"}],
+        **({"readOnly": True, "readOnlyReason": query.stranded_reason(record)}
+           if record is not None and query.is_stranded(record) else {}),
     }
 
 
@@ -132,6 +134,11 @@ def project_runs(project_path) -> dict:
     runs = []
     node_ids = [node["id"] for node in query.active_nodes()]
     for record in query.list_features(project_path):
+        if query.is_stranded(record):
+            runs.append({"featureId": record["feature"], "featureName": record["feature"], "currentNodeId": "unknown",
+                         "currentNodeStatus": "unknown", "currentNodeStatusLabel": state_label("unknown"),
+                         "nodeIds": node_ids, "readOnly": True, "readOnlyReason": query.stranded_reason(record)})
+            continue
         current, status = query.current_node(record)
         runs.append({"featureId": record["feature"], "featureName": record["feature"], "currentNodeId": current["id"],
                      "currentNodeStatus": status, "currentNodeStatusLabel": state_label(status), "nodeIds": node_ids})

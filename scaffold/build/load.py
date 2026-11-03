@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from scaffold.build.versions import entry_outdated
 from scaffold.lib import fsio, jsonschema
 from scaffold.lib.issues import Issue, UsageError, error
 from scaffold.lib.tree import Tree
@@ -61,6 +62,10 @@ def load(tree: Tree) -> tuple[Inputs | None, list[Issue]]:
     if entry is None:
         return None, issues
     _check(entry, SCHEMAS["entry"], ENTRY, issues)
+    outdated = entry_outdated(entry)
+    if outdated:
+        issues[:] = [issue for issue in issues if issue.pointer != "/scaffoldVersion"] + outdated
+        return None, issues
     if not isinstance(entry, dict) or any(issue.pointer.startswith(("/workflow", "/modules")) for issue in issues):
         return None, issues
     workflow_rel = rel_path(entry.get("workflow", "./workflow.json"))

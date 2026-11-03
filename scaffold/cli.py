@@ -39,21 +39,48 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument("--answers", help="回答的 JSON 文件，- 表示从 stdin 读取")
     new.add_argument("--yes", action="store_true", help="不提问，回答取自 --from 的样例和 --answers")
 
-    add = commands.add_parser("add", parents=[common], help="添加技能")
+    add = commands.add_parser("add", parents=[common], help="添加节点或技能")
     targets = add.add_subparsers(dest="target", parser_class=Parser)
+    node = targets.add_parser("node", parents=[common], help="在 workflow.json 中添加节点")
+    node.add_argument("node_id")
+    node.add_argument("--name", required=True)
+    node.add_argument("--skill", required=True)
+    node.add_argument("--stage", required=True, choices=("biz", "dev", "ops"))
+    node.add_argument("--seq", required=True, type=int)
+    node.add_argument("--output", dest="outputs", action="append", default=[], type=lambda value: (value, False),
+                      help="必需输出，可以重复；含 glob 的路径要加引号")
+    node.add_argument("--optional-output", dest="outputs", action="append", type=lambda value: (value, True),
+                      help="可选输出，可以重复")
+    node.add_argument("--terminal", action="store_true", help="终态节点（只推进到 archived，不能有输出）")
     skill = targets.add_parser("skill", parents=[common], help="导入已有技能目录，或创建空白 SKILL.md")
     skill.add_argument("skill")
     skill.add_argument("--from", dest="source", help="已有技能目录")
+
+    module = commands.add_parser("module", parents=[common], help="列出、启用或关闭模块")
+    actions = module.add_subparsers(dest="action", parser_class=Parser)
+    actions.add_parser("list", parents=[common], help="列出可用模块、版本及启用状态")
+    enable = actions.add_parser("enable", parents=[common], help="启用 knowledge 或 artifactSync")
+    enable.add_argument("module_id")
+    enable.add_argument("--set", dest="sets", action="append", default=[], help="key=value，key 沿 Schema 用 . 逐级指定")
+    disable = actions.add_parser("disable", parents=[common], help="关闭 knowledge 或 artifactSync（只去掉引用）")
+    disable.add_argument("module_id")
 
     doctor = commands.add_parser("doctor", parents=[common], help="修改核心配置或更新脚手架后重新生成插件")
     doctor.add_argument("--dry-run", action="store_true", help="只列出将要发生的变化，不写文件")
     doctor.add_argument("--force", action="store_true", help="覆盖被手改过的托管文件")
     doctor.add_argument("--allow-id-change", action="store_true", help="确认修改 plugin.id")
     doctor.add_argument("--allow-layout-change", action="store_true", help="确认修改 runtime.metaRoot")
+    doctor.add_argument("--allow-major-upgrade", action="store_true", help="确认运行框架跨主版本升级")
 
     for name, text in (("lint", "只检查核心配置"), ("check", "lint 加上技能内容、漂移检查和契约测试")):
         command = commands.add_parser(name, parents=[common], help=text)
         command.add_argument("--strict", action="store_true", help="warning 也视为 error")
+
+    simulate = commands.add_parser("simulate", parents=[common], help="在临时目录中按宿主的方式调用一遍插件")
+    simulate.add_argument("--feature", default="demo")
+    simulate.add_argument("--to", help="停在这个 checkpoint")
+    simulate.add_argument("--platform", choices=("darwin", "linux", "win32"), help="默认为当前平台")
+    simulate.add_argument("--keep", action="store_true", help="保留临时目录便于排查")
 
     package = commands.add_parser("package", parents=[common], help="检查后打包成 zip")
     package.add_argument("-o", dest="output", help="zip 路径，默认为 dist/<plugin.id>-<plugin.version>.zip")
@@ -67,16 +94,30 @@ def run(args) -> object:
 
         return new(Path(args.target), template=args.template, answers=load_answers(args.answers), yes=args.yes)
     if args.command == "add":
-        if args.target != "skill":
-            raise UsageError("用法：autobiz-plugin add skill <skill> [--from <dir>]")
-        from scaffold.commands.edit import add_skill
+        from scaffold.commands import edit
 
-        return add_skill(root, args.skill, source=Path(args.source) if args.source else None)
+        if args.target == "node":
+            return edit.add_node(root, node_id=args.node_id, name=args.name, skill=args.skill, stage=args.stage,
+                                 seq=args.seq, outputs=args.outputs, terminal=args.terminal)
+        if args.target == "skill":
+            return edit.add_skill(root, args.skill, source=Path(args.source) if args.source else None)
+        raise UsageError("用法：autobiz-plugin add node|skill …")
+    if args.command == "module":
+        from scaffold.commands import edit
+
+        if args.action == "list":
+            return edit.module_list(root)
+        if args.action == "enable":
+            return edit.module_enable(root, args.module_id, args.sets)
+        if args.action == "disable":
+            return edit.module_disable(root, args.module_id)
+        raise UsageError("用法：autobiz-plugin module list|enable|disable …")
     if args.command == "doctor":
         from scaffold.commands.doctor import doctor
 
         allow = frozenset(name for name, flag in (("id-change", args.allow_id_change),
-                                                  ("layout-change", args.allow_layout_change)) if flag)
+                                                  ("layout-change", args.allow_layout_change),
+                                                  ("major-upgrade", args.allow_major_upgrade)) if flag)
         return doctor(root, dry_run=args.dry_run, force=args.force, allow=allow)
     if args.command == "lint":
         from scaffold.commands.lint import lint
@@ -86,11 +127,15 @@ def run(args) -> object:
         from scaffold.commands.check import check
 
         return check(root, strict=args.strict)
+    if args.command == "simulate":
+        from scaffold.commands.simulate import simulate
+
+        return simulate(root, feature=args.feature, to=args.to, platform=args.platform, keep=args.keep)
     if args.command == "package":
         from scaffold.commands.package import package
 
         return package(root, output=Path(args.output) if args.output else None)
-    raise UsageError("缺少子命令：new、add skill、doctor、lint、check、package")
+    raise UsageError("缺少子命令：new、add、module、doctor、lint、check、simulate、package")
 
 
 def _configure_stdio() -> None:

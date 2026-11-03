@@ -183,6 +183,9 @@ def render(args) -> dict:
         project = query.resolve_project(args.plugin_workspace, args.project)
         if feature:
             record = query.feature_record(project, feature)
+        if record is not None and query.is_stranded(record):
+            messages.append(query.stranded_reason(record))
+            record = None
     except query.BoardError as error:
         messages.append(str(error))
     if record is not None and units:

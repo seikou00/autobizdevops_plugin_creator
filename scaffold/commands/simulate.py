@@ -1,7 +1,4 @@
-"""契约测试：在临时目录中按宿主的方式调用一遍已生成的插件（interfaces.md §1.5，D55）。
-
-check 用它跑契约测试；simulate 命令本身在后续版本提供（docs/priorities.md）。
-"""
+"""simulate 与 check 的契约测试：在临时目录中按宿主的方式调用一遍已生成的插件（interfaces.md §1.5，D55）。"""
 
 from __future__ import annotations
 
@@ -12,10 +9,11 @@ import tempfile
 from pathlib import Path
 
 from scaffold.build.manifest import read_manifest
+from scaffold.commands import CommandResult
 from scaffold.commands.package import collect
 from scaffold.host import Host
 from scaffold.lib import fsio, skillmd
-from scaffold.lib.issues import error, warning
+from scaffold.lib.issues import Report, UsageError, error, warning
 from scaffold.lib.tree import Tree
 from scaffold.shapes import check_shape
 
@@ -124,7 +122,10 @@ class Contract:
         (self.workspace / PROJECT).mkdir(parents=True)
         (base / "session").mkdir()
         self.flow = fsio.parse_json((plugin / "runtime" / "config" / "flow.json").read_bytes())
-        self.host = Host(plugin, self.workspace, self.platform)
+        try:
+            self.host = Host(plugin, self.workspace, self.platform)
+        except KeyError:
+            raise UsageError(f"board_config.json 中没有平台 {self.platform} 的命令") from None
         self.values = {"pluginPath": str(plugin), "pluginWorkspace": str(self.workspace), "projectDir": PROJECT,
                        "projectDirs...": [PROJECT], "feature": self.feature, "selectedDeployUnits": "[]",
                        "sessionWorkspacePath": str(base / "session"), "knowledge-path": ""}
@@ -136,7 +137,7 @@ class Contract:
             self.prepare(base)
             chain = self.flow["checkpoints"]["chain"]
             if self.to is not None and self.to not in chain:
-                raise ValueError(f"--to {self.to} 不是 flow.json 中的 checkpoint")
+                raise UsageError(f"--to {self.to} 不是 flow.json 中的 checkpoint：{'、'.join(chain)}")
             self.walk()
         finally:
             for message in getattr(self, "host", None).warnings if hasattr(self, "host") else []:
@@ -246,3 +247,40 @@ def run_contract(root: Path, *, platform: str | None = None, feature: str = "dem
         checkpoints = [step["detail"] for step in contract.steps if step["key"] == "model:update_state" and step["ok"]]
         simulation["stoppedAt"] = checkpoints[-1] if checkpoints else None
     return simulation, contract.issues
+
+
+def stale_inputs(tree: Tree, manifest: dict) -> list:
+    """按 build-manifest 中 inputs 记录的键重算摘要，不执行 load、lint（Q11.4）。"""
+    changed = []
+    for key, recorded in manifest.get("inputs", {}).items():
+        path, _, part = key.partition("#")
+        data = tree.read_bytes(path)
+        if data is None:
+            changed.append(key)
+            continue
+        current = fsio.digest((skillmd.description_of(skillmd.read_text(data)) or "") if part == "description" else data)
+        if current != recorded:
+            changed.append(key)
+    return changed
+
+
+def simulate(root: Path, *, feature: str = "demo", to: str | None = None, platform: str | None = None,
+             keep: bool = False) -> CommandResult:
+    tree = Tree(root)
+    manifest = read_manifest(tree)
+    if manifest is None or not tree.is_file("board_core/board_config.json"):
+        raise UsageError("插件还没有生成过，先执行 autobiz-plugin doctor")
+    report = Report()
+    changed = stale_inputs(tree, manifest)
+    if changed:
+        report.add("warning", "BUILD_STALE", "改了以下内容但没有重新生成，simulate 运行的是上次生成的插件：" + "、".join(changed),
+                   file=changed[0].split("#", 1)[0], hint="执行 autobiz-plugin doctor")
+    simulation, issues = run_contract(root, platform=platform, feature=feature, to=to, keep=keep)
+    simulation["stale"] = bool(changed)
+    report.extend(issues)
+    table = "\n".join(f"{item['id']:<16} {item['status']}" for item in simulation["nodes"])
+    failed = [step for step in simulation["steps"] if not step["ok"]]
+    summary = "全部步骤通过" if not failed else f"{len(failed)} 个步骤失败"
+    if simulation["workspace"]:
+        summary += f"；临时目录保留在 {simulation['workspace']}"
+    return CommandResult(report, extra={"simulation": simulation}, text=(table + "\n" if table else "") + summary)

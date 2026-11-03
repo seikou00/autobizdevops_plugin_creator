@@ -8,14 +8,17 @@ AutoBiz 看板插件脚手架。三方分工如下：
 
 配置可以由初始化向导问答生成；不改默认值的模块不需要写配置文件，所以入口文件很短。这些核心配置只写决策，由 `autobiz-plugin lint` 检测：build 前自动执行，开发者也可以随时手动执行；改了 `workflow.json` 或模块配置后，用 `autobiz-plugin doctor` 重新生成插件。插件运行时只读 build 编译出来的配置。看板配置、三平台宿主命令、状态机、插件清单、模块文件，以及每个技能 `SKILL.md` 开头的状态维护片段都由脚手架生成；开发者没有提供技能时，生成只带状态维护片段的空白 `SKILL.md`。
 
-当前状态：**v1 的 P0 功能已实现**（分期见 [docs/priorities.md](docs/priorities.md)），P1 功能尚未实现。只依赖 Python 3.9+ 标准库。
+当前状态：**v1 的 P0、P1 功能已实现**（分期与实现状态见 [docs/priorities.md](docs/priorities.md)），v2 预留和 mods、RPC 草案未实现。只依赖 Python 3.9+ 标准库。
 
 ```bash
-python3 tools/make_pyz.py                               # 打出 dist/autobiz-plugin.pyz
-python3 dist/autobiz-plugin.pyz new my-plugin --from lite --yes
+python3 tools/make_pyz.py                               # 打出 dist/autobiz-plugin.pyz 和插件开发技能的插件包
+python3 dist/autobiz-plugin.pyz new my-plugin                     # 初始化向导；--from lite --yes 跳过问答
 python3 dist/autobiz-plugin.pyz -C my-plugin add skill autodev-plan --from ../autobizdevops_lite/skills/autodev-plan
 python3 dist/autobiz-plugin.pyz -C my-plugin doctor     # 改了核心配置后重新生成
+python3 dist/autobiz-plugin.pyz -C my-plugin add node review --name 评审 --skill doc-review --stage dev --seq 5 --output REVIEW.md
+python3 dist/autobiz-plugin.pyz -C my-plugin module enable artifactSync --set allowedFrom=plan:done
 python3 dist/autobiz-plugin.pyz -C my-plugin check      # lint + 技能内容 + 漂移 + 契约测试
+python3 dist/autobiz-plugin.pyz -C my-plugin simulate   # 在临时目录中按宿主的方式走一遍流程
 python3 dist/autobiz-plugin.pyz -C my-plugin package    # 写 dist/<plugin.id>-<version>.zip
 python3 -m unittest discover -s tests -t .              # 脚手架自身的测试
 ```

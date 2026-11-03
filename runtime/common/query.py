@@ -15,6 +15,8 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = PLUGIN_ROOT / "runtime" / "config"
 GLOB_CHARS = ("*", "?", "[")
 STATE_SCHEMA_VERSION = 1
+LEGACY_STATE_V3 = "autobizdevops.state.v3"
+MIGRATED_FROM = "_migratedFrom"     # 只在内存中，写入前由 engine 去掉
 UNSAFE_COMPONENT = re.compile(r"[/\\\x00]")
 
 
@@ -266,7 +268,34 @@ def empty_state() -> dict:
     return {"schemaVersion": STATE_SCHEMA_VERSION, "pluginId": plugin_id(), "boardSeq": 0, "features": {}}
 
 
+def _from_v3(payload: dict) -> dict:
+    """全栈版的 autobizdevops.state.v3（不带 pluginId）当作本插件的旧格式读取（D60）。
+
+    记录可以是对象或 checkpoint 字符串；已下架的 lean、custom 模板按 standard 继续，原值记在 legacyWorkflowTemplate。
+    首次写入时由 engine 备份原文件并升级为 schemaVersion 1。
+    """
+    records = payload.get("features")
+    if not isinstance(records, dict):
+        raise BoardError("state.json（v3）的 features 必须是对象；原文件保留")
+    features = {}
+    for name, record in records.items():
+        if isinstance(record, str):
+            record = {"feature": name, "checkpoint": record}
+        if not isinstance(record, dict):
+            raise BoardError(f"Feature {name} 的状态记录无效；原文件保留")
+        record = dict(record)
+        record.setdefault("feature", name)
+        for key in ("workflowTemplate", "workflowProfile"):
+            if record.get(key, "standard") != "standard":
+                record.setdefault(f"legacy{key[0].upper()}{key[1:]}", record[key])
+                record[key] = "standard"
+        features[name] = record
+    return {"schemaVersion": STATE_SCHEMA_VERSION, "pluginId": plugin_id(), "boardSeq": 0, "features": features,
+            MIGRATED_FROM: LEGACY_STATE_V3}
+
+
 def load_state(project_path: Path) -> dict:
+    """读取并校验 state.json。checkpoint 不在当前流程中的 Feature 原样保留、只读（is_stranded），不影响其他 Feature。"""
     path = state_path(project_path)
     if not path.exists():
         return empty_state()
@@ -274,6 +303,8 @@ def load_state(project_path: Path) -> dict:
         payload = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, ValueError) as error:
         raise BoardError(f"state.json 无法解析，原文件保留: {error}") from None
+    if isinstance(payload, dict) and payload.get("schemaVersion") == LEGACY_STATE_V3 and "pluginId" not in payload:
+        payload = _from_v3(payload)
     if not isinstance(payload, dict) or payload.get("schemaVersion") != STATE_SCHEMA_VERSION:
         raise BoardError("state.json 格式或 schemaVersion 不正确；原文件保留")
     if payload.get("pluginId") != plugin_id():
@@ -282,16 +313,23 @@ def load_state(project_path: Path) -> dict:
     records = payload.get("features")
     if not isinstance(records, dict):
         raise BoardError("state.json 的 features 必须是对象")
-    chain = set(checkpoint_chain())
     for name, record in records.items():
-        if not isinstance(record, dict) or record.get("feature") != name:
+        if not isinstance(record, dict) or record.get("feature") != name or not isinstance(record.get("checkpoint"), str):
             raise BoardError(f"Feature {name} 的状态记录无效；原文件保留")
-        if record.get("checkpoint") not in chain:
-            raise BoardError(f"Feature {name} 的 checkpoint {record.get('checkpoint')!r} 不在当前流程中；原文件保留")
     seq = payload.get("boardSeq", 0)
     if not isinstance(seq, int) or isinstance(seq, bool) or seq < 0:
         raise BoardError("state.json 的 boardSeq 必须是非负整数")
     return payload
+
+
+def is_stranded(record: dict) -> bool:
+    """Feature 停在当前流程没有的 checkpoint 上（节点删除或改名、v3 的 needs_fix 等）：只能查看，不能推进。"""
+    return record.get("checkpoint") not in checkpoint_chain()
+
+
+def stranded_reason(record: dict) -> str:
+    return (f"Feature {record.get('feature')} 停在 checkpoint {record.get('checkpoint')!r}，当前流程中没有这个 checkpoint，"
+            "只能查看、不能推进；需要人工处理（例如手动改回某个节点的 checkpoint）")
 
 
 def list_features(project_path: Path) -> list:

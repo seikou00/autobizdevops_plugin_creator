@@ -1,6 +1,6 @@
-"""new：以种子或 --answers 为起点生成核心配置，再执行 doctor（interfaces.md §1.4，D56）。
+"""new：以种子、问答或 --answers 为起点生成核心配置，再执行 doctor（interfaces.md §1.4，D56）。
 
-交互式问答在后续版本提供（docs/priorities.md）；现在只支持 --yes，回答取自 --from 的种子和 --answers。
+不加 --yes 时进入初始化向导（scaffold/wizard.py）；加 --yes 时不提问，回答取自 --from 的种子和 --answers。
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from scaffold.build.load import MODULE_KEYS
 from scaffold.commands import CommandResult
 from scaffold.commands.doctor import doctor
 from scaffold.commands.edit import import_skill
-from scaffold.lib import derive, fsio
+from scaffold.lib import derive, fsio, jsonedit
 from scaffold.lib.issues import UsageError
 from scaffold.lib.tree import Tree
 
@@ -54,6 +54,11 @@ def seed_files(template: str) -> dict:
             if resources.exists(f"{base}/{rel}"):
                 seeded[rel] = resources.read_bytes(f"{base}/{rel}")
     return seeded
+
+
+def dump_config(value: dict) -> bytes:
+    """按示例的手排格式写核心配置：对象逐个键换行，只含标量的数组写在一行。"""
+    return (jsonedit.render(value, "", "  ", "\n") + "\n").encode("utf-8")
 
 
 def load_answers(source: str | None) -> dict | None:
@@ -98,30 +103,57 @@ def apply_answers(files: dict, answers: dict, template: str) -> tuple:
         if not isinstance(answers["nodes"], list) or not answers["nodes"]:
             raise UsageError("--answers 的 nodes 必须是非空数组")
         workflow_rel = (entry.get("workflow") or "./workflow.json")[2:]
-        files[workflow_rel] = fsio.dump_json(workflow_from(answers["nodes"]))
+        files[workflow_rel] = dump_config(workflow_from(answers["nodes"]))
     for key in MODULE_KEYS:
         if key not in answers or answers[key] is None:
             continue
         rel = f"modules/{key}.json"
-        files[rel] = fsio.dump_json({"$schema": schema_ref(rel), **answers[key]})
+        files[rel] = dump_config({"$schema": schema_ref(rel), **answers[key]})
         entry.setdefault("modules", {})[key] = f"./{rel}"
         changed = True
     if changed or "plugin.scaffold.json" not in files:
-        files["plugin.scaffold.json"] = fsio.dump_json(entry)
+        files["plugin.scaffold.json"] = dump_config(entry)
     skills = answers.get("skills") or {}
     if not isinstance(skills, dict):
         raise UsageError("--answers 的 skills 必须是对象：技能名 → 导入目录或 null")
     return files, skills
 
 
-def new(target: Path, *, template: str = "blank", answers: dict | None = None, yes: bool = False) -> CommandResult:
-    if not yes:
-        raise UsageError("交互式向导在后续版本提供；现在请加 --yes，并用 --from 或 --answers 给出回答")
+def interactive(target: Path, template: str, prompter) -> dict:
+    """问答得到回答；在内存中先 lint，有 error 时报出并重新回答，回答被放弃时什么都不写（interfaces.md §1.4）。"""
+    from scaffold import wizard
+    from scaffold.build.pipeline import analyze
+    from scaffold.lib.issues import Report
+
+    seed = seed_files(template)
+    seed_plugin = fsio.parse_json(seed["plugin.scaffold.json"]).get("plugin", {}) if seed else {}
+    while True:
+        answers = wizard.ask(prompter, seed_plugin=seed_plugin, seeded=template != "blank")
+        files, _ = apply_answers(dict(seed), answers, template)
+        errors = [issue for issue in analyze(Tree(target, files), stale=False).report.issues if issue.level == "error"]
+        if not errors:
+            return answers
+        prompter.say(Report(errors).to_text())
+        if not wizard.yes(prompter, "配置有问题，重新回答？", True):
+            raise UsageError("已放弃，没有写入任何文件")
+
+
+def new(target: Path, *, template: str = "blank", answers: dict | None = None, yes: bool = False,
+        prompter=None) -> CommandResult:
     if template not in TEMPLATES:
         raise UsageError(f"--from 只能是 {'、'.join(TEMPLATES)}")
     target = Path(target)
     if target.exists() and (not target.is_dir() or any(target.iterdir())):
         raise UsageError(f"目标目录 {target} 必须不存在或为空")
+    if not yes:
+        from scaffold.wizard import TerminalPrompter
+
+        if answers is not None:
+            raise UsageError("--answers 要与 --yes 一起使用")
+        try:
+            answers = interactive(target, template, prompter or TerminalPrompter())
+        except (EOFError, KeyboardInterrupt):
+            raise UsageError("问答被中断，没有写入任何文件") from None
     files = seed_files(template)
     skills = {}
     if answers is not None:
@@ -141,4 +173,3 @@ def new(target: Path, *, template: str = "blank", answers: dict | None = None, y
     if not result.report.failed():
         (target / "hooks").mkdir(parents=True, exist_ok=True)
     return result
-

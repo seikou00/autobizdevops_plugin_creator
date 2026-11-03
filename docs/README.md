@@ -371,7 +371,7 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 
 后三项是精简核心流程时移出的字段，需要时以对象形式扩展 `inputs`/`outputs` 和节点，现有写法保持不变。
 
-## 8. 已确认决策（2026-10-16；D22–D24 为 2026-10-26；D31 为 2026-10-28；D37–D40 为 2026-11-02；D41–D59 为 2026-11-03）
+## 8. 已确认决策（2026-10-16；D22–D24 为 2026-10-26；D31 为 2026-10-28；D37–D40 为 2026-11-02；D41–D59 为 2026-11-03；D60 为 2026-11-04）
 
 | # | 决策 | 落到 |
 |---|---|---|
@@ -434,12 +434,13 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 | D57 | 打包与升级的评审结论（2026-11-03，scaffold.md 单元 13）：① `package` 不再“重置运行期字段”；② CLI 不提供 `upgrade`，版本变化由 doctor 处理：同一主版本内直接替换 managed、module 文件并在 `changes.versions` 中报告，`coreVersion` 主版本变化报 `CORE_MAJOR_CHANGED`（`doctor --allow-major-upgrade` 放行），脚手架比记录旧时报 `SCAFFOLD_OUTDATED` 并拒绝；lint、check 对可升级的插件报 `SCAFFOLD_VERSION_CHANGED`；漂移只按磁盘与 build-manifest 记录是否一致判断；v1 不提供 `migrate`；③ 脚手架用标准库 zipapp 发布成一个文件 `autobiz-plugin.pyz`，插件开发技能在 `scripts/` 下带同一个文件；④ zip 中只有一个顶层目录 `<plugin.id>/`（待 DevClaw 确认）；⑤ 打包时 `plugin.json`、`board_core/`、`runtime/` 只收 build-manifest 记录的文件，开发者目录跳过缓存和系统文件，按实际路径收清单引用的文件（缺失时报 `PLUGIN_REF_MISSING`），`sys/` 只在启用知识模块且没有声明 `source` 时打包，zip 可重复；⑥ Node 依赖仍待定，在此之前 package 不安装、不带 `node_modules/` | §2.3、§3、§3.1、§4、§9；input-config.md §3.3、§4.4、§7.1、§7.2、§7.3；output-spec.md §1、§7.1、§8；interfaces.md §1.1、§1.3、§1.7、§4.5、§5；scaffold.md 总览、§9、§10、§13 |
 | D58 | 插件开发技能的评审结论（2026-11-03，scaffold.md 单元 14）：① 技能不带 `input-config.md` 副本，SKILL.md 只写建模和配置的要点，细节以 CLI 的 Issue 和插件目录 `.scaffold/` 下的 Schema 为准，`references/` 只有 `modeling-guide.md`；② 去掉技能自己的 `agents/openai.yaml`；③ 以只含这个技能的 DevClaw 插件发布（同 demo）：`tools/make_pyz.py` 打出 `.pyz` 后组装 `plugin.json` 和技能目录，`.pyz` 放在技能的 `scripts/` 下、不提交进仓库；SKILL.md 中的命令用 `${pluginPath}` 定位 `.pyz`，没有被替换时按 SKILL.md 所在目录定位；④ 对话流程与已定决策对齐：不问知识沉淀入口（D33），触发场景不写“给节点加校验”（D32），填写空白 SKILL.md 的 `description` 后再执行一次 doctor（D49），每次修改后 lint、一组修改完成后 doctor 再 check，`--force` 和 `--allow-*` 只在开发者明确同意后使用 | §3.1；interfaces.md §1.1、§1.6、§1.7；scaffold.md 总览、§14 |
 | D59 | 运行框架模板的评审结论（2026-11-03，scaffold.md 单元 15）：① `runtime/common/cli.py`（入口共用的参数、输出与退出码）和 `runtime/adapters/board_view.py`（看板数据拼装，`inspect_state.py`、`inspect_workflow_templates.py`、`render_session_context.py`、`board_events.py` 共用，节点文案读 `runtime/config/board.json`）加入输出目录，归属 managed；`BoardError` 定义在 `query.py`；② `sync_knowledge.py` 只更新知识目录，不回写配置文件；③ v1 运行框架不实现动态阶段和跳过节点：`flow.json` 保留 `dynamicStages`、`skip`，出现非默认值时 `query.load_flow` 拒绝加载，`update_state.py` 不提供 `--skip-node`，`query.pending_choice`、`engine.skip_nodes` 留到 v2；`inputs`、`validate` 照常实现；v1 的写入口只有 `init_workspace.py`、`init_feature.py`、`update_state.py` 三个；④ 改掉“框架只查存在性”的旧说法，完成判定是存在且非空（D37） | §2.2、§6.4；input-config.md §2.5、§2.7、§2.8；output-spec.md §1、§5.2；interfaces.md §3.1、§3.5.2、§3.5.3、§4.1、§4.2、§4.6、§5；scaffold.md §15 |
+| D60 | 全栈版已有项目的状态接续（2026-11-04，README §9 第 3 条）：① 运行框架读取 `autobizdevops.state.v3`（不带 `pluginId`），当作本插件的旧格式，记录可以是对象或 checkpoint 字符串；第一次写入时把原文件备份为 `state.v3.bak.json`，再升级为 `schemaVersion: 1` 并补上 `pluginId`、`boardSeq`；② 已下架的 `lean`、`custom` 模板按 `standard` 继续，原值记在 `legacyWorkflowTemplate`；③ checkpoint 不在当前流程中的 Feature（v3 的 `needs_fix`、`detail_design_*`，或节点删除、改名之后的 Feature）原样保留、只读：看板上 `currentNodeStatus` 为 `unknown` 并带 `readOnly`、`readOnlyReason`，推进、重开和更新发布单元都拒绝，不影响同项目的其他 Feature（取代 output-spec.md §4.2 中“checkpoint 不在当前配置中时拒绝写入”） | §9；output-spec.md §4.2；interfaces.md §3.3.3、§3.3.4、§5 |
 
 ## 9. 遗留问题
 
 1. **产物同步的服务端路径不含 `pluginId`**：上传路径是 `{PROJECT_CODE}/DEV/Features/{feature}/{employeeId}/`。D3 之后，同一项目中两个插件可以有同名 Feature，上传时会互相覆盖。是否在路径中加入 `pluginId`（例如 `{PROJECT_CODE}/DEV/Features/{pluginId}/{feature}/{employeeId}/`）？这需要和服务端约定，也会影响全栈版已上传数据的位置。
 2. **legacy 项目是否需要迁移**（已取消）：D48 之后只有一种目录布局，lite、全栈版已有项目的目录结构不变，不需要迁移。
-3. **全栈版已有项目的状态如何接续**：全栈版的 state.json 是 `autobizdevops.state.v3`，不带 `pluginId`，记录中还有 `workflowProfile`、`workflowNodes`，部分 Feature 的 `workflowTemplate` 是已下架的 `lean`、`custom`。运行框架是否读取 v3 并在首次写入时升级为 `schemaVersion: 1` 加 `pluginId`？用 `lean`/`custom` 创建的 Feature 按 `standard` 继续，还是保持只读？
+3. **全栈版已有项目的状态如何接续**（已定，D60）：全栈版的 state.json 是 `autobizdevops.state.v3`，不带 `pluginId`，记录中还有 `workflowProfile`、`workflowNodes`，部分 Feature 的 `workflowTemplate` 是已下架的 `lean`、`custom`。运行框架是否读取 v3 并在首次写入时升级为 `schemaVersion: 1` 加 `pluginId`？用 `lean`/`custom` 创建的 Feature 按 `standard` 继续，还是保持只读？
 4. **产物同步放在哪里**（已定）：作为独立的可选模块，配置在 `modules/artifactSync.json`，入口文件引用即启用，由脚手架生成同步配置和技能（D30）。
 5. **知识仓库由谁同步**：新目录结构中 `runtime/knowledge/` 只列出 `inspect_deploy_units.py`。本稿把 lite 的仓库同步保留为可选项 `knowledge.source`（生成 `sync_knowledge.py` 和 `pull_knowledge`）。如果改由 DevClaw 统一拉取知识，去掉该项即可。
 6. **`inspect_deploy_units.py` 如何暴露给 DevClaw**：本稿在 `inspectCommands` 中暂定键名 `deploy_units`，并已去掉静态的 `supported_deploy_units`（D31），DevClaw 需要改为调用它获取发布单元。键名待确认。

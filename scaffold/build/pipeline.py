@@ -13,6 +13,7 @@ from scaffold.build.contribute import merge
 from scaffold.build.load import load
 from scaffold.build.manifest import MANIFEST, make_manifest, read_manifest
 from scaffold.build.normalize import normalize
+from scaffold.build.versions import VersionChanges, compare_versions
 from scaffold.lib import fsio
 from scaffold.lib.issues import Report
 from scaffold.lib.tree import Tree
@@ -31,6 +32,7 @@ class BuildResult:
     plan: emit.WritePlan | None = None
     manifest: dict | None = None
     skills: skills.SkillChanges | None = None
+    versions: VersionChanges = field(default_factory=VersionChanges)
     written: list = field(default_factory=list)
 
     @property
@@ -48,6 +50,9 @@ def analyze(tree: Tree, *, stale: bool = True, allow: frozenset = frozenset()) -
     result.normalized = normalize(inputs)
     result.previous = read_manifest(tree)
     result.skill_dirs = lint.skill_dirs(result.normalized)
+    result.versions, issues = compare_versions(result.previous, enabled_modules(result.normalized), allow=allow,
+                                               report_upgrade=stale)
+    result.report.extend(issues)
     ctx = lint.LintContext(result.normalized, result.previous, result.skill_dirs, allow)
     result.report.extend(lint.lint_core(ctx, stale=False))
     if not result.report.failed():

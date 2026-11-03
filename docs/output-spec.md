@@ -222,7 +222,9 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
 规则：
 
 - 必须记录 `pluginId`（D3）。`pluginId` 与本插件不符时，拒绝读写，原文件保持不变（防止目录被拷贝或误放）；
-- `schemaVersion` 不符、`checkpoint` 不在当前配置中、或 key 与 `feature` 字段不一致时，拒绝写入，原文件保持不变；
+- `schemaVersion` 不符、或 key 与 `feature` 字段不一致时，拒绝读写，原文件保持不变；
+- `checkpoint` 不在当前流程中的 Feature（节点删除、改名之后，或全栈版的 `needs_fix` 等）原样保留、只读：看板上显示为 `unknown`，推进、重开都拒绝，同一项目的其他 Feature 照常读写（D60）；
+- 全栈版的 `autobizdevops.state.v3`（不带 `pluginId`）当作本插件的旧格式读取；第一次写入时先把原文件备份为 `state.v3.bak.json`，再升级为 `schemaVersion: 1` 并补上 `pluginId`、`boardSeq`；`lean`、`custom` 模板按 `standard` 继续，原值记在 `legacyWorkflowTemplate`（D60）；
 - `boardSeq` 是看板事件序号（interfaces.md §3.5），非负整数，缺省视为 0。engine 每次提交时在锁内加 1，其他写入方不得修改它；
 - 记录中的未知字段原样保留（允许技能存放自定义元数据）；
 - 不保存历史，事件写入 `hooks.ndjson`；读到旧版的 `history` 字段时，在下一次写入时移除；
