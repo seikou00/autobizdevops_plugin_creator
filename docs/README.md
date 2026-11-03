@@ -42,7 +42,7 @@ v1 范围：
 | [input-config.md](input-config.md) | 用户输入：输入分类、`workflow.json`、入口文件与模块配置文件的字段、默认值、推导规则、校验规则 |
 | [output-spec.md](output-spec.md) | 插件标准化输出：目录、清单、宿主接口 board_core、内部配置、运行期数据、技能格式 |
 | [interfaces.md](interfaces.md) | 接口：CLI 与初始化向导、模块契约、宿主命令协议、看板事件推送、运行框架入口与内部库 |
-| [scaffold.md](scaffold.md) | 草案（待评审）：脚手架自身的模块拆分与模块间接口，15 个评审单元及待评审点 |
+| [scaffold.md](scaffold.md) | 草案（已评审）：脚手架自身的模块拆分与模块间接口，15 个评审单元的核对结果与评审结论 |
 | [diagrams.md](diagrams.md) | 框架图与核心机制图（Mermaid）：整体架构、运行期调用、配置分层、构建、自动检测、状态推进、会话组成、知识模块、多插件隔离 |
 | [mods.md](mods.md) | 草案：DevClaw mods 机制下的插件初始化与热更新（开发 mod、运行 mod、变更等级、状态迁移） |
 | [rpc.md](rpc.md) | 草案：DevClaw 与插件的 JSON-RPC 双向通信（常驻进程、握手与鉴权、方法、降级） |
@@ -86,7 +86,7 @@ lite 版 `board_config.json` 有 509 行，开发者真正做出的决策只有�
 | 宿主命令 | 无 `-X utf8`，路径加引号 | 有 `-X utf8`，路径不加引号 | 一律加 `-X utf8`，不能关闭（D40）；单值占位符一律写成 `"${pluginPath}"` 形式（D2） |
 | 元数据目录 | `.autobizdevops/state.json`（带 `pluginId`） | `.autobizdevops/state.json`（`autobizdevops.state.v3`，不带 `pluginId`） | 一律 `<项目>/<metaRoot>/`，`metaRoot` 默认 `.autobizdevops`；同一项目装多个插件时各自配置不同的 `metaRoot`（D48） |
 | 状态脚本 | `update_state.py`，另有 `update_checkpoint.py` 别名 | `update_checkpoint.py` | `runtime/workflow/update_state.py` 为唯一入口，不再保留别名 |
-| 完成判定 | 必需产物存在且非空 | validators / guards | 框架只检查存在性，内容由节点校验命令判断（D13、D14） |
+| 完成判定 | 必需产物存在且非空 | validators / guards | 框架检查必需产物存在且非空，内容由节点校验命令判断（D13、D14、D37） |
 | 会话上下文 | `render_session_context.py`（读 manifest，纯 Python） | `render_collected_session_context.py` + `collect-knowledge.js`（需要 Node） | 默认会话入口输出流程上下文、运行策略和知识组装结果。知识组装默认用全栈版的 collector（内置组装脚本 `render_collected_session_context.py`），lite 也改用它；插件可以直接替换这个脚本，组装方也可以选 DevClaw（§6.2，D26） |
 | 运行策略下发 | 经 `session_context_inject` 的 `agentConfig` | 同左 | 由会话模块负责（`session.policies`），不依赖知识模块是否启用；宿主命令键改为 `session_collector_context_inject`（D40） |
 | 产物同步 | 无 | `stages` 键写死为 `biz`/`dev`，只认 `.autobizdevops/state.json` | 改为可选模块 `artifactSync`（`modules/artifactSync.json`，D30），`stages` 由节点生成 |
@@ -169,12 +169,12 @@ autobizdevops_plugin_creator/
 │       ├── knowledge/              # module.json  module.py  files/
 │       └── artifact_sync/          # module.json  module.py  files/
 ├── runtime/                        # 运行框架模板：workflow/  adapters/  session/  common/
-├── skills/autobiz-plugin-creator/  # 插件开发技能：SKILL.md  agents/openai.yaml  references/  scripts/autobiz-plugin.pyz
+├── skills/autobiz-plugin-creator/  # 插件开发技能：SKILL.md  references/modeling-guide.md；scripts/autobiz-plugin.pyz 发布时放入（D58）
 ├── schemas/                        # workflow.schema.json、plugin-scaffold.schema.json、modules/*.schema.json；
 │                                   # host/outputs.schema.json：宿主命令的输出结构，只供 simulate、check 使用，不拷进插件（D55）
 ├── examples/                       # lite/、fullstack/、minimal/
 ├── docs/                           # 设计文档
-├── tools/make_pyz.py               # 用标准库 zipapp 把脚手架打成 autobiz-plugin.pyz（D57）
+├── tools/make_pyz.py               # 用标准库 zipapp 把脚手架打成 autobiz-plugin.pyz（D57），再组装插件开发技能的 DevClaw 插件包（D58）
 └── tests/
     ├── golden/                     # 以 lite、全栈版为基线：命令输出的看板数据与其 board_config 中对应内容比对（inspectCommands 的脚本路径、`-X utf8`、会话入口键名及 input-config.md §9.2 列出的差异除外）
     ├── contract/                   # 在临时工作区模拟宿主调用
@@ -273,8 +273,8 @@ DevClaw 通过 `session_collector_context_inject` 拿到会话内容。默认会
 - 所有路径都通过 `query.metadata_dir()` 推导，不得在其他地方拼接 `.autobizdevops`；
 - `resolve_feature` 增加路径安全校验；
 - `load_config` 中“技能必须存在”的校验保留，改为对 `flow.json` 执行，按 `skillDir` 检查，支持一层分组目录下的技能；
-- `engine.py` 增加流程规则：动态阶段的选择与决定记录、跳过节点、终态节点。规则参照全栈版 `board_core/workflow.py`、`hooks/update_checkpoint.py` 的现有行为（input-config.md §2.6–§2.8），但只读 `flow.json`；跳过节点的入口 `runtime/adapters/skip_node.py` 留到 v2，v1 不生成（D52）；
-- 完成判定去掉“非空”检查，改为“存在性 + 校验命令”（§6.6）；
+- `engine.py` 增加终态节点规则（input-config.md §2.6），只读 `flow.json`。动态阶段和跳过节点 v1 不实现（D59）：`flow.json` 保留这两个字段，出现非默认值时 `query.load_flow` 拒绝加载；规则留到 v2 开放配置时参照全栈版 `board_core/workflow.py`、`hooks/update_checkpoint.py` 的现有行为实现（input-config.md §2.7、§2.8），跳过节点的入口 `runtime/adapters/skip_node.py` 同样留到 v2（D52）；
+- 完成判定沿用 lite 的“存在且非空”，再加上校验命令（§6.6，D37）；
 - `init_workspace.py` 拆成 `init_workspace.py`（项目）和 `init_feature.py`（Feature），不再用 `--mode` 区分；
 - 删除未被引用的 `board_core/context.py`（引用了不存在的 `references/workflow.md` 和旧技能名 `autodev-onlycode`），由技能托管片段和会话流程上下文替代。
 
@@ -370,7 +370,7 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 
 后三项是精简核心流程时移出的字段，需要时以对象形式扩展 `inputs`/`outputs` 和节点，现有写法保持不变。
 
-## 8. 已确认决策（2026-10-16；D22–D24 为 2026-10-26；D31 为 2026-10-28；D37–D40 为 2026-11-02；D41–D57 为 2026-11-03）
+## 8. 已确认决策（2026-10-16；D22–D24 为 2026-10-26；D31 为 2026-10-28；D37–D40 为 2026-11-02；D41–D59 为 2026-11-03）
 
 | # | 决策 | 落到 |
 |---|---|---|
@@ -431,6 +431,8 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 | D55 | simulate 的评审结论（2026-11-03，scaffold.md 单元 11）：① 宿主占位符 `${…}` 的格式和引号规则不变，simulate 先按 POSIX 规则拆分参数、再逐个参数替换来模拟 DevClaw；② check 不起模拟的看板事件服务，推送规则只在 `tests/contract/` 中验证，simulate 不设 `AUTOBIZ_BOARD_ENDPOINT`；③ 命令输出用 JSON Schema 校验，放在一个文件 `schemas/host/outputs.schema.json` 中；`.scaffold/` 改为显式拷贝 6 个输入配置的 Schema；④ 生成结果过期时 simulate 只报 warning `BUILD_STALE`，check 在 lint 或漂移检查有 error 时不跑契约测试；⑤ v1 去掉 `--skip-validate`；⑥ simulate 按打包清单把插件拷到临时目录再执行，只写临时目录；“不访问网络”不包括内置知识组装调用的 collector；⑦ 宿主命令只带参数，状态维护片段的命令才注入会话变量；⑧ 片段命令中的 `python` 换成所选平台在 `board.target.python` 中配置的解释器（darwin、linux 取 `posix`，win32 取 `win32`），找不到时报 warning `INTERPRETER_MISSING`；⑨ `simulation` 与 check 的 `contract` 结构相同，失败的步骤报 `CONTRACT_TEST` | §3.1、§5；input-config.md §7.2、§7.3；output-spec.md §1；interfaces.md §1.1、§1.3、§1.5；scaffold.md 总览、§7、§10、§11 |
 | D56 | 配置编辑与向导的评审结论（2026-11-03，scaffold.md 单元 12）：① 安装包带上 lite、fullstack 示例的核心配置作为 `new --from` 的种子，显式列出文件，拷贝时把 `$schema` 改写为 `.scaffold/` 下的路径；② `add node` 增加 `--optional-output`，与 `--output` 按命令行顺序写入 `outputs`；③ 修改核心配置时在原文上插入或替换片段，保留原有键序、缩进和换行；④ `add`、`module`、`new` 先在内存中修改配置并走 doctor 流水线，没有 error 时与生成结果一起写盘，否则什么都不写；⑤ 导入技能时发现的内容问题（`LEGACY_ENTRY_REF` 等）只报 warning、照样导入，frontmatter 的 `name` 改为技能名；⑥ `add node` 增加 `--terminal`，向导询问最后一个节点是否为终态节点；⑦ `--set` 沿 Schema 属性指定字段、按 Schema 类型转换值；`enable artifactSync` 必须给出 `allowedFrom` 或 `allowedCheckpoints`，`artifacts` 预填非 `.json` 输出、简述为 `[TODO: 简述]`；⑧ `new` 增加 `--answers`，`--yes` 只表示不提问；插件开发技能在建模确认后才调用 `new`；目标目录必须不存在或为空；⑨ 从未生成过（没有 build-manifest）时 doctor 把全部节点列为新增、不报 `DOCTOR_BASELINE_MISSING`；`new` 执行 doctor | input-config.md §7.3；interfaces.md §1.1、§1.2、§1.4、§1.6、§1.7；mods.md §3.2；scaffold.md 总览、§10、§12 |
 | D57 | 打包与升级的评审结论（2026-11-03，scaffold.md 单元 13）：① `package` 不再“重置运行期字段”；② CLI 不提供 `upgrade`，版本变化由 doctor 处理：同一主版本内直接替换 managed、module 文件并在 `changes.versions` 中报告，`coreVersion` 主版本变化报 `CORE_MAJOR_CHANGED`（`doctor --allow-major-upgrade` 放行），脚手架比记录旧时报 `SCAFFOLD_OUTDATED` 并拒绝；lint、check 对可升级的插件报 `SCAFFOLD_VERSION_CHANGED`；漂移只按磁盘与 build-manifest 记录是否一致判断；v1 不提供 `migrate`；③ 脚手架用标准库 zipapp 发布成一个文件 `autobiz-plugin.pyz`，插件开发技能在 `scripts/` 下带同一个文件；④ zip 中只有一个顶层目录 `<plugin.id>/`（待 DevClaw 确认）；⑤ 打包时 `plugin.json`、`board_core/`、`runtime/` 只收 build-manifest 记录的文件，开发者目录跳过缓存和系统文件，按实际路径收清单引用的文件（缺失时报 `PLUGIN_REF_MISSING`），`sys/` 只在启用知识模块且没有声明 `source` 时打包，zip 可重复；⑥ Node 依赖仍待定，在此之前 package 不安装、不带 `node_modules/` | §2.3、§3、§3.1、§4、§9；input-config.md §3.3、§4.4、§7.1、§7.2、§7.3；output-spec.md §1、§7.1、§8；interfaces.md §1.1、§1.3、§1.7、§4.5、§5；scaffold.md 总览、§9、§10、§13 |
+| D58 | 插件开发技能的评审结论（2026-11-03，scaffold.md 单元 14）：① 技能不带 `input-config.md` 副本，SKILL.md 只写建模和配置的要点，细节以 CLI 的 Issue 和插件目录 `.scaffold/` 下的 Schema 为准，`references/` 只有 `modeling-guide.md`；② 去掉技能自己的 `agents/openai.yaml`；③ 以只含这个技能的 DevClaw 插件发布（同 demo）：`tools/make_pyz.py` 打出 `.pyz` 后组装 `plugin.json` 和技能目录，`.pyz` 放在技能的 `scripts/` 下、不提交进仓库；SKILL.md 中的命令用 `${pluginPath}` 定位 `.pyz`，没有被替换时按 SKILL.md 所在目录定位；④ 对话流程与已定决策对齐：不问知识沉淀入口（D33），触发场景不写“给节点加校验”（D32），填写空白 SKILL.md 的 `description` 后再执行一次 doctor（D49），每次修改后 lint、一组修改完成后 doctor 再 check，`--force` 和 `--allow-*` 只在开发者明确同意后使用 | §3.1；interfaces.md §1.1、§1.6、§1.7；scaffold.md 总览、§14 |
+| D59 | 运行框架模板的评审结论（2026-11-03，scaffold.md 单元 15）：① `runtime/common/cli.py`（入口共用的参数、输出与退出码）和 `runtime/adapters/board_view.py`（看板数据拼装，`inspect_state.py`、`inspect_workflow_templates.py`、`render_session_context.py`、`board_events.py` 共用，节点文案读 `runtime/config/board.json`）加入输出目录，归属 managed；`BoardError` 定义在 `query.py`；② `sync_knowledge.py` 只更新知识目录，不回写配置文件；③ v1 运行框架不实现动态阶段和跳过节点：`flow.json` 保留 `dynamicStages`、`skip`，出现非默认值时 `query.load_flow` 拒绝加载，`update_state.py` 不提供 `--skip-node`，`query.pending_choice`、`engine.skip_nodes` 留到 v2；`inputs`、`validate` 照常实现；v1 的写入口只有 `init_workspace.py`、`init_feature.py`、`update_state.py` 三个；④ 改掉“框架只查存在性”的旧说法，完成判定是存在且非空（D37） | §2.2、§6.4；input-config.md §2.5、§2.7、§2.8；output-spec.md §1、§5.2；interfaces.md §3.1、§3.5.2、§3.5.3、§4.1、§4.2、§4.6、§5；scaffold.md §15 |
 
 ## 9. 遗留问题
 

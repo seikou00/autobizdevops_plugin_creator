@@ -1,4 +1,4 @@
-# 脚手架模块设计 v1（草案，待评审）
+# 脚手架模块设计 v1（草案，已评审）
 
 本文拆分脚手架自身的代码：开发期 CLI `autobiz-plugin`、构建流水线、四个模块的构建期实现、插件开发技能，以及运行框架模板的内部结构。对外行为已经由下面三份文档确定，本文不重复，只说明由哪个模块实现，以及模块之间用什么接口：
 
@@ -15,7 +15,7 @@
 - 脚手架和运行框架一样只用 Python 3.9+ 标准库（README §2.3）；
 - 脚手架默认在 Windows 上执行，同时支持 macOS、Linux（D42）；插件是成品，不假设插件仓库用 git 管理（D41）；
 - 下文代码只是接口签名，不是实现。签名中的 `list[...]`、`X | None` 写法是为了便于阅读，实现时用 `from __future__ import annotations`；
-- “demo”指 `demo/autobiz-plugin-creator-demo/skills/autobiz-plugin-creator/` 下的演示版脚本，它们按旧版设计实现，迁入时要按本文的接口调整。
+- “demo”指仓库根目录 `demo.zip` 中 `demo/autobiz-plugin-creator-demo/skills/autobiz-plugin-creator/` 下的演示版脚本，它们按旧版设计实现，迁入时要按本文的接口调整。
 
 ## 总览
 
@@ -39,7 +39,7 @@ autobizdevops_plugin_creator/
 ├── runtime/                         # 单元 15：运行框架模板（随插件发布）
 ├── skills/autobiz-plugin-creator/   # 单元 14：插件开发技能
 ├── schemas/  examples/  docs/
-├── tools/make_pyz.py                # 单元 13：把脚手架打成 autobiz-plugin.pyz
+├── tools/make_pyz.py                # 单元 13、14：把脚手架打成 autobiz-plugin.pyz，再组装插件开发技能的插件包
 └── tests/  golden/  contract/  modules/  unit/
 ```
 
@@ -1000,19 +1000,47 @@ CLI 不提供 `upgrade`：脚手架更新后，由 doctor 替换 managed、modul
 
 ## 14. 插件开发技能
 
-结构和对话流程见 interfaces.md §1.6。技能本身没有代码接口，评审的是它与 CLI 的关系：
+结构和对话流程见 interfaces.md §1.6。技能本身没有代码接口，评审的是它与 CLI 的关系和发布方式：
 
 | 项 | 做法 |
 |---|---|
 | 调用 CLI | 所有生成和校验只通过 CLI 完成，判断以退出码和 `--json` 的 Issue 为准 |
 | 写哪些文件 | 只写核心配置和 seeded、developer 文件（interfaces.md §1.6 的规则） |
-| `references/input-config.md` | 从 `docs/input-config.md` 同步 |
+| 字段说明 | 不带 `input-config.md` 副本，SKILL.md 只写要点（Q14.1） |
+| 发布 | 只含这个技能的 DevClaw 插件，`.pyz` 放在技能的 `scripts/` 下（Q14.2、Q14.4） |
 
-待评审：
+```python
+# tools/make_pyz.py（接单元 13 的 make_pyz）
+def make_creator_plugin(pyz: Path, output: Path) -> None
+    # 组装 autobiz-plugin-creator/：生成 plugin.json（version 取脚手架版本，"skills": "./skills/"），
+    # 拷贝 skills/autobiz-plugin-creator/ 下显式列出的文件，把 pyz 放到 scripts/autobiz-plugin.pyz；
+    # 写成 zip，规则同 package：只有一个顶层目录，条目按路径排序，时间戳固定（Q13.4、Q13.5）
+```
 
-- **Q14.1** `references/input-config.md` 靠同步脚本生成，还是靠测试保证两者一致？`tests/check_schema_defaults.py` 已经同时检查这两份文件的默认值表，说明两份内容会分别修改，容易不一致。
-- **Q14.2** 技能依赖开发者已经安装 `autobiz-plugin`，还是像 demo 那样在自己的 `scripts/` 下带一份脚手架？取决于 Q13.3。
-- **Q14.3 插件开发技能自己的 `agents/openai.yaml`。** D51 之后，生成的插件中的技能不再处理 `openai.yaml`。插件开发技能本身装在开发者的 agent 环境里（可能是 Codex），README §3.1 和 interfaces.md §1.6 的目录中仍列着它自己的 `agents/openai.yaml`，是否保留在本单元决定。
+核对结果（2026-11-03）：
+
+- Q14.1 的前提已经变了：提交 `03b2e70` 把 demo 移进 `demo.zip` 之后，`tests/check_schema_defaults.py` 只检查 `docs/input-config.md`。demo 中的副本已经与 docs 不一致，还留着 `rules.dynamicStages`、代码提交产物（git）、`capabilities.knowledgeSedimentation` 等已经去掉的内容。`docs/input-config.md` 中有 9 个指向 `../examples/`、`../schemas/` 的相对链接，拷进技能后都会失效；
+- demo 版技能以 DevClaw 插件 `autobiz-plugin-creator-demo` 发布（`plugin.json` 只有 `"skills": "./skills/"`），命令写作 `"${pluginPath}/skills/autobiz-plugin-creator/scripts/…"`，并写明 `${pluginPath}` 没有被替换时按本文件所在目录定位。interfaces.md §3.2 允许技能正文中出现 `${pluginPath}`；interfaces.md §1.6 只说“安装到开发者自己的 agent 环境中”，没有说怎么发布、怎么找到 `.pyz`；
+- demo 版技能没有 `agents/openai.yaml`；
+- interfaces.md §1.6 有几处与后来的决策不一致：
+  - 第 4 步询问知识沉淀入口，D33 之后它固定开启；
+  - `description` 的触发场景举了“给节点加校验”，demo 的 `modeling-guide.md` 也按校验命令建模，D32 之后用户不能配置 `validate`；demo 的建模指南还写着“空文件也算存在”，D37 之后是存在且非空；
+  - 第 5 步填写空白 SKILL.md 的 `description` 后，build-manifest 中记录的 `description` 摘要就过期了（D49），第 6 步 `check` 会报 error `BUILD_STALE`；
+  - §1.1 说“每次修改核心配置后运行 doctor，再运行 check”，§1.6 的规则说“每次修改后 lint，修改完成后 doctor”；
+  - 规则中没有说 `--force` 和各个放行参数什么时候可以用。
+
+评审结论（2026-11-03，D58）：
+
+- **Q14.1 技能不带 `input-config.md`（已定）。** 不同步，也不比对：两份内容迟早会被分别修改，demo 已经是这样。SKILL.md 只写建模和配置的要点（节点的 6 个字段与 `seq` 规则、产物 id 的推导、四个模块配置各管什么、`new --answers` 的格式），细节以 CLI 的 Issue（`code`、`pointer`、`hint`）和插件目录 `.scaffold/` 下的 Schema 为准；`references/` 只有 `modeling-guide.md`。`tests/check_schema_defaults.py` 不需要改。
+- **Q14.2 随 Q13.3 确定（已定）。** 技能在 `scripts/` 下带同一个 `autobiz-plugin.pyz`。它是发布产物，不提交进仓库，由 `make_creator_plugin` 放进插件包。
+- **Q14.3 去掉 `agents/openai.yaml`（已定）。** 理由同 Q7.1：它只是 Codex 的展示信息，demo 版也没有。已从 README §3.1 和 interfaces.md §1.6 的目录中删掉。
+- **Q14.4 以 DevClaw 插件发布，按目录兜底（已定）。** 与 demo 相同，发布为只含这个技能的 DevClaw 插件，zip 的顶层目录为 `autobiz-plugin-creator/`。SKILL.md 中的命令写作 `python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz" <命令>`（Windows 上为 `python`）；装在其他 agent 中、`${pluginPath}` 没有被替换时，按 SKILL.md 所在目录定位 `scripts/autobiz-plugin.pyz`。写入 interfaces.md §1.6。
+- **Q14.5 对话流程与已定决策对齐（已定）。** 写入 interfaces.md §1.1、§1.6、§1.7：
+  - 第 4 步改为询问目标平台、节点运行策略、知识模块和产物同步模块，不问知识沉淀入口；
+  - 触发场景把“给节点加校验”换成“导入已有技能”；`modeling-guide.md` 只讲阶段、节点和产物，更严格的完成条件写进技能正文（D37），不再讲校验命令；
+  - 第 5 步填写 `description` 后再执行一次 doctor；
+  - 每次修改核心配置后运行 lint，一组修改完成后运行 doctor，再运行 check；
+  - `--force`、`--allow-id-change`、`--allow-layout-change`、`--allow-major-upgrade` 只在开发者看过对应的 Issue 并明确同意后才加。
 
 ## 15. 运行框架模板
 
@@ -1020,13 +1048,24 @@ CLI 不提供 `upgrade`：脚手架更新后，由 doctor 替换 managed、modul
 
 | 文件 | 职责 | 使用者 |
 |---|---|---|
-| `runtime/common/query.py` | 只读：读编译配置和状态，查询节点、产物存在情况（interfaces.md §4.6） | 全部入口、模块脚本 |
-| `runtime/common/engine.py` | 初始化、状态转移、存在性检查、校验命令、加锁提交、变更日志 | 写入口 |
-| `runtime/common/cli.py` | 入口共用的参数解析、单个 JSON 输出、`BoardError` → `{"ok": false}` 与退出码 | 全部入口 |
-| `runtime/adapters/board_view.py` | 看板数据拼装：`WorkflowNode`、`run`、`projectRuns` | `inspect_state.py`、`inspect_workflow_templates.py`、`board_events.py` |
-| `runtime/adapters/board_events.py` | 提交后推送 `board/changed`（interfaces.md §3.5.3） | 四个写入口 |
+| `runtime/common/query.py` | 只读：读编译配置和状态，查询节点、产物存在情况（interfaces.md §4.6）；定义 `BoardError` | 全部入口、模块脚本 |
+| `runtime/common/engine.py` | 初始化、状态转移、存在且非空检查、校验命令、加锁提交、变更日志 | 写入口 |
+| `runtime/common/cli.py` | 入口共用的参数解析、单个 JSON 输出、`BoardError` → `{"ok": false}` 与退出码 | 全部框架入口 |
+| `runtime/adapters/board_view.py` | 看板数据拼装：`WorkflowNode`、`run`、`projectRuns`；文案读 `runtime/config/board.json` | `inspect_state.py`、`inspect_workflow_templates.py`、`render_session_context.py`、`board_events.py` |
+| `runtime/adapters/board_events.py` | 提交后推送 `board/changed`（interfaces.md §3.5.3） | 三个写入口：`init_workspace.py`、`init_feature.py`、`update_state.py` |
 
-待评审：
+核对结果（2026-11-03）：
 
-- **Q15.1** demo 中的 `runtime/common/cli.py` 和 `runtime/adapters/board_view.py` 不在 output-spec.md §1 的文件清单中。看板事件的内容要与读取命令的输出一致（interfaces.md §3.5.3），所以 `inspect_state.py` 和 `board_events.py` 必须共用同一套拼装代码。建议两个文件都加入 output-spec.md §1，归属 managed。
-- **Q15.2** interfaces.md §4.1 说 `sync_knowledge.py`“拉取知识仓库并回写运行期字段”，与 §3.3.9 的“只更新知识目录，不回写任何配置文件”以及 D31 矛盾，应改为只更新知识目录。
+- demo 中的 `runtime/common/cli.py`、`runtime/adapters/board_view.py` 不在 output-spec.md §1 的文件清单中。demo 的 `render_session_context.py` 也导入了 `board_view`（取节点的看板文案），原表的使用者中漏了它。demo 的 `board_view.py` 通过 `query.load_board()` 从 `board_config.json` 读看板文案，这是 D31 之前的设计；
+- interfaces.md §4.6 写的是 `engine.BoardError`，demo 把它定义在 `query.py`：query 的路径安全、状态格式和 `pluginId` 校验也要抛这个错误；
+- interfaces.md §4.1 说 `sync_knowledge.py`“拉取知识仓库并回写运行期字段”，与 §3.3.9、D31 矛盾；
+- 原表说 `board_events.py` 由“四个写入口”调用，interfaces.md §3.1、§3.5.3 也把 `skip_node` 列为发送方，但 v1 不生成 `skip_node.py`（D52）；
+- v1 的 build 固定把 `flow.json` 的 `dynamicStages`、`skip` 写成 `[]`、`null`（D32），README §6.4 却要求 engine 实现动态阶段的选择与决定记录、跳过节点。这些代码在 v1 中不会被执行，与 D52 不生成 `skip_node.py` 的理由相同。interfaces.md §4.2 的 `update_state.py` 还开放了 `--skip-node`；
+- README §2.2 的“完成判定”一行、README §6.4 的“去掉非空检查”、interfaces.md §5 的“框架不再检查产物是否为空”仍是 D37 之前的说法，与 README §6.6、output-spec.md §4.4 的“存在且非空”矛盾。
+
+评审结论（2026-11-03，D59）：
+
+- **Q15.1 `cli.py`、`board_view.py` 进入输出目录（已定）。** 两个文件加入 output-spec.md §1，归属 managed。看板事件的内容要与读取命令的输出一致，所以 `inspect_state.py`、`board_events.py` 必须共用 `board_view.py`；会话入口取节点文案也用它。`adapters/` 下的 `board_view.py`、`board_events.py` 是供入口导入的库，不是宿主命令。`BoardError` 定义在 `query.py`，engine 和 cli 从 query 导入，interfaces.md §4.6 随之修改。迁入 demo 的 `board_view.py` 时，节点文案改为读 `runtime/config/board.json`（D31）；`workflowDecisions` 固定为 `{}`、`nodeIds` 为全部节点，与 Q15.3 一致，保留不改。
+- **Q15.2 `sync_knowledge.py` 只更新知识目录（已定）。** interfaces.md §4.1 改为“拉取知识仓库，只更新知识目录，不回写任何配置文件”。
+- **Q15.3 v1 运行框架不实现动态阶段和跳过节点（已定）。** `flow.json` 保留 `dynamicStages`、`skip`，格式不变（D32）。`query.load_flow` 校验不变量时，`dynamicStages` 不为 `[]` 或 `skip` 不为 `null` 就抛 `BoardError`（“v1 运行框架不支持”）。`update_state.py` 不提供 `--skip-node`；`query.active_nodes` 在 v1 中就是全部节点，`query.pending_choice`、`engine.skip_nodes` 和 `reason = skip_node` 的看板事件留到 v2。`inputs`、`validate` 体量小，业务校验器又是开发者的职责，照常实现，由契约测试手写 `flow.json` 覆盖。v1 的写入口只有 `init_workspace.py`、`init_feature.py`、`update_state.py` 三个。写入 README §6.4，input-config.md §2.5、§2.7、§2.8，output-spec.md §5.2，interfaces.md §3.1、§3.5.2、§3.5.3、§4.1、§4.2、§4.6。
+- **Q15.4 改掉完成判定的旧说法（已定）。** README §2.2、§6.4 和 interfaces.md §5 统一为“必需产物存在且非空，再加校验命令”（D37）。lite 原来就是去掉首尾空白后判断非空，迁入后行为不变。

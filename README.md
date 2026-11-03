@@ -18,7 +18,7 @@ AutoBiz 看板插件脚手架。三方分工如下：
 | [docs/input-config.md](docs/input-config.md) | 用户输入：输入分类、`workflow.json`、入口文件与模块配置文件的字段、默认值、推导规则、校验规则 |
 | [docs/output-spec.md](docs/output-spec.md) | 插件标准化输出：目录、清单、宿主接口 board_core、内部配置、运行期数据、技能格式 |
 | [docs/interfaces.md](docs/interfaces.md) | 接口：CLI 与初始化向导、模块契约、宿主命令协议、看板事件推送、运行框架入口与内部库 |
-| [docs/scaffold.md](docs/scaffold.md) | 草案（待评审）：脚手架自身的模块拆分与模块间接口 |
+| [docs/scaffold.md](docs/scaffold.md) | 草案（已评审）：脚手架自身的模块拆分与模块间接口 |
 | [docs/diagrams.md](docs/diagrams.md) | 框架图与核心机制图（Mermaid） |
 | [docs/mods.md](docs/mods.md) | 草案：mods 机制下的插件初始化与热更新 |
 | [docs/rpc.md](docs/rpc.md) | 草案：DevClaw 与插件的 JSON-RPC 双向通信 |

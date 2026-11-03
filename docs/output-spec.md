@@ -32,7 +32,8 @@
 │   │   ├── init_feature.py               # managed    DevClaw 创建 Feature（create_feature）
 │   │   ├── inspect_state.py              # managed    DevClaw 查询项目与 Feature（project_status / feature_status）
 │   │   ├── inspect_workflow_templates.py # managed    DevClaw 动态工作流（dynamic_workflow）
-│   │   └── board_events.py               # managed    写入口提交后推送看板事件（interfaces.md §3.5）
+│   │   ├── board_events.py               # managed    写入口提交后推送看板事件（interfaces.md §3.5）
+│   │   └── board_view.py                 # managed    看板数据拼装，读取命令、会话入口与看板事件共用（D59）
 │   ├── session/
 │   │   └── render_session_context.py     # managed    DevClaw 会话机制（session_collector_context_inject）
 │   ├── knowledge/                        # module     知识模块，启用时生成
@@ -42,7 +43,8 @@
 │   │   └── sync_knowledge.py             #            知识仓库同步（声明 knowledge.source 时）
 │   ├── common/
 │   │   ├── query.py                      # managed    内部只读查询模块
-│   │   └── engine.py                     # managed    内部初始化与状态变更模块
+│   │   ├── engine.py                     # managed    内部初始化与状态变更模块
+│   │   └── cli.py                        # managed    入口共用：参数解析、单个 JSON 输出、错误与退出码（D59）
 │   ├── config/                           # generated  编译后的内部配置（§5），DevClaw 不读
 │   │   └── runtime.json  flow.json  board.json  session.json  knowledge.json
 │   └── build-manifest.json               # generated  生成文件及构建信息记录（§8）
@@ -51,7 +53,7 @@
     └── modules/board.schema.json  session.schema.json  knowledge.schema.json  artifactSync.schema.json
 ```
 
-`runtime/` 各级目录下的 `__init__.py` 省略未列。入口脚本通过 `__file__` 定位插件根目录，把它加入 `sys.path` 后导入 `runtime.common`。
+`runtime/` 各级目录下的 `__init__.py` 省略未列。入口脚本通过 `__file__` 定位插件根目录，把它加入 `sys.path` 后导入 `runtime.common`。`adapters/` 下的 `board_view.py`、`board_events.py` 是供入口导入的库，不是宿主命令。
 
 打包产物（`autobiz-plugin package`）是一个 zip，其中只有一个顶层目录 `<plugin.id>/`，DevClaw 由它得到安装目录名（README §9）。目录下的内容按以下规则收集（D57）：
 
@@ -322,9 +324,9 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
 }
 ```
 
-产物 id 由 build 从输出路径推导（input-config.md §2.3），文件产物的 `paths` 总是只有一项，即 `outputs` 中写的路径。节点的 `outputs` 写成 `{id, required}`。`skillDir` 是按 input-config.md §5 查找到的技能目录。`stage` 取节点在 `workflow.json` 中所在的分组（`biz` → `Biz`、`dev` → `Dev`、`ops` → `Ops`）。`nodes` 按 `seq` 从小到大排列，`seq` 原样保留，`order` 是排列后的位置 `(i + 1) * 10`（input-config.md §6）。`inputs`、`validate`、`dynamicStages`、`skip` 用户不能配置，build 固定写 `[]`、`null`、`[]`、`null`（input-config.md §2.5）；字段保留在 `flow.json` 中，运行框架照常读取，`inputs` 的元素形态为 `{id, required}`，`validate` 不为 `null` 时是单行命令、占位符执行时才替换。`flow.json` 不需要人阅读或修改，被手改时 `check` 报 `DRIFT_GENERATED`。
+产物 id 由 build 从输出路径推导（input-config.md §2.3），文件产物的 `paths` 总是只有一项，即 `outputs` 中写的路径。节点的 `outputs` 写成 `{id, required}`。`skillDir` 是按 input-config.md §5 查找到的技能目录。`stage` 取节点在 `workflow.json` 中所在的分组（`biz` → `Biz`、`dev` → `Dev`、`ops` → `Ops`）。`nodes` 按 `seq` 从小到大排列，`seq` 原样保留，`order` 是排列后的位置 `(i + 1) * 10`（input-config.md §6）。`inputs`、`validate`、`dynamicStages`、`skip` 用户不能配置，build 固定写 `[]`、`null`、`[]`、`null`（input-config.md §2.5）；字段保留在 `flow.json` 中：运行框架照常执行 `inputs`、`validate`，`dynamicStages`、`skip` 出现非默认值时拒绝加载（D59）；`inputs` 的元素形态为 `{id, required}`，`validate` 不为 `null` 时是单行命令、占位符执行时才替换。`flow.json` 不需要人阅读或修改，被手改时 `check` 报 `DRIFT_GENERATED`。
 
-终态节点和保留字段的形态如下。`dynamicStages`、`skip` 的非默认形态是运行框架的契约，v1 的 build 不会生成：
+终态节点和保留字段的形态如下。`dynamicStages`、`skip` 的非默认形态是留给 v2 的契约，v1 的 build 不会生成，运行框架也不实现：
 
 ```jsonc
 {

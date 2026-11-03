@@ -40,7 +40,7 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 
 `add` 和 `module` 只是修改配置文件的便捷入口，效果与手改配置后执行 doctor 相同：`add node` 写 `workflow.json`，`module` 写入口文件的 `modules` 引用和对应的 `modules/*.json`，写完都自动执行 doctor。修改在原文上插入或替换片段，原有的键序、缩进和换行不变；修改先在内存中完成，与 doctor 的生成结果一起写盘，任何一步有 error（包括 lint 的 `SEQ_DUP` 等）都不写文件（D56）。
 
-同一套命令还以技能形式提供：`autobiz-plugin-creator`（借鉴 Codex plugin-creator，见 README §2.3；规格见 §1.6）。技能负责与开发者对话、梳理流程、编写配置文件、生成技能展示文案；生成和校验仍然只通过上面的 CLI 完成。技能每次修改核心配置后必须运行 `doctor` 重新生成插件，再运行 `check`，并把 Issue 原样转述给开发者，不能自己修改 generated 或 managed 文件来绕过问题。
+同一套命令还以技能形式提供：`autobiz-plugin-creator`（借鉴 Codex plugin-creator，见 README §2.3；规格见 §1.6）。技能负责与开发者对话、梳理流程、编写配置文件、生成技能展示文案；生成和校验仍然只通过上面的 CLI 完成。技能每次修改核心配置后运行 `lint`，一组修改完成后运行 `doctor` 重新生成插件，再运行 `check`，并把 Issue 原样转述给开发者，不能自己修改 generated 或 managed 文件来绕过问题（D58）。
 
 ### 1.2 通用约定
 
@@ -182,18 +182,23 @@ simulate 在临时目录中扮演 DevClaw，调用一遍已经生成的插件，
 
 ### 1.6 插件开发技能 autobiz-plugin-creator（v1，D9）
 
-位于脚手架仓库的 `skills/autobiz-plugin-creator/`，安装到开发者自己的 agent 环境中使用，不随生成的插件发布。它是初始化向导的对话形式。
+源码位于脚手架仓库的 `skills/autobiz-plugin-creator/`，不随生成的插件发布。它是初始化向导的对话形式，以只含这个技能的 DevClaw 插件发布（与 demo 的 `autobiz-plugin-creator-demo` 相同，D58）：
 
 ```text
-skills/autobiz-plugin-creator/
-├── SKILL.md                  # 对话流程与规则（见下）
-├── agents/openai.yaml
-└── references/
-    ├── input-config.md       # 从 docs/ 同步，供 agent 查字段
-    └── modeling-guide.md     # 如何把业务流程拆成阶段、节点、产物、校验（含正反例）
+autobiz-plugin-creator/               # 插件包的顶层目录（D57 ④）
+├── plugin.json                       # 发布时生成：name、version（取脚手架版本）、description、"skills": "./skills/"
+└── skills/autobiz-plugin-creator/
+    ├── SKILL.md                      # 对话流程与规则（见下）
+    ├── references/
+    │   └── modeling-guide.md         # 如何把业务流程拆成阶段、节点和产物，更严格的完成条件怎么写进技能正文（含正反例）
+    └── scripts/autobiz-plugin.pyz    # 发布时放入，与脚手架是同一个文件（D57），不提交进仓库
 ```
 
-frontmatter 中的 `description` 要写明触发场景，例如“新建看板插件”“给插件加节点或产物”“给节点加校验”“启用知识模块或产物同步”。
+插件包由 `tools/make_pyz.py` 在打出 `.pyz` 之后组装。技能不带 `input-config.md` 副本：SKILL.md 只写建模和配置的要点（节点的 6 个字段与 `seq` 规则、产物 id 的推导、四个模块配置各管什么、`new --answers` 的格式），细节以 CLI 的 Issue（`code`、`pointer`、`hint`）和插件目录 `.scaffold/` 下的 Schema 为准（D58）。
+
+SKILL.md 中的命令写作 `python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz" <命令>`，Windows 上把 `python3` 换成 `python`。装在 DevClaw 中时 `${pluginPath}` 由 DevClaw 替换（§3.2）；装在其他 agent 中、`${pluginPath}` 没有被替换时，按 SKILL.md 所在目录定位 `scripts/autobiz-plugin.pyz`。
+
+frontmatter 中的 `description` 要写明触发场景，例如“新建看板插件”“给插件加节点或产物”“导入已有技能”“启用知识模块或产物同步”。v1 不能配置节点校验命令（input-config.md §2.5），所以不写“给节点加校验”。
 
 流程（SKILL.md 正文）：
 
@@ -202,17 +207,18 @@ frontmatter 中的 `description` 要写明触发场景，例如“新建看板�
 | 1. 定位 | 确认是新建还是修改；新建时确认插件放在哪个目录、插件 ID（提示发布后不可修改）、插件名 | —（新建时到第 2 步确认后再调用 `new`） |
 | 2. 建模 | 让开发者用自然语言描述流程，整理成“seq → 阶段（biz/dev/ops）→ 节点 → 技能 → 输出产物”表格回显，开发者确认后才写入；每个节点一个技能 | 新建：`new --yes --answers`（§1.4，D56）；修改：编辑 `workflow.json` 或调用 `add node`，写完运行 `lint` |
 | 3. 技能资源 | 对每个节点确认是导入已有技能，还是先不提供（由 build 生成空白 `SKILL.md`） | `add skill` |
-| 4. 模块 | 询问看板可选能力（知识沉淀入口）、节点运行策略、是否需要知识模块（组装方由谁担任）、是否需要产物同步模块（从哪个节点起允许同步、上传哪些产物） | 编辑 `modules/*.json` 和入口文件的引用，或 `module enable` |
-| 5. 生成 | 生成插件；对新生成的空白 `SKILL.md`，与开发者确认触发场景后填写 `description` | `doctor` |
+| 4. 模块 | 询问目标平台、节点运行策略、是否需要知识模块（组装方由谁担任）、是否需要产物同步模块（从哪个节点起允许同步、上传哪些产物）；知识沉淀入口固定开启，不用问（D33） | 编辑 `modules/*.json` 和入口文件的引用，或 `module enable` |
+| 5. 生成 | 生成插件；对新生成的空白 `SKILL.md`，与开发者确认触发场景后填写 `description`，再执行一次 doctor：节点描述取自 `description`，改了不重新生成会报 `BUILD_STALE`（D49） | `doctor`（填写 `description` 后再执行一次） |
 | 6. 校验 | 执行完整校验，把 Issue 按原文转述给开发者，修改输入后重试 | `check` |
 | 7. 演示 | 在临时工作区走一遍完整流程，展示每个节点的状态和产物路径 | `simulate` |
 
 规则：
 
 - 只修改 `workflow.json`、`plugin.scaffold.json`、`modules/*.json` 和 seeded/developer 文件，不得修改 generated、managed、module 文件来绕过校验，也不得直接修改编译配置 `runtime/config/*`；
-- 每次修改核心配置后都运行 `lint`，没有 error 才继续下一步；修改完成后运行 `doctor` 重新生成插件，不能只改配置不重新生成；
+- 每次修改核心配置后都运行 `lint`，没有 error 才继续下一步；一组修改完成后运行 `doctor` 重新生成插件，再运行 `check`，不能只改配置不重新生成；
 - 不修改 `SKILL.md` 中 `<!-- plugin workflow: begin state -->` 到 `<!-- plugin workflow: end state -->` 之间的内容，节点或 checkpoint 变了就运行 `doctor`；
 - 插件已经发布后，不得修改 `plugin.id` 和 `runtime.metaRoot`；
+- `--force`、`--allow-id-change`、`--allow-layout-change`、`--allow-major-upgrade` 只在开发者看过对应的 Issue 并明确同意后才加，执行后把放行时的 warning 原样转述（D58）；
 - 涉及节点业务逻辑的技能正文和校验器由开发者负责，agent 只能起草，不能把未经确认的流程或校验规则写进去；
 - 所有判断以 CLI 的退出码和 Issue 为准，不得自行宣称“校验通过”。
 
@@ -267,7 +273,7 @@ autobiz-plugin doctor [-C <plugin-dir>] [--dry-run] [--force] [--allow-id-change
 }
 ```
 
-触发方式：开发者手动执行；插件开发技能每次修改核心配置后执行（§1.6）；`add`、`module` 写完配置后自动执行。`lint`、`check` 只检查不生成，发现 `BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` 或 `SKILL_STATE_BLOCK` 时提示执行 doctor。
+触发方式：开发者手动执行；插件开发技能完成一组修改后执行（§1.6）；`add`、`module` 写完配置后自动执行。`lint`、`check` 只检查不生成，发现 `BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` 或 `SKILL_STATE_BLOCK` 时提示执行 doctor。
 
 `changes.versions` 中有变化的项写成 `{"from": 记录的版本, "to": 当前版本}`，例如 `"core": {"from": "1.0.0", "to": "1.1.0"}`；`modules` 只列版本有变化的模块。
 
@@ -445,7 +451,7 @@ DevClaw 负责展示看板、发起会话、传入运行上下文、调用插件
 - 退出码：`0` 表示成功；`1` 表示业务失败，此时 stdout 为 `{"ok": false, "errors": ["…"]}`。`session_collector_context_inject` 和 `pull_knowledge` 例外：始终以 `0` 退出，用 `ok` 字段表示结果（兼容现有宿主）；
 - 只读命令（`project_status`、`feature_status`、`dynamic_workflow`、`session_collector_context_inject`、`deploy_units`）不得创建或修改任何文件；
 - `create_project`、`create_feature` 是幂等的，重复执行不会丢失已有进度；
-- 写命令（`create_project`、`create_feature`、`skip_node`）和模型调用的 `update_state.py` 提交成功后推送看板事件（§3.5）。推送结果不影响 stdout 和退出码。
+- 写命令（`create_project`、`create_feature`）和模型调用的 `update_state.py` 提交成功后推送看板事件（§3.5），v2 的 `skip_node` 同样推送。推送结果不影响 stdout 和退出码。
 
 ### 3.2 占位符
 
@@ -804,7 +810,7 @@ runtime/adapters/skip_node.py --workspace <dir> --project <name> --feature <name
 |---|---|
 | `pluginPath`、`pluginWorkspace`、`projectDir` | 用于定位缓存。路径都已解析为绝对路径，DevClaw 应先对自己持有的路径取 realpath 再比较 |
 | `seq` | 该项目内的事件序号，即 `state.json` 中的 `boardSeq`（output-spec.md §4.2），每次提交加 1 |
-| `reason` | `create_project`、`create_feature`、`update_state`（重开、模型跳过节点也属于 `update_state`）、`skip_node`（看板上跳过节点） |
+| `reason` | `create_project`、`create_feature`、`update_state`（重开也属于 `update_state`）、`skip_node`（v2：看板上跳过节点；v1 运行框架不实现跳过，D59） |
 | `sessionId` | 环境变量 `SESSION_ID` 的值，没有时为空字符串 |
 | `feature`、`run` | 本次涉及的 Feature 及其 `feature_status.run`（§3.3.4）；`create_project` 时两者都为 `null` |
 | `projectRuns` | 该项目**全部** Feature 的摘要，即 `project_status` 中的 `projects.<project>.runs`（§3.3.3） |
@@ -815,7 +821,7 @@ runtime/adapters/skip_node.py --workspace <dir> --project <name> --feature <name
 
 | 项 | 规则 |
 |---|---|
-| 谁发送 | `init_workspace.py`、`init_feature.py`、`skip_node.py`、`update_state.py` 在 engine 提交成功后调用 `runtime/adapters/board_events.py`。engine 只负责递增 `boardSeq` 并在返回值中给出，看板数据由适配层组装（D17） |
+| 谁发送 | `init_workspace.py`、`init_feature.py`、`update_state.py`（v2 再加上 `skip_node.py`）在 engine 提交成功后调用 `runtime/adapters/board_events.py`，看板数据由它调用 `board_view.py` 组装，与读取命令共用同一套代码。engine 只负责递增 `boardSeq` 并在返回值中给出（D17、D59） |
 | 何时发送 | `create_project`、`create_feature` 每次调用都会提交并推送；`update_state` 只在状态实际改变时推送。`--dry-run`、检查失败、校验不通过、状态没有变化时都不推送 |
 | 锁 | 必须在释放 `.state.lock` 之后发送，不能持锁发网络请求 |
 | 超时与失败 | 只尝试一次，超时 300 ms，不重试。失败只在 stderr 写一行警告，命令的 stdout、退出码和 `warnings` 都不受影响 |
@@ -868,16 +874,16 @@ P0 不做鉴权，本机任何进程都可以向 DevClaw 发送伪造的看板�
 | `runtime/adapters/skip_node.py` | DevClaw 的 `skip_node`（`flow.json` 的 `skip` 不为 `null`（v1 不会出现） 时） | 处理宿主参数，通过引擎跳过节点。v1 不生成这个文件（D52） |
 | `runtime/session/render_session_context.py` | DevClaw 的会话机制 | 获取流程上下文，结合会话策略及知识组装结果生成会话内容 |
 | `runtime/knowledge/inspect_deploy_units.py` | 知识模块接入方 | 解析知识清单，提供支持的系统和发布单元信息 |
-| `runtime/knowledge/sync_knowledge.py` | DevClaw 的 `pull_knowledge` | 拉取知识仓库并回写运行期字段（仅声明 `knowledge.source` 时） |
+| `runtime/knowledge/sync_knowledge.py` | DevClaw 的 `pull_knowledge` | 拉取知识仓库，只更新知识目录，不回写任何配置文件（仅声明 `knowledge.source` 时，§3.3.9，D59） |
 
-`update_state.py`、`init_workspace.py`、`init_feature.py`、`skip_node.py`（v1 不生成）这几个写入口在提交成功后，通过 `runtime/adapters/board_events.py` 推送看板事件（§3.5）。
+`update_state.py`、`init_workspace.py`、`init_feature.py` 这三个写入口在提交成功后，通过 `runtime/adapters/board_events.py` 推送看板事件（§3.5）；v2 的 `skip_node.py` 同样推送。入口共用 `runtime/common/cli.py`（参数解析、单个 JSON 输出、`BoardError` 转成 `{"ok": false}` 与退出码），看板数据由 `runtime/adapters/board_view.py` 拼装（D59）。
 
 ### 4.2 update_state.py（状态变更入口）
 
 模型按技能 `SKILL.md` 开头的状态维护片段调用它：技能开始时 `--checkpoint <id>_in_progress`，技能完成时 `--checkpoint <id>_done`，终态节点完成时 `--checkpoint archived`（output-spec.md §6.1）。片段由 build 写入，技能正文不另写状态命令。重开等例外操作由人执行。
 
 ```text
-python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp> | --skip-node <nodeId> [--skip-node …]
+python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp>
        [--feature <name>] [--workspace <dir> [--project <name>]]
        [--reopen] [--reason <text>] [--owner <s>] [--iteration <s>] [--dry-run]
 ```
@@ -888,9 +894,9 @@ python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp
 | 推进到 `_in_progress` | 检查本节点的必需输入是否存在（optional、生产者被跳过或未执行的输入除外；v1 的 `inputs` 固定为 `[]`） |
 | 推进到 `_done` | 检查本节点的必需输入和必需输出都存在且非空（output-spec.md §4.4），`validate` 不为 `null` 时再执行节点校验命令（§4.4），全部通过才写入。不满足时 `errors` 中逐条列出缺少或为空的产物 |
 | 推进到 `archived` | 只能从终态节点前一个节点的 `_done` 推进；检查终态节点的必需输入，不执行校验命令。之后不能再推进或重开 |
-| 动态阶段选择 | 当前 checkpoint 是选择点时，推进到阶段第一个节点的 `_in_progress` 记为执行，推进到下一个主干节点的 `_in_progress` 记为跳过，写入 `workflowDecisions`。阶段执行时，最后一个节点 `_done` 的下一个是下一个主干节点的 `_in_progress` |
-| 重开 | 必须加 `--reopen` 和非空的 `--reason`；只能回到当前或之前节点的 `_in_progress`（含已执行的动态阶段节点）。下游节点在看板上显示为未开始，旧产物保留；回到选择点之前时清除该阶段的决定，回到被跳过节点之前时恢复这些节点。重开不执行校验命令 |
-| 跳过节点 | `flow.json` 的 `skip` 不为 `null`（v1 不会出现） 时，`--skip-node` 加非空的 `--reason`，不能与 `--checkpoint` 同时使用；规则见 input-config.md §2.8，与 `skip_node.py` 共用 `engine.skip_nodes` |
+| 动态阶段选择（v2） | v1 运行框架不实现，`flow.json` 的 `dynamicStages` 不为 `[]` 时拒绝加载（D59）。v2 的规则：当前 checkpoint 是选择点时，推进到阶段第一个节点的 `_in_progress` 记为执行，推进到下一个主干节点的 `_in_progress` 记为跳过，写入 `workflowDecisions`。阶段执行时，最后一个节点 `_done` 的下一个是下一个主干节点的 `_in_progress` |
+| 重开 | 必须加 `--reopen` 和非空的 `--reason`；只能回到当前或之前节点的 `_in_progress`。下游节点在看板上显示为未开始，旧产物保留。重开不执行校验命令。v2 有动态阶段和跳过节点后，还可以回到已执行的动态阶段节点，回到选择点之前时清除该阶段的决定，回到被跳过节点之前时恢复这些节点 |
+| 跳过节点（v2） | v1 不提供 `--skip-node`，`flow.json` 的 `skip` 不为 `null` 时拒绝加载（D59）。v2 的规则：`skip` 不为 `null` 时，`--skip-node` 加非空的 `--reason`，不能与 `--checkpoint` 同时使用；规则见 input-config.md §2.8，与 `skip_node.py` 共用 `engine.skip_nodes` |
 | `--dry-run` | 执行全部检查（包括校验命令），但不写 `state.json`、不写变更日志 |
 | 定位 | 省略 `--workspace` 时，使用 `PLUGIN_WORKSPACE` + `PROJECT_DIR`；省略 `--feature` 时，使用 `FEATURE_ID` |
 
@@ -983,7 +989,7 @@ from runtime.common import query, engine
 # —— query：定位 ——
 query.plugin_root() -> Path
 query.plugin_id() -> str                                         # runtime/config/runtime.json
-query.load_flow() -> dict                                        # runtime/config/flow.json，已校验不变量
+query.load_flow() -> dict                                        # runtime/config/flow.json，已校验不变量；dynamicStages 不为 [] 或 skip 不为 null 时抛 BoardError（D59）
 query.resolve_project(workspace: str | None = None, project: str | None = None) -> Path
     # 显式参数优先；否则读 PLUGIN_WORKSPACE + PROJECT_DIR；拒绝插件安装目录
 query.resolve_feature(feature: str | None = None, *, required: bool = True) -> str
@@ -997,9 +1003,8 @@ query.list_features(project_path: Path) -> list[dict]
 query.feature_record(project_path: Path, feature: str) -> dict | None
 query.current_node(project_path: Path, feature: str) -> tuple[dict, str]   # (节点, "in_progress"|"done")
 query.next_node(node_id: str, record: dict | None = None) -> dict | None
-    # 按 Feature 记录中的 workflowDecisions、workflowSkippedNodes 求下一节点；不传 record 时按 defaultDecision
-query.active_nodes(record: dict) -> list[dict]                   # 该 Feature 实际经过的节点（含已执行的动态阶段节点，不含被跳过的）
-query.pending_choice(record: dict) -> dict | None                 # 停在选择点且尚未选择时返回待选项
+    # v1 按 seq 线性求下一节点；v2 再按 Feature 记录中的 workflowDecisions、workflowSkippedNodes 求
+query.active_nodes(record: dict) -> list[dict]                   # 该 Feature 实际经过的节点；v1 即全部节点，v2 含已执行的动态阶段节点、不含被跳过的
 query.node_skill(node_id: str) -> str
 query.node_artifacts(node_id: str, direction: str = "outputs") -> list[dict]
 query.checkpoint_chain() -> list[str]
@@ -1014,14 +1019,12 @@ engine.init_feature(project_path: Path, feature: str, *, owner: str | None = Non
                     iteration: str | None = None, template: str = "standard") -> dict
 engine.transition(project_path: Path, feature: str, checkpoint: str, *, reopen: bool = False,
                   reason: str = "", dry_run: bool = False) -> dict
-    # 状态转移检查（含动态阶段选择、archived）→ 产物存在性检查 → （_done 时）校验命令
+    # 状态转移检查（含 archived）→ 产物存在且非空检查 → （_done 且 validate 不为 null 时）校验命令
     # → 加锁提交 state.json → 写变更日志
-engine.skip_nodes(project_path: Path, feature: str, node_ids: list[str], *, reason: str,
-                  dry_run: bool = False) -> dict
-    # 跳过规则检查 → 记录 workflowSkippedNodes → 必要时落到下一个节点 → 加锁提交 → 写 skip-node 日志
+# v2 再加 query.pending_choice（停在选择点时的待选项）和 engine.skip_nodes（跳过节点），v1 不提供（D59）
 # 以上函数提交时都在锁内把 state.json 的 boardSeq 加 1，返回值中带 "boardSeq"，供入口推送看板事件（§3.5）
 
-class engine.BoardError(ValueError): ...                          # 所有业务错误都抛这个类型
+class query.BoardError(ValueError): ...                           # 所有业务错误都抛这个类型；engine、cli 从 query 导入（D59）
 ```
 
 使用范围：
@@ -1056,7 +1059,7 @@ class engine.BoardError(ValueError): ...                          # 所有业务
 由 lite 迁移时的行为差异：
 
 - 入口从 `hooks/`、根目录迁到 `runtime/`，board_config 中的命令随之重新生成；board_config 只剩 `inspectCommands`，流程定义改由命令输出，看板入口移到 `modules.json`；技能中旧的 `scaffold` 状态片段原地替换成 `plugin workflow` 状态维护片段，`artifacts` 托管片段删除；
-- 框架不再检查产物是否为空，v1 也不能配置校验命令，lite 现在“去除空白后非空”的判定由技能自己保证；
+- 完成判定不变：必需产物存在且去掉首尾空白后非空（D37）；v1 也不能配置校验命令；
 - 会话内容新增流程上下文段；会话入口的键由 `session_context_inject` 改为 `session_collector_context_inject`；宿主命令统一加 `-X utf8`（lite 原来没有）；
 - 产物显示名不再配置，取路径本身（lite 的“结构化需求”“实施计划”等名称不再保留）；节点描述改为取技能的 `description`、`nextAction` 改用默认文案，lite 的节点文案覆写不再保留；产物 id 改由路径推导（`requirements` → `prd`、`specs` → `spec`）；
 - `plan.md` 对旧文件名 `PLAN.md` 的回退不再支持。macOS、Windows 默认文件系统不区分大小写，不受影响；Linux 上的旧 Feature 需要把文件改名。

@@ -151,7 +151,7 @@
 
 ### 2.5 编译配置中保留、用户不配置的字段
 
-`workflow.json` 不能写节点的 `inputs`、`validate`，也不能写流程规则（动态阶段、跳过节点）。编译配置 `flow.json` 保留这些字段，运行框架照常读取，build 写入下表的默认值。字段留着是为了让运行框架的契约保持不变，以后需要开放配置时不用改 `flow.json` 的格式：
+`workflow.json` 不能写节点的 `inputs`、`validate`，也不能写流程规则（动态阶段、跳过节点）。编译配置 `flow.json` 保留这些字段，build 写入下表的默认值；运行框架照常执行 `inputs`、`validate`，`dynamicStages`、`skip` 出现非默认值时拒绝加载（D59）。字段留着是为了让运行框架的契约保持不变，以后需要开放配置时不用改 `flow.json` 的格式：
 
 | `flow.json` 字段 | build 写入的值 | 含义 |
 |---|---|---|
@@ -197,11 +197,11 @@
 
 ### 2.7 动态阶段 dynamicStages
 
-v1 不由用户配置，`flow.json` 的 `dynamicStages` 固定为 `[]`（§2.5）。字段保留给运行框架：数组中的每一项是插在某个主干节点之后、到达时由用户决定执行还是跳过的一组节点，选择记录在 Feature 的 `workflowDecisions` 中（output-spec.md §5.2）。为 `[]` 时没有选择点，流程按主干线性推进。
+v1 不由用户配置，`flow.json` 的 `dynamicStages` 固定为 `[]`（§2.5）。字段保留给 v2，v1 运行框架不实现，不为 `[]` 时拒绝加载（D59）。v2 中数组的每一项是插在某个主干节点之后、到达时由用户决定执行还是跳过的一组节点，选择记录在 Feature 的 `workflowDecisions` 中（output-spec.md §5.2）。为 `[]` 时没有选择点，流程按主干线性推进。
 
 ### 2.8 跳过节点 skip
 
-v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看板不提供跳过入口，`board_config.json` 不生成 `skip_node` 命令。字段保留给运行框架：不为 `null` 时写作 `{locked: [节点 id]}`，允许跳过 `locked` 以外的非终态节点，被跳过的节点记录在 Feature 的 `workflowSkippedNodes` 中。
+v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看板不提供跳过入口，`board_config.json` 不生成 `skip_node` 命令。字段保留给 v2，v1 运行框架不实现，不为 `null` 时拒绝加载（D59）。v2 中不为 `null` 时写作 `{locked: [节点 id]}`，允许跳过 `locked` 以外的非终态节点，被跳过的节点记录在 Feature 的 `workflowSkippedNodes` 中。
 
 ### 2.9 编码节点
 

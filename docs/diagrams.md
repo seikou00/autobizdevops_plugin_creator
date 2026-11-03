@@ -160,7 +160,7 @@ flowchart LR
 | `knowledge.json` | `modules/knowledge.json` |
 | `runtime.json` | `plugin.scaffold.json` 的 `plugin.id`、`runtime` |
 | `board.json` | `modules/board.json` 的 `display`，按节点展开 `nextAction` |
-| `board_config.json` | `modules/board.json` 的 `target` 与文案模板，加上知识模块、跳过节点的命令 |
+| `board_config.json` | `modules/board.json` 的 `target` 与文案模板，加上知识模块的命令（跳过节点的 `skip_node` 留到 v2，D52） |
 | `modules.json` | 入口文件 `modules` 的引用情况，加上知识沉淀入口和产物同步模块的入口 `artifact_sync` |
 | `SKILL.md` 状态维护片段 | `workflow.json` 的节点 id（推出 checkpoint）与技能绑定 |
 
