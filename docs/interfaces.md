@@ -140,7 +140,7 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 - `board`、`session`、`knowledge`、`artifactSync` 可选，内容与对应的模块配置文件相同；写了 `knowledge`、`artifactSync` 即表示启用；
 - 与 `--from` 一起使用时，`plugin` 按字段覆盖样例，其余写了的类别整体替换样例中的对应内容。
 
-`--from lite` / `--from fullstack` 以 [examples/lite/](../examples/lite/) 或 [examples/fullstack/](../examples/fullstack/) 的核心配置为起点（入口文件、`workflow.json` 和入口文件引用的 `modules/*.json`，不含 `output/`），拷贝时把 `$schema` 改写为 `.scaffold/` 下的路径，向导中的回答覆盖样例中的对应项。脚手架不提供从已有插件的 `board_config.json` 反推核心配置的命令：迁移已有插件时，以对应样例为起点修改核心配置，再用 `add skill --from` 导入技能目录。
+`--from lite` / `--from fullstack` 以 [examples/lite/](../booter/examples/lite/) 或 [examples/fullstack/](../booter/examples/fullstack/) 的核心配置为起点（入口文件、`workflow.json` 和入口文件引用的 `modules/*.json`，不含 `output/`），拷贝时把 `$schema` 改写为 `.scaffold/` 下的路径，向导中的回答覆盖样例中的对应项。脚手架不提供从已有插件的 `board_config.json` 反推核心配置的命令：迁移已有插件时，以对应样例为起点修改核心配置，再用 `add skill --from` 导入技能目录。
 
 ### 1.5 simulate
 

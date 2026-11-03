@@ -122,7 +122,7 @@ mods.md 中的 P0/P1/P2 是 mod 能力自己的分档，与本文无关。
 
 ## 6. 实现状态（2026-11-04）
 
-P0、P1 已全部实现。代码在 `scaffold/`（CLI、构建流水线、初始化向导）、`runtime/`（运行框架模板）、`scaffold/modules/`（四个模块）、`skills/autobiz-plugin-creator/`（插件开发技能）、`schemas/host/outputs.schema.json`（命令输出结构）和 `tools/make_pyz.py`（发布 `.pyz` 与插件开发技能的插件包）中。`tests/` 下 51 个测试在 Python 3.9 和 3.14 上通过：
+P0、P1 已全部实现。代码都在 `booter/` 下：`scaffold/`（CLI、构建流水线、初始化向导）、`runtime/`（运行框架模板）、`scaffold/modules/`（四个模块）、`skills/autobiz-plugin-creator/`（插件开发技能）、`schemas/host/outputs.schema.json`（命令输出结构）和 `tools/make_pyz.py`（发布 `.pyz` 与插件开发技能的插件包）中。`tests/` 下 51 个测试在 Python 3.9 和 3.14 上通过：
 
 | 测试 | 内容 |
 |---|---|

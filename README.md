@@ -10,20 +10,14 @@ AutoBiz 看板插件脚手架。三方分工如下：
 
 当前状态：**v1 的 P0、P1 功能已实现**（分期与实现状态见 [docs/priorities.md](docs/priorities.md)），v2 预留和 mods、RPC 草案未实现。只依赖 Python 3.9+ 标准库。
 
+脚手架的代码、Schema、示例和测试都在 [booter/](booter/) 下，用法见 [booter/README.md](booter/README.md)：
+
 ```bash
+cd booter
 python3 tools/make_pyz.py                               # 打出 dist/autobiz-plugin.pyz 和插件开发技能的插件包
-python3 dist/autobiz-plugin.pyz new my-plugin                     # 初始化向导；--from lite --yes 跳过问答
-python3 dist/autobiz-plugin.pyz -C my-plugin add skill autodev-plan --from ../autobizdevops_lite/skills/autodev-plan
-python3 dist/autobiz-plugin.pyz -C my-plugin doctor     # 改了核心配置后重新生成
-python3 dist/autobiz-plugin.pyz -C my-plugin add node review --name 评审 --skill doc-review --stage dev --seq 5 --output REVIEW.md
-python3 dist/autobiz-plugin.pyz -C my-plugin module enable artifactSync --set allowedFrom=plan:done
-python3 dist/autobiz-plugin.pyz -C my-plugin check      # lint + 技能内容 + 漂移 + 契约测试
-python3 dist/autobiz-plugin.pyz -C my-plugin simulate   # 在临时目录中按宿主的方式走一遍流程
-python3 dist/autobiz-plugin.pyz -C my-plugin package    # 写 dist/<plugin.id>-<version>.zip
+python3 dist/autobiz-plugin.pyz new my-plugin           # 初始化向导；--from lite --yes 跳过问答
 python3 -m unittest discover -s tests -t .              # 脚手架自身的测试
 ```
-
-在仓库中也可以直接用 `python3 -m scaffold <命令>`。Windows 上把 `python3` 换成 `python`。
 
 ## 文档
 
@@ -38,14 +32,15 @@ python3 -m unittest discover -s tests -t .              # 脚手架自身的测�
 | [docs/mods.md](docs/mods.md) | 草案：mods 机制下的插件初始化与热更新 |
 | [docs/rpc.md](docs/rpc.md) | 草案：DevClaw 与插件的 JSON-RPC 双向通信 |
 | [docs/priorities.md](docs/priorities.md) | 草案：v1 功能分期（P0 / P1） |
-| [schemas/](schemas/) | `workflow.schema.json`、`plugin-scaffold.schema.json`、`modules/*.schema.json` |
-| [examples/](examples/) | `minimal/`、`lite/`（复刻 autobizdevops_lite）、`fullstack/`（全栈版）；每个示例的 `output/` 是 build 应生成的内容 |
+| [booter/](booter/README.md) | 脚手架本身：CLI 与构建流水线 `scaffold/`、运行框架模板 `runtime/`、插件开发技能、发布脚本和测试 |
+| [booter/schemas/](booter/schemas/) | `workflow.schema.json`、`plugin-scaffold.schema.json`、`modules/*.schema.json`、`host/outputs.schema.json` |
+| [booter/examples/](booter/examples/) | `minimal/`、`lite/`（复刻 autobizdevops_lite）、`fullstack/`（全栈版）；每个示例的 `output/` 是 build 应生成的内容 |
 
 ## 参考插件
 
 - `autobizdevops_lite`：运行框架与知识模块的起点，也是金样测试（golden test）基线；
 - `autobiz_kanban`（全栈版）：产物同步能力的起点（`skills/autobizdevops-artifact-sync`，自 `9411fc3` 起）。
 
-## 计划结构
+## 仓库结构
 
-见 [docs/README.md §3.1](docs/README.md)：`scaffold/`（CLI、初始化向导与模块）、`runtime/`（运行框架模板）、`skills/autobiz-plugin-creator/`、`schemas/`、`examples/`、`docs/`、`tests/`。
+见 [docs/README.md §3.1](docs/README.md)：根目录放设计文档 `docs/`，脚手架本身（`scaffold/`、`runtime/`、`schemas/`、`examples/`、`skills/autobiz-plugin-creator/`、`tools/`、`tests/`）都在 `booter/` 下。

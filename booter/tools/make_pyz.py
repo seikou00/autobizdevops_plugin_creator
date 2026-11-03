@@ -7,7 +7,7 @@
 插件包 autobiz-plugin-creator-<版本>.zip 只有一个顶层目录 autobiz-plugin-creator/：生成的 plugin.json，
 skills/autobiz-plugin-creator/ 下的 SKILL.md、references/，以及放进 scripts/ 的同一个 .pyz（不提交进仓库）。
 
-用法：python3 tools/make_pyz.py [-o dist/autobiz-plugin.pyz] [--no-creator]
+用法（在 booter/ 下）：python3 tools/make_pyz.py [-o dist/autobiz-plugin.pyz] [--no-creator]
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import zipapp
 import zipfile
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[1]          # booter/
 SKIPPED = ("__pycache__", ".DS_Store", "Thumbs.db")
 SEED_FILES = {
     "lite": ("plugin.scaffold.json", "workflow.json", "modules/board.json", "modules/session.json",

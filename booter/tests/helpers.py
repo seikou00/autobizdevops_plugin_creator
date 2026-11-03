@@ -10,7 +10,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[1]          # booter/
+SIBLINGS = REPO.parents[1]                          # 与本仓库并列存放参考插件仓库的目录
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 

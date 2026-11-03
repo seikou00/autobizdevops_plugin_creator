@@ -33,7 +33,7 @@ v1 范围：
 
 脚手架位于独立仓库 `autobizdevops_plugin_creator`（即本仓库，结构见 §3.1）。§8 汇总了已经确认的决策，§10 列出本次相对初稿的调整。
 
-两个参考插件是 lite（仓库 `autobizdevops_lite`）和全栈版（仓库 `autobiz_kanban`）。全栈版用到的流程能力除回流修复（`needs_fix`）外都在 v1 中支持，样例见 [examples/fullstack/](../examples/fullstack/)；它自有的校验与钩子配置（声明式校验器清单、编译守卫、人工确认关卡、回滚归档清单）留在插件自己的文件中（§6.8，D23）。回流修复、模板子集和 collector 知识组装预留到 v2（§7）。
+两个参考插件是 lite（仓库 `autobizdevops_lite`）和全栈版（仓库 `autobiz_kanban`）。全栈版用到的流程能力除回流修复（`needs_fix`）外都在 v1 中支持，样例见 [examples/fullstack/](../booter/examples/fullstack/)；它自有的校验与钩子配置（声明式校验器清单、编译守卫、人工确认关卡、回滚归档清单）留在插件自己的文件中（§6.8，D23）。回流修复、模板子集和 collector 知识组装预留到 v2（§7）。
 
 文档索引：
 
@@ -47,12 +47,12 @@ v1 范围：
 | [mods.md](mods.md) | 草案：DevClaw mods 机制下的插件初始化与热更新（开发 mod、运行 mod、变更等级、状态迁移） |
 | [rpc.md](rpc.md) | 草案：DevClaw 与插件的 JSON-RPC 双向通信（常驻进程、握手与鉴权、方法、降级） |
 | [priorities.md](priorities.md) | 草案：按截至 D59 的评审结论划分的 v1 功能分期（P0 / P1） |
-| [schemas/workflow.schema.json](../schemas/workflow.schema.json) | 核心流程 JSON Schema |
-| [schemas/plugin-scaffold.schema.json](../schemas/plugin-scaffold.schema.json) | 入口文件 JSON Schema |
-| [schemas/modules/](../schemas/modules/) | 看板、会话、知识模块配置的 JSON Schema |
-| [examples/lite/](../examples/lite/) | 复刻 autobizdevops_lite 的完整输入样例 |
-| [examples/fullstack/](../examples/fullstack/) | 按全栈版（autobiz_kanban）编写的完整输入样例，用到全部流程规则（input-config.md §9.2） |
-| [examples/minimal/](../examples/minimal/) | 两个节点、没有模块配置文件的最小样例（input-config.md §8） |
+| [schemas/workflow.schema.json](../booter/schemas/workflow.schema.json) | 核心流程 JSON Schema |
+| [schemas/plugin-scaffold.schema.json](../booter/schemas/plugin-scaffold.schema.json) | 入口文件 JSON Schema |
+| [schemas/modules/](../booter/schemas/modules/) | 看板、会话、知识模块配置的 JSON Schema |
+| [examples/lite/](../booter/examples/lite/) | 复刻 autobizdevops_lite 的完整输入样例 |
+| [examples/fullstack/](../booter/examples/fullstack/) | 按全栈版（autobiz_kanban）编写的完整输入样例，用到全部流程规则（input-config.md §9.2） |
+| [examples/minimal/](../booter/examples/minimal/) | 两个节点、没有模块配置文件的最小样例（input-config.md §8） |
 
 ## 2. 从两个参考插件中提取的结论
 
@@ -73,7 +73,7 @@ lite 版 `board_config.json` 有 509 行，开发者真正做出的决策只有�
 - 两处是运行期回写字段。其中 win32 的 `knowledge_path` 已被本地同步写成个人机器路径 `C:\Users\80319167\...` 并提交进了仓库。v1 不再回写任何配置文件（§6.1）；
 - 一处是样例额外启用的产物同步带来的 `artifact_sync` 入口（lite 本身没有这个能力）。
 
-本次调整后，输入拆成 [examples/lite/](../examples/lite/) 下的五个文件（入口、流程、三个模块配置），内容基本不变，只是换了位置；`plan.md` 对旧文件名 `PLAN.md` 的回退不再表达（interfaces.md §5）。框架入口迁到 `runtime/`、宿主命令一律加 `-X utf8`（D40）、会话入口的键改为 `session_collector_context_inject`（D40）后，`inspectCommands` 中的这几处不再与 lite 一致，金样测试改为比对它们以外的部分（§3.1）。
+本次调整后，输入拆成 [examples/lite/](../booter/examples/lite/) 下的五个文件（入口、流程、三个模块配置），内容基本不变，只是换了位置；`plan.md` 对旧文件名 `PLAN.md` 的回退不再表达（interfaces.md §5）。框架入口迁到 `runtime/`、宿主命令一律加 `-X utf8`（D40）、会话入口的键改为 `session_collector_context_inject`（D40）后，`inspectCommands` 中的这几处不再与 lite 一致，金样测试改为比对它们以外的部分（§3.1）。
 
 这些推导结果原来写在 `board_config.json` 中，一份文件同时给 DevClaw 和插件脚本读。v1 把两者分开（D31）：`board_config.json` 只剩宿主命令，流程和文案编译进 `runtime/config/`，由命令输出给 DevClaw。
 
@@ -163,23 +163,25 @@ DevClaw ─▶ runtime/adapters/init_workspace.py、init_feature.py ────
 
 ```text
 autobizdevops_plugin_creator/
-├── scaffold/                       # CLI、初始化向导与构建流水线，模块拆分见 scaffold.md
-│   └── modules/
-│       ├── board/                  # 看板模块：module.json  module.py（运行期代码在 runtime/adapters/）
-│       ├── session/                # 会话模块：module.json  module.py（运行期代码在 runtime/session/）
-│       ├── knowledge/              # module.json  module.py  files/
-│       └── artifact_sync/          # module.json  module.py  files/
-├── runtime/                        # 运行框架模板：workflow/  adapters/  session/  common/
-├── skills/autobiz-plugin-creator/  # 插件开发技能：SKILL.md  references/modeling-guide.md；scripts/autobiz-plugin.pyz 发布时放入（D58）
-├── schemas/                        # workflow.schema.json、plugin-scaffold.schema.json、modules/*.schema.json；
-│                                   # host/outputs.schema.json：宿主命令的输出结构，只供 simulate、check 使用，不拷进插件（D55）
-├── examples/                       # lite/、fullstack/、minimal/
-├── docs/                           # 设计文档
-├── tools/make_pyz.py               # 用标准库 zipapp 把脚手架打成 autobiz-plugin.pyz（D57），再组装插件开发技能的 DevClaw 插件包（D58）
-└── tests/
-    ├── golden/                     # 以 lite、全栈版为基线：命令输出的看板数据与其 board_config 中对应内容比对（inspectCommands 的脚本路径、`-X utf8`、会话入口键名及 input-config.md §9.2 列出的差异除外）
-    ├── contract/                   # 在临时工作区模拟宿主调用
-    └── modules/
+├── README.md
+├── docs/                               # 设计文档
+└── booter/                             # 脚手架本身：构建、测试、打包都在这里进行，下文提到的 scaffold/、schemas/ 等路径都相对它
+    ├── scaffold/                       # CLI、初始化向导与构建流水线，模块拆分见 scaffold.md
+    │   └── modules/
+    │       ├── board/                  # 看板模块：module.json  module.py（运行期代码在 runtime/adapters/）
+    │       ├── session/                # 会话模块：module.json  module.py（运行期代码在 runtime/session/）
+    │       ├── knowledge/              # module.json  module.py  files/
+    │       └── artifact_sync/          # module.json  module.py  files/
+    ├── runtime/                        # 运行框架模板：workflow/  adapters/  session/  common/
+    ├── skills/autobiz-plugin-creator/  # 插件开发技能：SKILL.md  references/modeling-guide.md；scripts/autobiz-plugin.pyz 发布时放入（D58）
+    ├── schemas/                        # workflow.schema.json、plugin-scaffold.schema.json、modules/*.schema.json；
+    │                                   # host/outputs.schema.json：宿主命令的输出结构，只供 simulate、check 使用，不拷进插件（D55）
+    ├── examples/                       # lite/、fullstack/、minimal/
+    ├── tools/make_pyz.py               # 用标准库 zipapp 把脚手架打成 autobiz-plugin.pyz（D57），再组装插件开发技能的 DevClaw 插件包（D58）
+    └── tests/
+        ├── golden/                     # 示例逐字节比对；以 lite、全栈版为基线：命令输出的看板数据与其 board_config 中对应内容比对（inspectCommands 的脚本路径、`-X utf8`、会话入口键名及 input-config.md §9.2 列出的差异除外）
+        ├── contract/                   # 在临时工作区模拟宿主调用
+        └── unit/
 ```
 
 运行框架以 lite 的 `board_core` 为起点，产物同步模块以全栈版的 `autobizdevops-artifact-sync` 最新提交为起点，知识模块以 lite 的 `hooks/` 为起点。三者都带着各自已有的测试迁入。
@@ -334,7 +336,7 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 
 ### 6.8 全栈版迁入
 
-全栈版（仓库 `autobiz_kanban`）用到的流程能力都能在核心配置中表达，样例见 [examples/fullstack/](../examples/fullstack/)（input-config.md §9.2）。对应关系：
+全栈版（仓库 `autobiz_kanban`）用到的流程能力都能在核心配置中表达，样例见 [examples/fullstack/](../booter/examples/fullstack/)（input-config.md §9.2）。对应关系：
 
 | 全栈版现有形态 | 迁入后 |
 |---|---|

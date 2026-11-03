@@ -17,7 +17,7 @@
 | 产物同步模块配置 | `modules/artifactSync.json` | 允许同步的阶段、要上传的产物 | 引导启用 | 同步技能 `skills/<skillName>/`、看板同步入口 `artifact_sync` |
 | 自定义扩展 | `hooks/` 等 | 开发者自己的 hooks 等资源 | 创建对应目录 | 原样交付的扩展资源 |
 
-每个配置文件都有自己的 JSON Schema：[workflow.schema.json](../schemas/workflow.schema.json)、[plugin-scaffold.schema.json](../schemas/plugin-scaffold.schema.json)，以及 [schemas/modules/](../schemas/modules/) 下的各模块 Schema。
+每个配置文件都有自己的 JSON Schema：[workflow.schema.json](../booter/schemas/workflow.schema.json)、[plugin-scaffold.schema.json](../booter/schemas/plugin-scaffold.schema.json)，以及 [schemas/modules/](../booter/schemas/modules/) 下的各模块 Schema。
 
 ### 1.2 设计原则
 
@@ -598,7 +598,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 
 ## 8. 最小示例
 
-两个节点，不写任何模块配置文件：看板和会话全部取默认值，不启用知识模块（文件见 [examples/minimal/](../examples/minimal/)）。
+两个节点，不写任何模块配置文件：看板和会话全部取默认值，不启用知识模块（文件见 [examples/minimal/](../booter/examples/minimal/)）。
 
 `workflow.json`：
 
@@ -632,7 +632,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 - `inspectCommands` 中不含 `knowledge_path`、`deploy_units`、`pull_knowledge`；`modules.json` 中 `knowledge`、`artifactSync` 为 `{"enabled": false}`，只有固定的 `knowledge_config`，没有 `artifact_sync`；
 - `session_collector_context_inject` 返回流程上下文和默认策略的 `agentConfig`，不含知识段；
 
-全部生成内容见 [examples/minimal/output/](../examples/minimal/output/)。
+全部生成内容见 [examples/minimal/output/](../booter/examples/minimal/output/)。
 
 以后需要调整看板文案时，新建 `modules/board.json` 并在入口文件的 `modules.board` 中引用即可，`workflow.json` 不用动。
 
@@ -640,7 +640,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 
 ### 9.1 lite
 
-[examples/lite/](../examples/lite/)：复刻 autobizdevops_lite，共六个配置文件：
+[examples/lite/](../booter/examples/lite/)：复刻 autobizdevops_lite，共六个配置文件：
 
 | 文件 | 内容 |
 |---|---|
@@ -651,11 +651,11 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `modules/knowledge.json` | 内置组装器和知识仓库同步 |
 | `modules/artifactSync.json` | 从 `plan` 完成起同步 5 个文档产物 |
 
-生成内容见 [examples/lite/output/](../examples/lite/output/)。产物同步是样例额外启用的，lite 本身没有这个能力。lite 中 `plan.md` 对旧文件名 `PLAN.md` 的回退在 v1 核心配置中不再表达（interfaces.md §5）。
+生成内容见 [examples/lite/output/](../booter/examples/lite/output/)。产物同步是样例额外启用的，lite 本身没有这个能力。lite 中 `plan.md` 对旧文件名 `PLAN.md` 的回退在 v1 核心配置中不再表达（interfaces.md §5）。
 
 ### 9.2 全栈版
 
-[examples/fullstack/](../examples/fullstack/)：按全栈版插件（仓库 `autobiz_kanban`）的现有内容编写：
+[examples/fullstack/](../booter/examples/fullstack/)：按全栈版插件（仓库 `autobiz_kanban`）的现有内容编写：
 
 | 文件 | 内容 |
 |---|---|
@@ -666,7 +666,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `modules/knowledge.json` | 内置组装器和知识仓库同步 |
 | `modules/artifactSync.json` | 从 `plan` 完成起同步（编码进行中除外）5 个文档产物，以及 `prd` 的原始材料 |
 
-生成内容见 [examples/fullstack/output/](../examples/fullstack/output/)。
+生成内容见 [examples/fullstack/output/](../booter/examples/fullstack/output/)。
 
 与全栈版现有 `board_config.json` 的差异：
 

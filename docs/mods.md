@@ -365,7 +365,7 @@ flowchart TD
 | [output-spec.md §6.1](output-spec.md) | 状态维护片段保留；输入输出约定由技能展开时注入（R2） |
 | [interfaces.md §4.2](interfaces.md) | `update_state.py` 增加迁移步骤 |
 | [interfaces.md §1.1](interfaces.md) | 新增 `autobiz-plugin diff`：输出变更等级和影响分析，开发 mod 和 `package` 都使用 |
-| [input-config.md §4.3](input-config.md)、[schemas/modules/knowledge.schema.json](../schemas/modules/knowledge.schema.json) | `knowledge.json` 新增 `assembly.loading`（`eager` / `lazy`）和 `nodes.<节点 id>.include`、`nodes.<节点 id>.sediment`（§2.4）；`nodes` 中的节点 id 必须存在于 `workflow.json` |
+| [input-config.md §4.3](input-config.md)、[schemas/modules/knowledge.schema.json](../booter/schemas/modules/knowledge.schema.json) | `knowledge.json` 新增 `assembly.loading`（`eager` / `lazy`）和 `nodes.<节点 id>.include`、`nodes.<节点 id>.sediment`（§2.4）；`nodes` 中的节点 id 必须存在于 `workflow.json` |
 | [output-spec.md §7.1](output-spec.md) | 知识模块新增 `runtime/knowledge/lookup.py`；内置组装脚本增加索引模式；声明 `source` 时运行 mod 会话开始自动同步，`pull_knowledge` 保留给会话以外使用 |
 | [interfaces.md §3.3.7](interfaces.md) | `loading = lazy` 时 `sessionContext` 的知识段只有系统级、词汇表、会话工作区和发布单元索引；`agentmdLoadStatus` 中未加载的单元带 `"deferred": true` |
 | [input-config.md](input-config.md) | 新增 `migrations.json`、`plugin.modExtension`；新增检查规则 `FLOW_BREAKING`、`MIGRATION_MISSING`、`CHANGE_IMPACT`、`VERSION_BUMP`、`MOD_EXTENSION_CONFLICT` |

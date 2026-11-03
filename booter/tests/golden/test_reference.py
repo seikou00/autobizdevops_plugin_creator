@@ -1,5 +1,6 @@
 """以参考插件为基线的金样测试（README §3.1）：示例生成的插件在命令中输出的看板数据，与 lite、全栈版现有
-board_config.json 中对应的内容比较。参考仓库与本仓库并列存放（../autobizdevops_lite、../autobiz_kanban），不在时跳过。
+board_config.json 中对应的内容比较。参考仓库与本仓库并列存放（与 autobizdevops_plugin_creator 同级的
+autobizdevops_lite、autobiz_kanban），不在时跳过。
 
 比较的内容：节点顺序、id（去掉阶段前缀，D36）、label、group、skill、checkpoints、order、states 的状态与名称、
 输出产物的路径、类型和必需性、runtimePolicy、主干 checkpoint 流转与标签、模板名称和描述。
@@ -15,9 +16,9 @@ import subprocess
 import sys
 import unittest
 
-from tests.helpers import REPO, built_example, temp_dir
+from tests.helpers import SIBLINGS, built_example, temp_dir
 
-REFERENCES = {"lite": REPO.parent / "autobizdevops_lite", "fullstack": REPO.parent / "autobiz_kanban"}
+REFERENCES = {"lite": SIBLINGS / "autobizdevops_lite", "fullstack": SIBLINGS / "autobiz_kanban"}
 KNOWN = {
     "lite": {"order": False, "labels": False, "types": {}, "template_description": True},
     "fullstack": {"order": True, "labels": True, "types": {"evidence/EVIDENCE.jsonl": ("file", "json")},

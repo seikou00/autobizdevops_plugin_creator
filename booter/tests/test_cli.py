@@ -4,7 +4,7 @@ import json
 import unittest
 import zipfile
 
-from tests.helpers import REPO, cli, temp_dir
+from tests.helpers import SIBLINGS, cli, temp_dir
 
 ANSWERS = {
     "plugin": {"id": "doc-review", "name": "Doc-Review-Kanban", "version": "0.1.0", "description": "文档起草与评审"},
@@ -140,7 +140,7 @@ class DoctorTest(unittest.TestCase):
         self.assertNotIn("plugin workflow", (root / "skills/autodev-code/SKILL.md").read_text("utf-8"))
 
     def test_add_skill_from_reference_plugin(self):
-        source = REPO.parent / "autobizdevops_lite" / "skills" / "autodev-plan"
+        source = SIBLINGS / "autobizdevops_lite" / "skills" / "autodev-plan"
         if not source.is_dir():
             self.skipTest("没有 autobizdevops_lite 参考仓库")
         root = temp_dir(self) / "lite"

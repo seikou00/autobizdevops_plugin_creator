@@ -1,0 +1,35 @@
+# booter：AutoBiz 看板插件脚手架
+
+开发期 CLI `autobiz-plugin`：把开发者写的核心配置（`plugin.scaffold.json`、`workflow.json`、`modules/*.json`）和技能资源，生成可以导入 DevClaw 的看板插件。只依赖 Python 3.9+ 标准库，设计文档在仓库根目录的 [docs/](../docs/)。
+
+## 目录
+
+| 目录 | 内容 |
+|---|---|
+| `scaffold/` | CLI 与构建流水线（Python 包名仍为 `scaffold`）：`lib/` 公共基础，`build/` 流水线，`commands/` 各子命令，`modules/` 四个模块包，`wizard.py` 初始化向导，`host.py` 模拟 DevClaw |
+| `runtime/` | 运行框架模板：随生成的插件发布的 `query`/`engine` 内部库、宿主入口、会话入口和状态变更入口 |
+| `schemas/` | 核心配置的 JSON Schema（拷进插件的 `.scaffold/` 供 IDE 补全），以及宿主命令输出结构 `host/outputs.schema.json` |
+| `examples/` | `minimal/`、`lite/`、`fullstack/` 三个示例的核心配置和金样输出 `output/`；`lite`、`fullstack` 也是 `new --from` 的种子 |
+| `skills/autobiz-plugin-creator/` | 插件开发技能：与开发者对话建模，再调用 CLI |
+| `tools/make_pyz.py` | 发布：打出 `dist/autobiz-plugin.pyz` 和插件开发技能的插件包 |
+| `tests/` | 金样、参考插件基线、运行框架契约、CLI 端到端和单元测试 |
+
+## 用法
+
+以下命令都在 `booter/` 下执行，Windows 上把 `python3` 换成 `python`：
+
+```bash
+python3 tools/make_pyz.py                                  # 打出 dist/autobiz-plugin.pyz 和 dist/autobiz-plugin-creator-<版本>.zip
+python3 dist/autobiz-plugin.pyz new ../../my-plugin        # 初始化向导；--from lite --yes 以样例为起点、不提问
+python3 dist/autobiz-plugin.pyz -C ../../my-plugin add skill autodev-plan --from ../../autobizdevops_lite/skills/autodev-plan
+python3 dist/autobiz-plugin.pyz -C ../../my-plugin add node review --name 评审 --skill doc-review --stage dev --seq 5 --output REVIEW.md
+python3 dist/autobiz-plugin.pyz -C ../../my-plugin module enable artifactSync --set allowedFrom=plan:done
+python3 dist/autobiz-plugin.pyz -C ../../my-plugin doctor     # 改了核心配置或更新脚手架后重新生成
+python3 dist/autobiz-plugin.pyz -C ../../my-plugin check      # lint + 技能内容 + 漂移 + 契约测试
+python3 dist/autobiz-plugin.pyz -C ../../my-plugin simulate   # 在临时目录中按宿主的方式走一遍流程
+python3 dist/autobiz-plugin.pyz -C ../../my-plugin package    # 写 dist/<plugin.id>-<version>.zip
+python3 -m unittest discover -s tests -t .                 # 脚手架自身的测试
+python3 tests/check_schema_defaults.py                     # docs/input-config.md 的默认值与 Schema 是否一致
+```
+
+不打 `.pyz` 时，在 `booter/` 下用 `python3 -m scaffold <命令>` 效果相同。各命令的参数和输出见 [docs/interfaces.md §1](../docs/interfaces.md)。

@@ -23,24 +23,26 @@
 
 ```text
 autobizdevops_plugin_creator/
-├── scaffold/
-│   ├── cli.py                       # 单元 10：命令行入口
-│   ├── lib/                         # 单元 1、2、12：issues  jsonschema  fsio  derive  skillmd  jsonedit
-│   ├── build/                       # 单元 3–8、13：load  normalize  lint  ir  compile  contribute
-│   │                                #              framework  skills  emit  manifest  pipeline  versions
-│   ├── commands/                    # 单元 10–13：doctor  lint  check  simulate
-│   │                                #             edit  new  package
-│   ├── host.py  shapes.py           # 单元 11：扮演 DevClaw、校验命令输出结构
-│   ├── wizard.py                    # 单元 12：初始化向导问答
-│   └── modules/                     # 单元 6、9：模块契约与四个模块包
-│       ├── __init__.py
-│       └── board/  session/  knowledge/  artifact_sync/
-│           └── module.json  module.py  files/
-├── runtime/                         # 单元 15：运行框架模板（随插件发布）
-├── skills/autobiz-plugin-creator/   # 单元 14：插件开发技能
-├── schemas/  examples/  docs/
-├── tools/make_pyz.py                # 单元 13、14：把脚手架打成 autobiz-plugin.pyz，再组装插件开发技能的插件包
-└── tests/  golden/  contract/  modules/  unit/
+├── docs/                                # 设计文档
+└── booter/                              # 脚手架本身；本文提到的 scaffold/、runtime/、schemas/、tests/ 等路径都相对 booter/
+    ├── scaffold/
+    │   ├── cli.py                       # 单元 10：命令行入口
+    │   ├── lib/                         # 单元 1、2、12：issues  jsonschema  fsio  derive  skillmd  jsonedit  tree
+    │   ├── build/                       # 单元 3–8、13：load  normalize  lint  ir  compile  contribute
+    │   │                                #              framework  skills  emit  manifest  pipeline  versions
+    │   ├── commands/                    # 单元 10–13：doctor  lint  check  simulate
+    │   │                                #             edit  new  package
+    │   ├── host.py  shapes.py           # 单元 11：扮演 DevClaw、校验命令输出结构
+    │   ├── wizard.py                    # 单元 12：初始化向导问答
+    │   └── modules/                     # 单元 6、9：模块契约与四个模块包
+    │       ├── __init__.py
+    │       └── board/  session/  knowledge/  artifact_sync/
+    │           └── module.json  module.py  files/
+    ├── runtime/                         # 单元 15：运行框架模板（随插件发布）
+    ├── skills/autobiz-plugin-creator/   # 单元 14：插件开发技能
+    ├── schemas/  examples/
+    ├── tools/make_pyz.py                # 单元 13、14：把脚手架打成 autobiz-plugin.pyz，再组装插件开发技能的插件包
+    └── tests/  golden/  contract/  unit/
 ```
 
 README §3.1 原来把 `cli wizard normalize validate compile emit manifest simulate` 平铺在 `scaffold/` 下，这里按层分成子包；`tests/unit/` 为新增，放 `lib/` 和 `build/` 的单元测试。模块包中不再有 `options.schema.json`，见 Q6.6。

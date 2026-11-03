@@ -9,7 +9,7 @@
 
 推导出来的默认值（例如 `plugin.name`）不是 JSON 字面量，Schema 也没有 default，不检查。
 
-用法：python3 tests/check_schema_defaults.py [--schemas DIR] [文档 ...]
+用法（在 booter/ 下）：python3 tests/check_schema_defaults.py [--schemas DIR] [文档 ...]
 退出码：0 一致；1 有不一致；2 用法错误或文件无法读取。
 """
 
@@ -20,8 +20,8 @@ import re
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
-DEFAULT_DOCS = [REPO / "docs" / "input-config.md"]
+REPO = Path(__file__).resolve().parents[1]          # booter/
+DEFAULT_DOCS = [REPO.parent / "docs" / "input-config.md"]
 # 章节编号 → (Schema 文件, Schema 内的起点)。起点是 #/definitions/<名> 或用 . 连接的属性路径，空串为根
 SECTIONS = {
     "3.4": ("plugin-scaffold.schema.json", "runtime"),
