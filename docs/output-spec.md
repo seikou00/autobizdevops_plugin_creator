@@ -53,7 +53,17 @@
 
 `runtime/` 各级目录下的 `__init__.py` 省略未列。入口脚本通过 `__file__` 定位插件根目录，把它加入 `sys.path` 后导入 `runtime.common`。
 
-打包产物（`autobiz-plugin package`）包含：`plugin.json`、`board_core/`、`runtime/`、`skills/`、`hooks/`、`agents/`（存在时），以及清单中引用的 `.mcp.json`。不包含 `plugin.scaffold.json`、`workflow.json`、`modules/`、`.scaffold/`、`__pycache__/`，也不包含 build-manifest 中标了 `inactive` 的文件（§8）。知识目录 `sys/` 在声明了 `knowledge.source` 时是运行期缓存，不打包；未声明时视为开发者提供的资源，原样打包。
+打包产物（`autobiz-plugin package`）是一个 zip，其中只有一个顶层目录 `<plugin.id>/`，DevClaw 由它得到安装目录名（README §9）。目录下的内容按以下规则收集（D57）：
+
+| 内容 | 规则 |
+|---|---|
+| `plugin.json`、`board_core/`、`runtime/` | 只收 build-manifest 记录的文件（标了 `inactive` 的除外，§8）和 `runtime/build-manifest.json` 本身。`node_modules/`、`__pycache__/` 等没有记录的文件不打包，列在 `--json` 输出的 `package.skipped` 中 |
+| `skills/`、`hooks/`、`agents/`（存在时） | 整个目录打包，跳过 `__pycache__/`、`*.pyc`、`.DS_Store`、`Thumbs.db` |
+| 清单引用的文件 | `plugin.mcpServers`、`plugin.hooks` 引用的文件按实际路径打包；文件不存在时 lint 报 `PLUGIN_REF_MISSING` |
+| 知识目录 `sys/` | 只在启用知识模块、并且没有声明 `knowledge.source` 时打包（此时视为开发者提供的资源）；声明了 `source` 时它是运行期缓存，不打包 |
+| 不打包 | `plugin.scaffold.json`、`workflow.json`、`modules/`、`.scaffold/`、`dist/`，以及以上规则没有列出的文件 |
+
+zip 条目按路径排序，时间戳固定，路径用 `/` 分隔，同一个插件每次打出的 zip 相同。
 
 ## 2. 插件清单
 
@@ -506,7 +516,7 @@ description: [TODO: 做什么；在什么情况下使用]
 | 文件 | 来源 | 条件 | 作用 |
 |---|---|---|---|
 | `runtime/knowledge/inspect_deploy_units.py` | lite `agents_repo.py` | 启用即生成 | 按 `manifest.format` 解析知识清单，输出支持的系统和发布单元（interfaces.md §3.3.8） |
-| `runtime/knowledge/render_collected_session_context.py` | 全栈版 `render_collected_session_context.py`，去掉流程上下文和运行策略部分 | `assembler = plugin` | 内置组装脚本（interfaces.md §4.5）：调用 `collect-knowledge.js` 按所选发布单元组装知识；collector 不可用或单元未命中时按清单映射加载，最后回退 `<localRepoPath>/AGENTS.md`；始终读取 `<sessionWorkspacePath>/AGENTS.md`。插件可以替换这个文件，被替换后 build 和 upgrade 保留插件的版本（README §4） |
+| `runtime/knowledge/render_collected_session_context.py` | 全栈版 `render_collected_session_context.py`，去掉流程上下文和运行策略部分 | `assembler = plugin` | 内置组装脚本（interfaces.md §4.5）：调用 `collect-knowledge.js` 按所选发布单元组装知识；collector 不可用或单元未命中时按清单映射加载，最后回退 `<localRepoPath>/AGENTS.md`；始终读取 `<sessionWorkspacePath>/AGENTS.md`。插件可以替换这个文件，被替换后 doctor 保留插件的版本，脚手架更新后替换运行框架时也一样（README §4） |
 | `runtime/knowledge/collect-knowledge.js` | 全栈版 `collect-knowledge.js` | `assembler = plugin` | collector：列出支持的发布单元、按单元恢复知识，依赖 Node 和 `gray-matter` |
 | `runtime/knowledge/sync_knowledge.py` | lite `sync_agents.py` | 声明 `source` | 按 `runtime/config/knowledge.json` 的 `source` 克隆知识仓库到 `root`：先在临时目录克隆并校验清单，成功后再替换；HTTPS 失败时回退 SSH。不回写任何配置文件 |
 
@@ -576,7 +586,7 @@ skills/<skillName>/
 
 ## 8. runtime/build-manifest.json
 
-记录生成文件及构建信息，随插件发布。脚手架靠它判断哪些文件被手改过、能否安全升级：
+记录生成文件及构建信息，随插件发布。脚手架靠它判断哪些文件被手改过、能否安全升级：`scaffoldVersion`、`coreVersion`、`modules` 与当前脚手架比较，决定 doctor 是否替换运行框架（interfaces.md §1.7，D57）：
 
 ```json
 {

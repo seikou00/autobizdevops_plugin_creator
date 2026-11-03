@@ -24,18 +24,19 @@
 | `autobiz-plugin add skill <skill> [--from <dir>]` | 导入已有技能资源（正文、模板、脚本、校验器）到 `skills/<skill>/`；不带 `--from` 时创建空白 `SKILL.md`（只有 frontmatter 和状态维护片段，技能已绑定节点时才有片段）。导入时 frontmatter 的 `name` 改为 `<skill>`，顶层 `version`、`author` 迁到 `metadata`；正文中的旧状态命令（`LEGACY_ENTRY_REF`）等技能内容问题报 warning，照样导入，check 和 package 时报 error（input-config.md §7.3）。目标目录已存在，或其他分组下有同名技能时拒绝导入（D56） |
 | `autobiz-plugin module list` | 列出可用模块与可选能力、版本及启用状态 |
 | `autobiz-plugin module enable <id> [--set key=value …]` / `disable <id>` | 启用或关闭 `knowledge`、`artifactSync`（看板能力固定开启，不能用这个命令关闭）。`enable knowledge` / `enable artifactSync` 在 `modules/knowledge.json` / `modules/artifactSync.json` 不存在时创建骨架，并在入口文件中引用；`disable` 只去掉引用，`modules/*.json` 和模块以前生成的文件都保留；这些文件不再生效：宿主命令和看板入口不再生成，build-manifest 中标为 `inactive`，`package` 不打包，lint 报 `MODULE_INACTIVE_FILES`（D52）。已存在时不重建，只加回引用。`--set` 的 key 沿模块 Schema 的属性用 `.` 逐级指定（例如 `assembly.assembler=devclaw`、`source.url=…`），value 按 Schema 的类型转换：字符串原样保留，其余按 JSON 解析；`artifacts`、`extraPaths` 这类以路径为键的映射不能用 `--set` 指定。`enable artifactSync` 必须用 `--set` 给出 `allowedFrom` 或 `allowedCheckpoints`；它会把扩展名不是 `.json` 的输出路径预填进 `artifacts`，简述写成 `[TODO: 简述]`，开发者删掉不需要上传的、补上简述即可（D56） |
-| `autobiz-plugin doctor [--dry-run] [--force] [--allow-id-change] [--allow-layout-change]` | 修改核心配置（`workflow.json`、`modules/*.json`、入口文件）后重新生成插件：lint → 与上次构建比较并列出影响 → build → 复查（§1.7） |
+| `autobiz-plugin doctor [--dry-run] [--force] [--allow-id-change] [--allow-layout-change] [--allow-major-upgrade]` | 修改核心配置（`workflow.json`、`modules/*.json`、入口文件）或更新脚手架后重新生成插件：lint → 与上次构建比较并列出影响 → build → 复查（§1.7） |
 | `autobiz-plugin lint [--strict]` | 只检查核心配置（`workflow.json`、入口文件、`modules/*.json`）的结构和语义规则，以及编译配置是否过期（input-config.md §7.2）。只读、不联网，通常在 1 秒内完成 |
 | `autobiz-plugin check [--strict]` | `lint` 加上技能内容、生成文件漂移检查，并运行契约测试，只读（input-config.md §7.3） |
 | `autobiz-plugin simulate [--feature demo] [--to <checkpoint>] [--platform <p>] [--keep]` | 把已生成的插件拷到临时目录，按宿主的方式调用一遍（§1.5） |
-| `autobiz-plugin upgrade [--to <version>]` | 升级托管的运行框架和模块 |
-| `autobiz-plugin package [-o <zip>]` | 重置运行期字段、check，然后打包 |
+| `autobiz-plugin package [-o <zip>]` | check（只把 `TODO_PLACEHOLDER` 升为 error），然后按 output-spec.md §1 的打包规则写 zip，默认为 `dist/<plugin.id>-<plugin.version>.zip` |
 
 所有命令都支持 `-C <plugin-dir>`（默认为当前目录）和 `--json`（机器可读输出）。
 
-CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 doctor 调用，`new` 写好核心配置后执行 doctor；第一次生成时没有 build-manifest，doctor 把全部节点列为新增（D54、D56）。
+脚手架以单个文件 `autobiz-plugin.pyz` 发布（标准库 zipapp），执行方式为 `python3 autobiz-plugin.pyz <命令>`，Windows 上为 `python …` 或 `py -3 …`；本文的 `autobiz-plugin` 即指它。插件开发技能在自己的 `scripts/` 下带同一个文件（D57）。
 
-`--allow-id-change`、`--allow-layout-change` 只用于 `doctor`：确认要修改 `plugin.id` 或 `runtime.metaRoot` 时，放行 `PLUGIN_ID_CHANGED` 或 `LAYOUT_CHANGED`，本次生成后 build-manifest 记下新值，之后 lint 不再报错。放行时仍输出一条 warning，说明已有项目中的状态需要人工处理。lint 报这两个 error 时，在 `hint` 中给出对应的命令（D47）。
+CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 doctor 调用，`new` 写好核心配置后执行 doctor；第一次生成时没有 build-manifest，doctor 把全部节点列为新增（D54、D56）。也不提供 `upgrade`：脚手架更新后执行 doctor，由它替换 managed、module 文件并报告版本变化（§1.7，D57）。
+
+`--allow-id-change`、`--allow-layout-change` 只用于 `doctor`：确认要修改 `plugin.id` 或 `runtime.metaRoot` 时，放行 `PLUGIN_ID_CHANGED` 或 `LAYOUT_CHANGED`，本次生成后 build-manifest 记下新值，之后 lint 不再报错。放行时仍输出一条 warning，说明已有项目中的状态需要人工处理。lint 报这两个 error 时，在 `hint` 中给出对应的命令（D47）。`--allow-major-upgrade` 同样只用于 `doctor`，放行运行框架跨主版本升级的 `CORE_MAJOR_CHANGED`（D57）。
 
 `add` 和 `module` 只是修改配置文件的便捷入口，效果与手改配置后执行 doctor 相同：`add node` 写 `workflow.json`，`module` 写入口文件的 `modules` 引用和对应的 `modules/*.json`，写完都自动执行 doctor。修改在原文上插入或替换片段，原有的键序、缩进和换行不变；修改先在内存中完成，与 doctor 的生成结果一起写盘，任何一步有 error（包括 lint 的 `SEQ_DUP` 等）都不写文件（D56）。
 
@@ -79,7 +80,7 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 - `file` 标明问题所在的文件（`workflow.json`、`plugin.scaffold.json`、`modules/board.json`，或 `skills/autodev-plan/SKILL.md` 这类资源文件）；`pointer` 是该文件内的 JSON Pointer，问题出在文件层面时为空；
 - `code` 的取值见 input-config.md §7.2、§7.3，此外还有 `MODULE_CONFLICT`（§2.3）、doctor 的 `CHECKPOINT_REMOVED` 和 `DOCTOR_BASELINE_MISSING`（§1.7）、simulate 的 `INTERPRETER_MISSING` 和 `KNOWLEDGE_MANIFEST_MISSING`（§1.5）、用法错误的 `USAGE`（§1.2）；
 - `issues` 按文件、位置、code 稳定排序（D43）：文件依次为入口文件、`workflow.json`、`modules/` 下的 board、session、knowledge、artifactSync，其余按路径；同一文件内按 `pointer` 逐段比较，数字段按数值比较；最后按 `code`；
-- 各命令在通用结构之外的附加字段（D54）：`doctor` 加 `changes`（§1.7），`check` 加 `contract`（契约测试的结果），`simulate` 加 `simulation`（§1.5），`module list` 加 `modules`（各模块的版本和启用状态），`package` 加 `package`（生成的 zip 路径）；`lint`、`add`、`module enable`/`disable`、`new` 没有附加字段；
+- 各命令在通用结构之外的附加字段（D54）：`doctor` 加 `changes`（§1.7），`check` 加 `contract`（契约测试的结果），`simulate` 加 `simulation`（§1.5），`module list` 加 `modules`（各模块的版本和启用状态），`package` 加 `package`（`{"path": 生成的 zip, "skipped": [没有打包的文件]}`，output-spec.md §1，D57）；`lint`、`add`、`module enable`/`disable`、`new` 没有附加字段；
 - 不加 `--json` 时输出同样内容的可读文本，按文件和位置分组。
 
 ### 1.4 初始化向导（new）
@@ -220,12 +221,12 @@ frontmatter 中的 `description` 要写明触发场景，例如“新建看板�
 开发者或 agent 改了 `workflow.json`、`modules/*.json` 或入口文件之后，用 doctor 重新生成插件。build 只管“输入 → 输出”；doctor 在它前后加上诊断：先说明这次改动影响了什么，再生成，最后复查，保证核心配置、编译配置和各技能 `SKILL.md` 中的状态维护片段三者一致。
 
 ```text
-autobiz-plugin doctor [-C <plugin-dir>] [--dry-run] [--force] [--allow-id-change] [--allow-layout-change] [--json]
+autobiz-plugin doctor [-C <plugin-dir>] [--dry-run] [--force] [--allow-id-change] [--allow-layout-change] [--allow-major-upgrade] [--json]
 ```
 
 | 步骤 | 做什么 | 失败时 |
 |---|---|---|
-| 1. 检查 | 执行 lint（input-config.md §7.2；`BUILD_STALE` 不报，过期正是要重新生成的原因） | 有 error 时退出码 1，不写任何文件 |
+| 1. 检查 | 执行 lint（input-config.md §7.2；`BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` 不报，过期和可升级正是要重新生成的原因） | 有 error 时退出码 1，不写任何文件 |
 | 2. 比较 | 按 build-manifest 的 `inputs` 找出改过的核心配置；在内存中编译新流程，与当前的 `runtime/config/flow.json` 和 build-manifest 记录的技能片段比较，列出影响（下表） | 从未生成过（没有 build-manifest）时，全部节点列为新增，不报 warning（D56）。有 build-manifest 但 `runtime/config/flow.json` 不存在或无法解析时不做比较：报 warning `DOCTOR_BASELINE_MISSING`，说明本次没有影响报告，直接进入第 3 步重新生成，重新生成即修复了 flow.json（D54） |
 | 3. 生成 | 执行 build：重写编译配置和 `board_core/`；同步技能：缺失的技能生成空白 `SKILL.md`，已有技能插入或更新状态维护片段，不再绑定节点的技能删掉片段（output-spec.md §6.1） | managed 文件被手改时报 `DRIFT_MANAGED`，确认要覆盖时加 `--force` |
 | 4. 复查 | 重新 lint（不应再有 `BUILD_STALE`），并检查每个节点技能的片段与推导结果一致（`SKILL_STATE_BLOCK`） | 报出问题，退出码 1 |
@@ -242,6 +243,7 @@ autobiz-plugin doctor [-C <plugin-dir>] [--dry-run] [--force] [--allow-id-change
 | 节点改了 id | `specs` → `spec` | 按删除加新增处理，片段中的 checkpoint 换成新 id |
 | 调整顺序 | 改了 `seq` | 重算 `order`、checkpoint 链和各节点的 `nextAction`；只改号、先后不变时编译配置中只有 `seq` 变化 |
 | 改了输出或模块配置 | `outputs`、`board.display`、`session.policies` | 只重新生成编译配置，技能不变 |
+| 脚手架更新（D57） | 当前脚手架的 `coreVersion` 为 `1.1.0`，build-manifest 中记录的是 `1.0.0` | 替换 managed、module 文件（被插件替换的内置组装脚本保留，手改过的报 `DRIFT_MANAGED`），`changes.versions` 列出脚手架、运行框架和各模块的版本变化。`coreVersion` 主版本变化时报 `CORE_MAJOR_CHANGED`，确认后加 `--allow-major-upgrade`；脚手架、运行框架或任一模块的版本低于记录时报 `SCAFFOLD_OUTDATED`，不写任何文件，应先更新脚手架 |
 | checkpoint 消失 | 上次构建的 checkpoint 在新流程中不存在（删除或改名了节点） | 报 `CHECKPOINT_REMOVED`（warning）：已有 Feature 停在这些 checkpoint 上时无法继续推进。doctor 只读插件目录，不知道哪些项目在用这个插件，不检查也不迁移已有 Feature 的状态 |
 
 `--json` 输出在 §1.3 的基础上增加 `changes`：
@@ -258,13 +260,16 @@ autobiz-plugin doctor [-C <plugin-dir>] [--dry-run] [--force] [--allow-id-change
     "inputs": ["workflow.json"],
     "nodes": { "added": ["design"], "removed": ["detail_design"], "reordered": false },
     "skills": { "created": ["skills/autodev-design/SKILL.md"], "stateInserted": [], "stateUpdated": [],
-                "stateRemoved": ["skills/autodev-detail-design/SKILL.md"] }
+                "stateRemoved": ["skills/autodev-detail-design/SKILL.md"] },
+    "versions": { "scaffold": null, "core": null, "modules": {} }
   },
   "written": ["runtime/config/flow.json", "runtime/config/board.json", "skills/autodev-design/SKILL.md", "…"]
 }
 ```
 
-触发方式：开发者手动执行；插件开发技能每次修改核心配置后执行（§1.6）；`add`、`module` 写完配置后自动执行。`lint`、`check` 只检查不生成，发现 `BUILD_STALE` 或 `SKILL_STATE_BLOCK` 时提示执行 doctor。
+触发方式：开发者手动执行；插件开发技能每次修改核心配置后执行（§1.6）；`add`、`module` 写完配置后自动执行。`lint`、`check` 只检查不生成，发现 `BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` 或 `SKILL_STATE_BLOCK` 时提示执行 doctor。
+
+`changes.versions` 中有变化的项写成 `{"from": 记录的版本, "to": 当前版本}`，例如 `"core": {"from": "1.0.0", "to": "1.1.0"}`；`modules` 只列版本有变化的模块。
 
 ---
 
@@ -961,7 +966,7 @@ python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp
 
 内置组装脚本的做法（来自全栈版）：调用同目录的 `collect-knowledge.js`（需要 Node）列出 collector 支持的发布单元，再逐个取所选单元的知识；collector 不可用（没有 Node、接口失败、超时）或单元不在它的列表中时，按清单映射加载，最后回退 `<localRepoPath>/AGENTS.md`。另外始终读取 `<sessionWorkspacePath>/AGENTS.md` 作为会话工作区指令。collector 依赖的 `gray-matter` 缺失时，首次运行会在 `runtime/knowledge/` 下执行 `npm install`（README §9）。
 
-插件替换这个文件时，只需在同一路径实现上面的协议。主体逻辑可以用任何语言写，由这个 Python 文件调用（内置版本就是这样调用 Node 的）。build 和 upgrade 不覆盖被替换的文件（README §4）。
+插件替换这个文件时，只需在同一路径实现上面的协议。主体逻辑可以用任何语言写，由这个 Python 文件调用（内置版本就是这样调用 Node 的）。doctor 重新生成或替换运行框架时都不覆盖被替换的文件（README §4）。
 
 ### 4.6 内部库 query.py / engine.py
 
@@ -1031,11 +1036,12 @@ class engine.BoardError(ValueError): ...                          # 所有业务
 
 | 版本号 | 位置 | 何时升级 |
 |---|---|---|
-| `scaffoldVersion` | `plugin.scaffold.json` | 入口文件格式出现不兼容变化时升主版本，脚手架提供 `migrate` |
+| `scaffoldVersion`（入口文件格式） | `plugin.scaffold.json` | 入口文件格式出现不兼容变化时升主版本。v1 不提供迁移命令，格式升主版本时再定；入口文件的版本比脚手架支持的高时报 `SCAFFOLD_OUTDATED`（D57） |
+| 脚手架版本 | build-manifest 的 `scaffoldVersion`、`autobiz-plugin.pyz` | 遵循 semver；当前脚手架比记录旧时报 `SCAFFOLD_OUTDATED`，doctor 拒绝执行（D57） |
 | 模块配置格式 | `modules/*.json` | 不单独标版本，随模块主版本变化；出现不兼容变化时由模块提供迁移 |
 | 核心流程格式 | `workflow.json` | 不单独标版本，随 `scaffoldVersion` 变化 |
 | `apiVersion` | `board_core/board_config.json`、`board_core/modules.json` | 宿主协议出现不兼容变化时（与 DevClaw 共同决定） |
-| 运行框架版本 | build-manifest 的 `coreVersion` | 遵循 semver；同一主版本内 `upgrade` 可以直接替换 |
+| 运行框架版本 | build-manifest 的 `coreVersion` | 遵循 semver；同一主版本内 doctor 直接替换，跨主版本要 `doctor --allow-major-upgrade`，比记录旧时拒绝（D57） |
 | 模块版本 | 模块包的 `module.json`、插件的 `board_core/modules.json`、build-manifest | 遵循 semver；board、session 取 `coreVersion`，knowledge、artifactSync 各自维护；模块随脚手架一起发布，v1 不检查模块与运行框架的版本是否匹配（D50） |
 | `state.json.schemaVersion` | 运行期 | 状态格式变化时；新版运行框架必须能读取旧版本 |
 | `schemaVersion` 字符串 | 各命令输出 | 例如 `autobizdevops.workflow.templates.v2`、`autobizdevops.agents.sync.v1`；沿用现有值 |

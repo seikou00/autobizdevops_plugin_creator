@@ -104,7 +104,7 @@ lite 版 `board_config.json` 有 509 行，开发者真正做出的决策只有�
 | 借鉴点 | 做法 | 落到本设计 |
 |---|---|---|
 | **脚手架以技能形式交付**（v1，D9） | 一份 SKILL.md 讲清流程和规则，确定性工作交给脚本；agent 先问清位置等关键信息再执行 | 除了 `autobiz-plugin` CLI 和初始化向导，再提供插件开发技能 `autobiz-plugin-creator`（interfaces.md §1.6）：agent 与开发者对话，梳理阶段、节点、产物和校验，写出 `workflow.json`、入口文件和需要的模块配置，再调用 `doctor`/`check`；技能的 `description` 也由 agent 与开发者确认后填写。开发者可以只描述流程，不用自己写 JSON |
-| 名称规范化 | 小写连字符、不超过 64 字符；目录名等于清单 `name` | `plugin.id` 同时作为安装目录名和元数据目录名；技能名禁止下划线；初始化向导自动规范化并提示 |
+| 名称规范化 | 小写连字符、不超过 64 字符；目录名等于清单 `name` | `plugin.id` 同时作为安装目录名（`package` 生成的 zip 以它为顶层目录，D57）；技能名禁止下划线；初始化向导自动规范化并提示 |
 | 技能 frontmatter 校验 | `quick_validate.py`：五个允许的键、name/description 约束 | 新增 `SKILL_FRONTMATTER` 规则；DevClaw 不依赖顶层 `version`（D8），导入技能时自动迁到 `metadata` |
 | `[TODO: …]` 占位 | 空白 `SKILL.md` 等生成的文件里用显式占位提示待填项 | `check` 对残留占位报 warning，`package` 报 error |
 | 不随意覆盖 | 默认不覆盖已有文件，需要 `--force`；已有的技能文件只更新状态维护片段 | 与 §4 的归属模型一致 |
@@ -154,7 +154,7 @@ DevClaw ─▶ runtime/adapters/init_workspace.py、init_feature.py ────
 
 整体分三层：
 
-1. **脚手架**：开发期 CLI `autobiz-plugin`，负责初始化、生成、改配置后的重新生成（`doctor`）、校验、模拟、升级、打包，不随插件发布。初始化向导和插件开发技能 `autobiz-plugin-creator` 位于这一层之上：它们只负责问答和编写输入配置，生成工作全部交给 CLI。
+1. **脚手架**：开发期 CLI `autobiz-plugin`（以单个文件 `autobiz-plugin.pyz` 发布，D57），负责初始化、生成、改配置或更新脚手架后的重新生成（`doctor`）、校验、模拟、打包，不随插件发布。初始化向导和插件开发技能 `autobiz-plugin-creator` 位于这一层之上：它们只负责问答和编写输入配置，生成工作全部交给 CLI。
 2. **运行框架**（`runtime/`）：固定入口 + 内部库 `query.py`/`engine.py` + 编译配置。从 lite 运行时泛化而来，完全由配置驱动，不含任何插件专属名称；随插件发布，按版本托管。
 3. **模块**：核心模块 `board`（看板接入）和 `session`（会话与 Agent）始终启用；`knowledge`（知识）和 `artifactSync`（产物同步）按配置启用。各模块声明要拷贝的文件、要补充的配置和宿主命令（interfaces.md §2）。
 
@@ -169,11 +169,12 @@ autobizdevops_plugin_creator/
 │       ├── knowledge/              # module.json  module.py  files/
 │       └── artifact_sync/          # module.json  module.py  files/
 ├── runtime/                        # 运行框架模板：workflow/  adapters/  session/  common/
-├── skills/autobiz-plugin-creator/  # 插件开发技能：SKILL.md  agents/openai.yaml  references/
+├── skills/autobiz-plugin-creator/  # 插件开发技能：SKILL.md  agents/openai.yaml  references/  scripts/autobiz-plugin.pyz
 ├── schemas/                        # workflow.schema.json、plugin-scaffold.schema.json、modules/*.schema.json；
 │                                   # host/outputs.schema.json：宿主命令的输出结构，只供 simulate、check 使用，不拷进插件（D55）
 ├── examples/                       # lite/、fullstack/、minimal/
 ├── docs/                           # 设计文档
+├── tools/make_pyz.py               # 用标准库 zipapp 把脚手架打成 autobiz-plugin.pyz（D57）
 └── tests/
     ├── golden/                     # 以 lite、全栈版为基线：命令输出的看板数据与其 board_config 中对应内容比对（inspectCommands 的脚本路径、`-X utf8`、会话入口键名及 input-config.md §9.2 列出的差异除外）
     ├── contract/                   # 在临时工作区模拟宿主调用
@@ -184,7 +185,7 @@ autobizdevops_plugin_creator/
 
 ## 4. 文件归属
 
-每个输出文件都有明确的归属。归属决定了 build 和 upgrade 时脚手架会怎么处理这个文件，归属关系记录在 `runtime/build-manifest.json`。
+每个输出文件都有明确的归属。归属决定了 doctor 重新生成时（包括脚手架更新后替换运行框架时，D57）脚手架会怎么处理这个文件，归属关系记录在 `runtime/build-manifest.json`。
 
 | 归属 | 示例 | build 时 | 开发者能否修改 |
 |---|---|---|---|
@@ -369,7 +370,7 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 
 后三项是精简核心流程时移出的字段，需要时以对象形式扩展 `inputs`/`outputs` 和节点，现有写法保持不变。
 
-## 8. 已确认决策（2026-10-16；D22–D24 为 2026-10-26；D31 为 2026-10-28；D37–D40 为 2026-11-02；D41–D56 为 2026-11-03）
+## 8. 已确认决策（2026-10-16；D22–D24 为 2026-10-26；D31 为 2026-10-28；D37–D40 为 2026-11-02；D41–D57 为 2026-11-03）
 
 | # | 决策 | 落到 |
 |---|---|---|
@@ -429,6 +430,7 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 | D54 | CLI 与核心命令的评审结论（2026-11-03，scaffold.md 单元 10）：① check 总是在内存中重放 build 并与磁盘比较，不设 `--check` 参数；② `runtime/config/flow.json` 不存在或无法解析时，doctor 不做比较，报 warning `DOCTOR_BASELINE_MISSING`，直接重新生成；③ CLI 不再提供 `build` 命令，build 只是内部流水线的名字，供 `new` 和 `doctor` 调用；放行参数只用于 doctor；④ 各命令 `--json` 输出的附加字段：`doctor` 的 `changes`、`check` 的 `contract`、`simulate` 的 `simulation`、`module list` 的 `modules`、`package` 的 `package` | §5；input-config.md §1.2；interfaces.md §1.1、§1.2、§1.3、§1.4、§1.6、§1.7；scaffold.md §4、§10 |
 | D55 | simulate 的评审结论（2026-11-03，scaffold.md 单元 11）：① 宿主占位符 `${…}` 的格式和引号规则不变，simulate 先按 POSIX 规则拆分参数、再逐个参数替换来模拟 DevClaw；② check 不起模拟的看板事件服务，推送规则只在 `tests/contract/` 中验证，simulate 不设 `AUTOBIZ_BOARD_ENDPOINT`；③ 命令输出用 JSON Schema 校验，放在一个文件 `schemas/host/outputs.schema.json` 中；`.scaffold/` 改为显式拷贝 6 个输入配置的 Schema；④ 生成结果过期时 simulate 只报 warning `BUILD_STALE`，check 在 lint 或漂移检查有 error 时不跑契约测试；⑤ v1 去掉 `--skip-validate`；⑥ simulate 按打包清单把插件拷到临时目录再执行，只写临时目录；“不访问网络”不包括内置知识组装调用的 collector；⑦ 宿主命令只带参数，状态维护片段的命令才注入会话变量；⑧ 片段命令中的 `python` 换成所选平台在 `board.target.python` 中配置的解释器（darwin、linux 取 `posix`，win32 取 `win32`），找不到时报 warning `INTERPRETER_MISSING`；⑨ `simulation` 与 check 的 `contract` 结构相同，失败的步骤报 `CONTRACT_TEST` | §3.1、§5；input-config.md §7.2、§7.3；output-spec.md §1；interfaces.md §1.1、§1.3、§1.5；scaffold.md 总览、§7、§10、§11 |
 | D56 | 配置编辑与向导的评审结论（2026-11-03，scaffold.md 单元 12）：① 安装包带上 lite、fullstack 示例的核心配置作为 `new --from` 的种子，显式列出文件，拷贝时把 `$schema` 改写为 `.scaffold/` 下的路径；② `add node` 增加 `--optional-output`，与 `--output` 按命令行顺序写入 `outputs`；③ 修改核心配置时在原文上插入或替换片段，保留原有键序、缩进和换行；④ `add`、`module`、`new` 先在内存中修改配置并走 doctor 流水线，没有 error 时与生成结果一起写盘，否则什么都不写；⑤ 导入技能时发现的内容问题（`LEGACY_ENTRY_REF` 等）只报 warning、照样导入，frontmatter 的 `name` 改为技能名；⑥ `add node` 增加 `--terminal`，向导询问最后一个节点是否为终态节点；⑦ `--set` 沿 Schema 属性指定字段、按 Schema 类型转换值；`enable artifactSync` 必须给出 `allowedFrom` 或 `allowedCheckpoints`，`artifacts` 预填非 `.json` 输出、简述为 `[TODO: 简述]`；⑧ `new` 增加 `--answers`，`--yes` 只表示不提问；插件开发技能在建模确认后才调用 `new`；目标目录必须不存在或为空；⑨ 从未生成过（没有 build-manifest）时 doctor 把全部节点列为新增、不报 `DOCTOR_BASELINE_MISSING`；`new` 执行 doctor | input-config.md §7.3；interfaces.md §1.1、§1.2、§1.4、§1.6、§1.7；mods.md §3.2；scaffold.md 总览、§10、§12 |
+| D57 | 打包与升级的评审结论（2026-11-03，scaffold.md 单元 13）：① `package` 不再“重置运行期字段”；② CLI 不提供 `upgrade`，版本变化由 doctor 处理：同一主版本内直接替换 managed、module 文件并在 `changes.versions` 中报告，`coreVersion` 主版本变化报 `CORE_MAJOR_CHANGED`（`doctor --allow-major-upgrade` 放行），脚手架比记录旧时报 `SCAFFOLD_OUTDATED` 并拒绝；lint、check 对可升级的插件报 `SCAFFOLD_VERSION_CHANGED`；漂移只按磁盘与 build-manifest 记录是否一致判断；v1 不提供 `migrate`；③ 脚手架用标准库 zipapp 发布成一个文件 `autobiz-plugin.pyz`，插件开发技能在 `scripts/` 下带同一个文件；④ zip 中只有一个顶层目录 `<plugin.id>/`（待 DevClaw 确认）；⑤ 打包时 `plugin.json`、`board_core/`、`runtime/` 只收 build-manifest 记录的文件，开发者目录跳过缓存和系统文件，按实际路径收清单引用的文件（缺失时报 `PLUGIN_REF_MISSING`），`sys/` 只在启用知识模块且没有声明 `source` 时打包，zip 可重复；⑥ Node 依赖仍待定，在此之前 package 不安装、不带 `node_modules/` | §2.3、§3、§3.1、§4、§9；input-config.md §3.3、§4.4、§7.1、§7.2、§7.3；output-spec.md §1、§7.1、§8；interfaces.md §1.1、§1.3、§1.7、§4.5、§5；scaffold.md 总览、§9、§10、§13 |
 
 ## 9. 遗留问题
 
@@ -438,10 +440,11 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 4. **产物同步放在哪里**（已定）：作为独立的可选模块，配置在 `modules/artifactSync.json`，入口文件引用即启用，由脚手架生成同步配置和技能（D30）。
 5. **知识仓库由谁同步**：新目录结构中 `runtime/knowledge/` 只列出 `inspect_deploy_units.py`。本稿把 lite 的仓库同步保留为可选项 `knowledge.source`（生成 `sync_knowledge.py` 和 `pull_knowledge`）。如果改由 DevClaw 统一拉取知识，去掉该项即可。
 6. **`inspect_deploy_units.py` 如何暴露给 DevClaw**：本稿在 `inspectCommands` 中暂定键名 `deploy_units`，并已去掉静态的 `supported_deploy_units`（D31），DevClaw 需要改为调用它获取发布单元。键名待确认。
-7. **内置组装脚本的 Node 依赖**：collector 需要 Node 和 `gray-matter`。全栈版的做法是缺依赖时在会话入口里执行 `npm install`，这要联网，耗时可能超过 `assembly.timeoutSec`，也违反了 `session_collector_context_inject` 不写文件的约定（interfaces.md §3.1）。是否改为 build 或 package 时安装、随包带上 `node_modules`？没有 Node 的机器上退回清单映射和本地 `AGENTS.md`，需要确认这样加载的知识是否够用。
+7. **内置组装脚本的 Node 依赖**：collector 需要 Node 和 `gray-matter`。全栈版的做法是缺依赖时在会话入口里执行 `npm install`，这要联网，耗时可能超过 `assembly.timeoutSec`，也违反了 `session_collector_context_inject` 不写文件的约定（interfaces.md §3.1）。是否改为 build 或 package 时安装、随包带上 `node_modules`？没有 Node 的机器上退回清单映射和本地 `AGENTS.md`，需要确认这样加载的知识是否够用。在定下之前，`package` 不执行 `npm install`，也不带 `node_modules/`（D57）。
 8. **去掉的输出**：根目录 `board.json` 副本、`references/workflow.md`、`hooks/update_checkpoint.py` 别名、插件内的 `tests/` 都不在新目录结构中，本稿已经去掉。需要确认 DevClaw 不读取 `board.json`。
 9. **产物路径数组在看板数据中的表达**：本稿输出 `path`（取首项）加 `paths`（全部），只认 `path` 的旧版 DevClaw 仍能工作，但只会看到首项。需要 DevClaw 确认能否读取 `paths`。
 10. **看板事件推送需要 DevClaw 配合的部分**（D21）：一是启动本机服务并实现 interfaces.md §3.5.5 的缓存与拉取规则；二是在执行 inspectCommands 和发起会话时注入 `AUTOBIZ_BOARD_ENDPOINT`；三是从新增的 `board_core/modules.json` 读取 `boardEvents`。后续做产物实时刷新时，还需要 DevClaw 能拿到会话中模型写文件的工具调用事件。
+11. **插件 zip 的目录结构**（D57）：`package` 生成的 zip 中只有一个顶层目录 `<plugin.id>/`，插件文件都在它下面。`plugin.json` 中没有 `id`，lite 的 `id` 与 `name` 也不同，DevClaw 要靠这个目录得到安装目录名。需要 DevClaw 确认导入时是否这样取安装目录名。
 
 ## 10. 本次调整（相对初稿 2c713e4）
 

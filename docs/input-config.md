@@ -261,7 +261,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 
 | 字段 | 必填 | 说明 | 输出位置 |
 |---|---|---|---|
-| `id` | 是 | 稳定 ID，小写连字符，不超过 64 字符，同时也是安装目录名。**发布后不可修改**，否则已有项目 state.json 中记录的 `pluginId` 对不上，会被拒绝读取 | `state.json.pluginId`、hooks.ndjson `pluginId` |
+| `id` | 是 | 稳定 ID，小写连字符，不超过 64 字符，同时也是安装目录名（`package` 生成的 zip 以它为顶层目录，D57）。**发布后不可修改**，否则已有项目 state.json 中记录的 `pluginId` 对不上，会被拒绝读取 | `state.json.pluginId`、hooks.ndjson `pluginId` |
 | `name` | 是 | DevClaw 沿用的插件名，可含大写（例如 `AutoBizDevOps-Plugin-Lite`） | 根 `plugin.json.name` |
 | `version` | 是 | semver | 根 `plugin.json.version` |
 | `description` | 是 | — | 根 `plugin.json.description` |
@@ -401,7 +401,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 
 所以知识仓库里没有 collector 知识的插件，也能直接用它从各仓库和工作区的 `AGENTS.md` 取到上下文。
 
-没有配置项可以换掉它。插件需要不同的组装方式时，直接替换这个文件：新文件放在同一路径，按 interfaces.md §4.5 的协议从 stdin 读请求、向 stdout 输出知识段即可。build 和 upgrade 发现它与构建记录不一致时，当作插件的替换保留，不报 `DRIFT_MANAGED`（README §4）。
+没有配置项可以换掉它。插件需要不同的组装方式时，直接替换这个文件：新文件放在同一路径，按 interfaces.md §4.5 的协议从 stdin 读请求、向 stdout 输出知识段即可。doctor 发现它与构建记录不一致时，当作插件的替换保留，不报 `DRIFT_MANAGED`；脚手架更新后替换运行框架时也保留它（README §4）。
 
 ### 4.5 modules/artifactSync.json（产物同步模块）
 
@@ -538,7 +538,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 |---|---|---|---|
 | 编辑时 | IDE 读取文件头的 `$schema` | 字段名、类型、必填项 | 编辑器里即时标红 |
 | agent 修改后 | 插件开发技能每次改完配置都运行 `autobiz-plugin lint`（interfaces.md §1.6） | §7.2 全部规则 | agent 按 Issue 修正后再继续 |
-| 重新生成时 | `autobiz-plugin doctor`（以及它调用的 `build`）先执行同样的检查 | §7.2 全部规则（`BUILD_STALE` 除外，过期正是要重新生成的原因） | 不写任何编译配置和技能文件 |
+| 重新生成时 | `autobiz-plugin doctor`（以及它调用的 `build`）先执行同样的检查 | §7.2 全部规则（`BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` 除外，过期和可升级正是要重新生成的原因） | 不写任何编译配置和技能文件 |
 | 手动 | 开发者执行 `autobiz-plugin lint` 或 `autobiz-plugin check` | `lint`：§7.2 全部规则，包括编译配置是否过期；`check`：再加 §7.3 全部规则和契约测试 | 按 Issue 修正 |
 | 运行时 | 运行框架加载 `flow.json` | 编译配置自身的不变量（output-spec.md §5.2） | 拒绝执行并报错 |
 
@@ -577,6 +577,10 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `MODULE_INACTIVE_FILES` | warning | 有模块已关闭，它以前生成的文件还在插件目录中（build-manifest 中标为 `inactive`）。这些文件不再生效、不会打包，可以删除（D52） |
 | `PLUGIN_ID_CHANGED` | error | `plugin.id` 与 `runtime/build-manifest.json` 中记录的不一致。确认要改时执行 `doctor --allow-id-change`（D47） |
 | `LAYOUT_CHANGED` | error | `runtime.metaRoot` 与 build-manifest 中记录的不一致：已有项目的状态会找不到。确认要改时执行 `doctor --allow-layout-change`（D47） |
+| `PLUGIN_REF_MISSING` | error | `plugin.mcpServers` 或 `plugin.hooks` 引用的文件不存在；`package` 按实际路径打包这些文件（D57） |
+| `SCAFFOLD_OUTDATED` | error | 当前脚手架、运行框架或某个模块的版本低于 build-manifest 中的记录，或入口文件的 `scaffoldVersion` 比脚手架支持的高：继续生成会把插件降级，doctor 拒绝执行，应先更新脚手架（D57） |
+| `CORE_MAJOR_CHANGED` | error | 当前运行框架的主版本与 build-manifest 记录的 `coreVersion` 不同。确认要跨主版本升级时执行 `doctor --allow-major-upgrade`（D57） |
+| `SCAFFOLD_VERSION_CHANGED` | warning | 当前脚手架、运行框架或某个模块的版本高于 build-manifest 中的记录（主版本不变）。执行 doctor 即可替换 managed、module 文件（D57） |
 | `BUILD_STALE` | error（lint、check）/ warning（simulate） | 核心配置或节点技能 `description` 的摘要与 build-manifest 中记录的不一致：改了但没有重新生成（从未 build 过时不报，D49）。执行 `autobiz-plugin doctor` 即可消除。simulate 只报 warning，照常运行上次生成的插件（D55） |
 
 ### 7.3 资源与构建规则（check）
@@ -589,7 +593,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `SKILL_STATE_BLOCK` | error | 节点技能的 `SKILL.md` 缺少状态维护片段，片段内容与推导结果不一致（例如被手改，或改了节点却没有重新生成），或不再绑定节点的技能还留着片段。执行 `doctor` 即可修复（output-spec.md §6.1） |
 | `LEGACY_ENTRY_REF` | error | 技能正文（跳过 frontmatter 和状态维护片段）逐行检查，命中一行报一条，`message` 写明行号和所在小节（D51）：节点技能中出现 `update_state.py`、`update_checkpoint.py`、`route_checkpoint.py`（节点状态只由状态维护片段维护）；所有技能中出现旧入口路径 `hooks/update_state.py`、`hooks/update_checkpoint.py`、`hooks/route_checkpoint.py`、`hooks/skip_node.py`、`hooks/init_workspace.py`、`${pluginPath}/inspect_state.py`（新目录结构中已不存在）。提示：删掉这一行；整节只剩状态命令时连同小节标题一起删；这一行前面有校验等步骤时，改写成“执行完成命令之前先……”。`add skill --from` 导入时同样检查，但只报 warning、照样导入（D56）。旧版的 `scaffold:begin state` 片段由 build 直接替换成新片段，不报 |
 | `TODO_PLACEHOLDER` | warning（check）/ error（package） | 空白 `SKILL.md`、骨架文件或清单中还有未填写的 `[TODO: …]`，包括 `module enable artifactSync` 预填在 `modules/artifactSync.json` 的 `artifacts` 中的简述（D56） |
-| `DRIFT_GENERATED` / `DRIFT_MANAGED` | error | 生成或托管的文件被手改过（内置知识组装脚本除外，插件可以替换它，§4.4） |
+| `DRIFT_GENERATED` / `DRIFT_MANAGED` | error | 生成或托管的文件被手改过（内置知识组装脚本除外，插件可以替换它，§4.4）。按磁盘内容与 build-manifest 的记录是否一致判断：与记录一致、只是与当前脚手架重放的结果不同时，报 `SCAFFOLD_VERSION_CHANGED`（§7.2），不算漂移（D57） |
 | `CONTRACT_TEST` | error | 在临时目录中模拟宿主调用失败，每个失败的步骤报一条；`simulate` 报同一个 code（interfaces.md §1.5）。lint 或漂移检查有 error 时不跑契约测试（D55） |
 
 ## 8. 最小示例

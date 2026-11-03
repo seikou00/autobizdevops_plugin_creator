@@ -25,11 +25,11 @@
 autobizdevops_plugin_creator/
 ├── scaffold/
 │   ├── cli.py                       # 单元 10：命令行入口
-│   ├── lib/                         # 单元 1、2：issues  jsonschema  fsio  derive  skillmd
-│   ├── build/                       # 单元 3–8：load  normalize  lint  ir  compile  contribute
-│   │                                #           framework  skills  emit  manifest  pipeline
+│   ├── lib/                         # 单元 1、2、12：issues  jsonschema  fsio  derive  skillmd  jsonedit
+│   ├── build/                       # 单元 3–8、13：load  normalize  lint  ir  compile  contribute
+│   │                                #              framework  skills  emit  manifest  pipeline  versions
 │   ├── commands/                    # 单元 10–13：doctor  lint  check  simulate
-│   │                                #             edit  new  package  upgrade
+│   │                                #             edit  new  package
 │   ├── host.py  shapes.py           # 单元 11：扮演 DevClaw、校验命令输出结构
 │   ├── wizard.py                    # 单元 12：初始化向导问答
 │   └── modules/                     # 单元 6、9：模块契约与四个模块包
@@ -39,6 +39,7 @@ autobizdevops_plugin_creator/
 ├── runtime/                         # 单元 15：运行框架模板（随插件发布）
 ├── skills/autobiz-plugin-creator/   # 单元 14：插件开发技能
 ├── schemas/  examples/  docs/
+├── tools/make_pyz.py                # 单元 13：把脚手架打成 autobiz-plugin.pyz
 └── tests/  golden/  contract/  modules/  unit/
 ```
 
@@ -89,7 +90,7 @@ README §3.1 原来把 `cli wizard normalize validate compile emit manifest simu
 | 10 | CLI 与核心命令 | `cli.py` `commands/{doctor,lint,check}.py` | 参数、退出码、doctor 影响报告、check | demo_lint.py `main` |
 | 11 | simulate | `host.py` `shapes.py` `commands/simulate.py` | 扮演 DevClaw 执行命令、校验输出结构 | demo_simulate.py `Simulation` |
 | 12 | 配置编辑与向导 | `commands/{edit,new}.py` `wizard.py` | `add`、`module`、`new` | demo_skills.py |
-| 13 | 打包、升级 | `commands/{package,upgrade}.py` | zip、替换托管文件 | demo_package.py |
+| 13 | 打包、升级 | `commands/package.py` `build/versions.py` `tools/make_pyz.py` | 插件 zip、版本比较（升级由 doctor 完成）、脚手架发布 | demo_package.py |
 | 14 | 插件开发技能 | `skills/autobiz-plugin-creator/` | 对话建模并调用 CLI | demo 版 SKILL.md |
 | 15 | 运行框架模板 | `runtime/` | query、engine、adapters、session、board_events 的内部拆分 | demo `assets/runtime/`、lite `board_core` |
 
@@ -726,7 +727,7 @@ def build(root: Path, *, dry_run: bool = False, force: bool = False,
 评审结论（2026-11-03，D53）：
 
 - **Q9.1 知识组装继续调用 JS 脚本（已定）。** 内置组装脚本保持现状，调用 `collect-knowledge.js`。这个脚本由知识库开发同事提供，脚手架原样拷贝、不改写，也不用 Python 重写。它对 `gray-matter` 的依赖怎么安装（随包带 `node_modules`，还是 build 或 package 时安装）仍是 README §9 第 7 条的遗留问题。
-- **Q9.2 模块的版本号（已定）。** `board_core/modules.json` 和 build-manifest 中每个启用的模块都带 `version`（三个示例都是 `1.0.0`）。board、session 的运行期代码在仓库根目录的 `runtime/` 中，和框架一起发布（D50），不可能单独升级。board、session 的版本号直接取 `coreVersion`，`module.json` 中不再单独维护；knowledge、artifactSync 的文件在各自的模块包中，保留自己的版本号，供 upgrade 判断哪些模块文件变了（单元 13）。
+- **Q9.2 模块的版本号（已定）。** `board_core/modules.json` 和 build-manifest 中每个启用的模块都带 `version`（三个示例都是 `1.0.0`）。board、session 的运行期代码在仓库根目录的 `runtime/` 中，和框架一起发布（D50），不可能单独升级。board、session 的版本号直接取 `coreVersion`，`module.json` 中不再单独维护；knowledge、artifactSync 的文件在各自的模块包中，保留自己的版本号，供 doctor 判断哪些模块文件变了（单元 13 去掉了 upgrade，Q13.2）。
 - **Q9.3 知识目录固定为 `sys`，DevClaw 维护的目录通过参数传入（已定）。** Schema 中去掉 `knowledge.root`，插件自己的知识目录固定为 `sys/`；编译后的 `knowledge.json` 仍写 `"root": "sys"`，宿主命令 `knowledge_path` 固定为 `${pluginPath}/sys`。为兼容两种知识目录，启用知识模块时，会话入口 `session_collector_context_inject` 的命令末尾带两个参数：
 
   ```text
@@ -763,11 +764,13 @@ class Changes:
     inputs: list[str]                              # 改过的核心配置
     nodes: dict                                    # {"added": [...], "removed": [...], "reordered": bool}
     skills: SkillChanges
+    versions: VersionChanges                       # 脚手架、运行框架、模块的版本变化（Q13.2）
 
 def diff(previous_flow: dict | None, previous: dict | None, ir: PluginIR,
          inputs: Inputs) -> tuple[Changes, list[Issue]]          # CHECKPOINT_REMOVED（interfaces.md §1.7）
 def doctor(root: Path, *, dry_run: bool = False, force: bool = False, allow=frozenset()) -> CommandResult
-    # lint（不报 BUILD_STALE）→ diff → build 流水线 → 复查（lint + SKILL_STATE_BLOCK）
+    # lint（不报 BUILD_STALE、SCAFFOLD_VERSION_CHANGED）→ diff → build 流水线 → 复查（lint + SKILL_STATE_BLOCK）
+    # allow 可含 CORE_MAJOR_CHANGED（--allow-major-upgrade，Q13.2）
     # 没有 build-manifest（从未生成过）时全部节点列为新增；有 build-manifest 但 flow.json 不存在或无法解析时
     # 跳过 diff，报 DOCTOR_BASELINE_MISSING（Q10.2、Q12.9）
 
@@ -937,21 +940,63 @@ def new(target: Path, *, template: str = "blank", answers: Answers | None = None
 ## 13. 打包、升级
 
 ```python
+# build/versions.py：当前脚手架与 build-manifest 记录的版本比较（Q13.2）
+@dataclass
+class VersionChanges:
+    scaffold: tuple[str, str] | None        # (记录的版本, 当前版本)；没有变化时为 None
+    core: tuple[str, str] | None
+    modules: dict[str, tuple[str, str]]     # 只列版本有变化的模块；新启用、关闭的模块不在这里
+
+def compare_versions(previous: dict | None, current: dict) -> tuple[VersionChanges, list[Issue]]
+    # previous 为 build-manifest，没有时（从未生成过）不比较
+    # 任一版本低于记录 → SCAFFOLD_OUTDATED；coreVersion 主版本变化 → CORE_MAJOR_CHANGED；
+    # 其余变化 → SCAFFOLD_VERSION_CHANGED（warning）。lint、check、doctor、package 共用
+
 # commands/package.py
 def package(root: Path, *, output: Path | None = None) -> CommandResult
-    # check（只把 TODO_PLACEHOLDER 升为 error，不用 --strict，Q4.6）→ 按 output-spec.md §1 的打包清单写 zip
-    # 默认输出 dist/<plugin.id>-<plugin.version>.zip
+    # check（只把 TODO_PLACEHOLDER 升为 error，不用 --strict，Q4.6）→ 按 output-spec.md §1 的打包规则写 zip（Q13.5）
+    # 默认输出 dist/<plugin.id>-<plugin.version>.zip，zip 内只有一个顶层目录 <plugin.id>/（Q13.4）
+    # extra 为 {"package": {"path": …, "skipped": […]}}
 
-# commands/upgrade.py
-def upgrade(root: Path, *, force: bool = False) -> CommandResult      # Q13.2
-
+# tools/make_pyz.py：脚手架仓库的发布脚本，自己不进 .pyz（Q13.3）
+def make_pyz(output: Path) -> None
+    # 用标准库 zipapp 把 scaffold/、runtime/、schemas/ 和 Q12.1 的种子打成 autobiz-plugin.pyz，文件显式列出
 ```
 
-待评审：
+CLI 不提供 `upgrade`：脚手架更新后，由 doctor 替换 managed、module 文件（Q13.2）。
 
-- **Q13.1** interfaces.md §1.1 说 package 会“重置运行期字段”。D31 之后已经没有运行期字段，README §6.1 也写明“build 和 package 不需要保留或重置任何字段”，这句应该删掉。
-- **Q13.2 upgrade 和 build 的边界不清楚。** coreVersion 变化时 build 本来就会替换 managed 文件（README §4）。一个脚手架安装包只带一个版本的运行框架，`upgrade --to <version>` 没法实现。建议 v1 去掉 `--to`：upgrade 等于“用当前脚手架重新 build，并报告运行框架和各模块的版本变化”；跨主版本时先报告、要求确认。
-- **Q13.3 脚手架怎么安装，文档没有写。** 用 pip/pipx 安装命令行入口 `autobiz-plugin`，还是 `python -m autobiz_plugin`，还是像 demo 那样把脚本放在技能里？这决定了开发者在 Windows 上怎么执行它（D42），以及插件开发技能怎么调用 CLI（Q14.2）。
+核对结果（2026-11-03）：
+
+- “重置运行期字段”只出现在 interfaces.md §1.1 的 `package` 一行；
+- 提到 upgrade 的有 interfaces.md §1.1、§4.5、§5，README §4，input-config.md §4.4，output-spec.md §7.1 和本文 Q9.2。interfaces.md §5 说“脚手架提供 `migrate`”，§1.1 中没有这个命令；
+- `plugin-scaffold.schema.json` 中入口文件的 `scaffoldVersion` 是 `const: 1`，写成 2 时只报一条 `INPUT_SCHEMA`“只能是 1”，看不出是脚手架太旧；
+- `plugin.json` 中没有 `id`。lite 的 `plugin.id`（`autodev-planning-kanban`）与 `name`（`AutoBizDevOps-Plugin-Lite`）不同，而 input-config.md §3.3 规定 `id` 是安装目录名，DevClaw 只能从 zip 得知 `id`。README §2.3 中“`plugin.id` 同时作为……元数据目录名”在 D48 之后已经不成立；
+- 在 Python 3.9.6 上用标准库 `zipapp` 打出 `.pyz`，`importlib.resources.files()` 能遍历并读取包内的文件；
+- output-spec.md §1 的打包清单写的是 `.mcp.json`，但 `plugin.mcpServers`、`plugin.hooks` 可以指向 `./` 下的任意路径。
+
+评审结论（2026-11-03，D57）：
+
+- **Q13.1 删掉“重置运行期字段”（已定）。** D31 之后没有运行期字段（README §6.1）。interfaces.md §1.1 的 `package` 改为“check（只把 `TODO_PLACEHOLDER` 升为 error），然后打包”。
+- **Q13.2 不提供 `upgrade`，版本变化由 doctor 处理（已定）。** 与 D54 去掉 `build` 的理由相同：两个命令做同一件事；开发者每次改配置都执行 doctor，单独的 upgrade 也拦不住 doctor 顺手升级。doctor（以及 lint、check、package）把当前脚手架的版本、`coreVersion` 和各模块版本与 build-manifest 中的记录比较：
+
+  | 情况 | 处理 |
+  |---|---|
+  | 版本相同 | 同现在 |
+  | 脚手架更新，`coreVersion` 主版本不变 | doctor 替换 managed、module 文件，漂移检查和“被替换的内置组装脚本保留”照旧；`changes.versions` 列出变化。lint、check 报 warning `SCAFFOLD_VERSION_CHANGED`，提示执行 doctor |
+  | `coreVersion` 主版本变化 | 报 error `CORE_MAJOR_CHANGED`，`doctor --allow-major-upgrade` 放行（同 D47 的放行方式） |
+  | 脚手架、运行框架或任一模块的版本低于记录 | 报 error `SCAFFOLD_OUTDATED`：doctor 会把运行框架降级，拒绝执行，没有放行参数，提示更新脚手架。入口文件的 `scaffoldVersion`（格式主版本）比脚手架支持的高时，也报这个 code，不再报 `INPUT_SCHEMA` |
+
+  漂移只按“磁盘内容与 build-manifest 的记录不同”判断：磁盘与记录一致、只是与当前脚手架重放的结果不同时，check 报 `SCAFFOLD_VERSION_CHANGED`，不报 `DRIFT_GENERATED`。v1 不提供 `migrate`，interfaces.md §5 改为等入口文件格式升主版本时再定。各处“build 和 upgrade”的说法统一改为 doctor。
+- **Q13.3 脚手架发布成一个 zipapp 文件（已定）。** 脚手架只用标准库，用 `tools/make_pyz.py` 打成一个文件 `autobiz-plugin.pyz`，执行方式为 `python3 autobiz-plugin.pyz <命令>`（Windows 上为 `python …` 或 `py -3 …`），文档中的 `autobiz-plugin` 指的就是它。插件开发技能在 `scripts/` 下带同一个 `.pyz`（Q14.2 随之确定）。理由：Windows 上 pip 安装的入口在 `Scripts\` 下，常常不在 PATH 中；内网环境拷贝一个文件即可使用；技能和 CLI 始终是同一个版本。包内的 `runtime/`、模块文件、Schema 和种子用 `importlib.resources` 读取，已在 3.9.6 上验证。缺点是没有直接可用的 `autobiz-plugin` 命令，以后需要时再加包装脚本。
+- **Q13.4 zip 的顶层目录（已定，待 DevClaw 确认）。** zip 中只有一个顶层目录 `<plugin.id>/`，插件文件都在它下面，DevClaw 由它得到安装目录名。已记入 README §9，README §2.3 中过时的“元数据目录名”已改掉。
+- **Q13.5 打包规则（已定）。** 写入 output-spec.md §1：
+  - `plugin.json`、`board_core/`、`runtime/` 只收 build-manifest 记录的文件（标了 `inactive` 的除外）和 build-manifest 本身。这些区域本来就由记录显式列出，`node_modules/`、`__pycache__/` 等其他文件不会进包，没收进的文件列在 `package.skipped` 中；
+  - `skills/`、`hooks/`、`agents/` 整个打包，跳过 `__pycache__/`、`*.pyc`、`.DS_Store`、`Thumbs.db`；
+  - `plugin.mcpServers`、`plugin.hooks` 引用的文件按实际路径打包，文件不存在时报 error `PLUGIN_REF_MISSING`（lint 规则，check、package 同样报出）；
+  - `sys/` 只在启用知识模块、并且没有声明 `source` 时打包；
+  - zip 条目按路径排序、时间戳固定、路径用 `/`，同一个插件每次打出的 zip 相同；
+  - `--json` 的 `package` 字段为 `{"path", "skipped"}`。
+- **Q13.6 Node 依赖仍待定（已定）。** README §9 第 7 条不在本单元决定。在它定下之前，按 Q13.5，package 不执行 `npm install`，也不会带上 `node_modules/`；以后决定随包带上时，由知识模块把它登记进 build-manifest。
 
 ## 14. 插件开发技能
 

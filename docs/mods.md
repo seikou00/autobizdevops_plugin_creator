@@ -266,7 +266,7 @@ build 编译出新流程后，与当前的 `runtime/config/flow.json` 比较，�
 | C3 流程扩展 | 追加或插入节点，给节点加输入或输出，改校验命令、产物路径 | checkpoint 仍然有效，但可能有 Feature 推进不了 | build 后做影响分析（§4.5）：没有受影响的 Feature 就自动生效；有就在工作台列出，开发者确认后生效 | minor |
 | C4 流程破坏 | 删除节点，改节点 id（checkpoint 名随之变化），调整节点顺序（改了 `seq` 的先后） | checkpoint 不存在或含义改变，按现有规则 `state.json` 会拒绝写入（[output-spec.md §4.2](output-spec.md)） | 必须在 `migrations.json` 中写迁移映射，否则不生效（`FLOW_BREAKING`） | major，必须带迁移 |
 | C5 身份 | `plugin.id`、`runtime.metaRoot` | 状态找不到 | 禁止（`PLUGIN_ID_CHANGED`、`LAYOUT_CHANGED`） | 禁止 |
-| 框架升级 | `coreVersion`、模块版本 | 可能涉及 `state.json.schemaVersion` | `upgrade` 后代码热更新 | 跟随框架版本 |
+| 框架升级 | `coreVersion`、模块版本 | 可能涉及 `state.json.schemaVersion` | 更新脚手架后执行 doctor 替换运行框架（D57），之后代码热更新 | 跟随框架版本 |
 
 C3 与 C4 的判定规则：旧 checkpoint 链是新链的子序列（顺序不变，只增不减）就是 C3，否则是 C4。
 
