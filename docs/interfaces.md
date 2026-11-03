@@ -22,6 +22,7 @@
 | `autobiz-plugin new <dir> [--from blank\|lite\|fullstack] [--answers <file\|->] [--yes]` | 初始化向导：按 §1.4 的七类输入问答，生成入口文件 `plugin.scaffold.json`、`workflow.json`、需要的 `modules/*.json` 和工程目录，随后执行 doctor。`<dir>` 必须不存在或为空；`--answers` 给出回答（§1.4），`--yes` 不提问 |
 | `autobiz-plugin add node <id> --name <name> --skill <skill> --stage biz\|dev\|ops --seq <n> [--output <path> …] [--optional-output <path> …] [--terminal]` | 在 `workflow.json` 的 `nodes.<stage>` 中添加节点，按 `seq` 插到组内对应位置，不改其他节点的 `seq`。`--output` 是必需输出，`--optional-output` 是可选输出（写成 `{path, optional: true}`），两者按命令行上的顺序追加到 `outputs`；含 glob 的路径要加引号，避免被 shell 展开。`--terminal` 表示终态节点，不能带输出。写完后执行 doctor（技能不存在时生成空白 `SKILL.md`） |
 | `autobiz-plugin add skill <skill> [--from <dir>]` | 导入已有技能资源（正文、模板、脚本、校验器）到 `skills/<skill>/`；不带 `--from` 时创建空白 `SKILL.md`（只有 frontmatter 和状态维护片段，技能已绑定节点时才有片段）。导入时 frontmatter 的 `name` 改为 `<skill>`，顶层 `version`、`author` 迁到 `metadata`；正文中的旧状态命令（`LEGACY_ENTRY_REF`）等技能内容问题报 warning，照样导入，check 和 package 时报 error（input-config.md §7.3）。目标目录已存在，或其他分组下有同名技能时拒绝导入（D56） |
+| `autobiz-plugin add skills --from <skills-dir>` | 批量导入 `<skills-dir>` 下每个直接子目录中含 `SKILL.md` 的技能，以子目录名作为技能名；跳过其他条目。每个技能沿用 `add skill --from` 的迁移、冲突检查和 warning 规则。整批先在内存中完成导入与一次 doctor，任一 error 均不写文件；成功时 JSON 输出增加 `importedSkills` 技能名数组。`agents/` 不属于技能集合，需单独提供 |
 | `autobiz-plugin module list` | 列出可用模块与可选能力、版本及启用状态 |
 | `autobiz-plugin module enable <id> [--set key=value …]` / `disable <id>` | 启用或关闭 `knowledge`、`artifactSync`（看板能力固定开启，不能用这个命令关闭）。`enable knowledge` / `enable artifactSync` 在 `modules/knowledge.json` / `modules/artifactSync.json` 不存在时创建骨架，并在入口文件中引用；`disable` 只去掉引用，`modules/*.json` 和模块以前生成的文件都保留；这些文件不再生效：宿主命令和看板入口不再生成，build-manifest 中标为 `inactive`，`package` 不打包，lint 报 `MODULE_INACTIVE_FILES`（D52）。已存在时不重建，只加回引用。`--set` 的 key 沿模块 Schema 的属性用 `.` 逐级指定（例如 `assembly.assembler=devclaw`、`source.url=…`），value 按 Schema 的类型转换：字符串原样保留，其余按 JSON 解析；`artifacts`、`extraPaths` 这类以路径为键的映射不能用 `--set` 指定。`enable artifactSync` 必须用 `--set` 给出 `allowedFrom` 或 `allowedCheckpoints`；它会把扩展名不是 `.json` 的输出路径预填进 `artifacts`，简述写成 `[TODO: 简述]`，开发者删掉不需要上传的、补上简述即可（D56） |
 | `autobiz-plugin doctor [--dry-run] [--force] [--allow-id-change] [--allow-layout-change] [--allow-major-upgrade]` | 修改核心配置（`workflow.json`、`modules/*.json`、入口文件）或更新脚手架后重新生成插件：lint → 与上次构建比较并列出影响 → build → 复查（§1.7） |
@@ -38,7 +39,7 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 
 `--allow-id-change`、`--allow-layout-change` 只用于 `doctor`：确认要修改 `plugin.id` 或 `runtime.metaRoot` 时，放行 `PLUGIN_ID_CHANGED` 或 `LAYOUT_CHANGED`，本次生成后 build-manifest 记下新值，之后 lint 不再报错。放行时仍输出一条 warning，说明已有项目中的状态需要人工处理。lint 报这两个 error 时，在 `hint` 中给出对应的命令（D47）。`--allow-major-upgrade` 同样只用于 `doctor`，放行运行框架跨主版本升级的 `CORE_MAJOR_CHANGED`（D57）。
 
-`add` 和 `module` 只是修改配置文件的便捷入口，效果与手改配置后执行 doctor 相同：`add node` 写 `workflow.json`，`module` 写入口文件的 `modules` 引用和对应的 `modules/*.json`，写完都自动执行 doctor。修改在原文上插入或替换片段，原有的键序、缩进和换行不变；修改先在内存中完成，与 doctor 的生成结果一起写盘，任何一步有 error（包括 lint 的 `SEQ_DUP` 等）都不写文件（D56）。
+`add node` 和 `module` 是修改配置文件的便捷入口：前者写 `workflow.json`，后者写入口文件的 `modules` 引用和对应的 `modules/*.json`。`add skill` 和 `add skills` 则导入技能资源。这些命令写完都自动执行 doctor；批量导入只执行一次。配置修改在原文上插入或替换片段，原有的键序、缩进和换行不变；修改先在内存中完成，与 doctor 的生成结果一起写盘，任何一步有 error（包括 lint 的 `SEQ_DUP` 等）都不写文件（D56）。
 
 同一套命令还以技能形式提供：`autobiz-plugin-creator`（借鉴 Codex plugin-creator，见 README §2.3；规格见 §1.6）。技能负责与开发者对话、梳理流程、编写配置文件、生成技能展示文案；生成和校验仍然只通过上面的 CLI 完成。技能每次修改核心配置后运行 `lint`，一组修改完成后运行 `doctor` 重新生成插件，再运行 `check`，并把 Issue 原样转述给开发者，不能自己修改 generated 或 managed 文件来绕过问题（D58）。
 
@@ -80,7 +81,7 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 - `file` 标明问题所在的文件（`workflow.json`、`plugin.scaffold.json`、`modules/board.json`，或 `skills/autodev-plan/SKILL.md` 这类资源文件）；`pointer` 是该文件内的 JSON Pointer，问题出在文件层面时为空；
 - `code` 的取值见 input-config.md §7.2、§7.3，此外还有 `MODULE_CONFLICT`（§2.3）、doctor 的 `CHECKPOINT_REMOVED` 和 `DOCTOR_BASELINE_MISSING`（§1.7）、simulate 的 `INTERPRETER_MISSING` 和 `KNOWLEDGE_MANIFEST_MISSING`（§1.5）、用法错误的 `USAGE`（§1.2）；
 - `issues` 按文件、位置、code 稳定排序（D43）：文件依次为入口文件、`workflow.json`、`modules/` 下的 board、session、knowledge、artifactSync，其余按路径；同一文件内按 `pointer` 逐段比较，数字段按数值比较；最后按 `code`；
-- 各命令在通用结构之外的附加字段（D54）：`doctor` 加 `changes`（§1.7），`check` 加 `contract`（契约测试的结果），`simulate` 加 `simulation`（§1.5），`module list` 加 `modules`（各模块的版本和启用状态），`package` 加 `package`（`{"path": 生成的 zip, "skipped": [没有打包的文件]}`，output-spec.md §1，D57）；`lint`、`add`、`module enable`/`disable`、`new` 没有附加字段；
+- 各命令在通用结构之外的附加字段（D54）：`doctor` 加 `changes`（§1.7），`check` 加 `contract`（契约测试的结果），`simulate` 加 `simulation`（§1.5），`module list` 加 `modules`（各模块的版本和启用状态），`package` 加 `package`（`{"path": 生成的 zip, "skipped": [没有打包的文件]}`，output-spec.md §1，D57）；`add skills` 成功时加 `importedSkills`（已导入的技能名数组）；`lint`、其他 `add`、`module enable`/`disable`、`new` 没有附加字段；
 - 不加 `--json` 时输出同样内容的可读文本，按文件和位置分组。
 
 ### 1.4 初始化向导（new）
@@ -140,7 +141,7 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 - `board`、`session`、`knowledge`、`artifactSync` 可选，内容与对应的模块配置文件相同；写了 `knowledge`、`artifactSync` 即表示启用；
 - 与 `--from` 一起使用时，`plugin` 按字段覆盖样例，其余写了的类别整体替换样例中的对应内容。
 
-`--from lite` / `--from fullstack` 以 [examples/lite/](../booter/examples/lite/) 或 [examples/fullstack/](../booter/examples/fullstack/) 的核心配置为起点（入口文件、`workflow.json` 和入口文件引用的 `modules/*.json`，不含 `output/`），拷贝时把 `$schema` 改写为 `.scaffold/` 下的路径，向导中的回答覆盖样例中的对应项。脚手架不提供从已有插件的 `board_config.json` 反推核心配置的命令：迁移已有插件时，以对应样例为起点修改核心配置，再用 `add skill --from` 导入技能目录。
+`--from lite` / `--from fullstack` 以 [examples/lite/](../booter/examples/lite/) 或 [examples/fullstack/](../booter/examples/fullstack/) 的核心配置为起点（入口文件、`workflow.json` 和入口文件引用的 `modules/*.json`，不含 `output/`），拷贝时把 `$schema` 改写为 `.scaffold/` 下的路径，向导中的回答覆盖样例中的对应项。脚手架不提供从已有插件的 `board_config.json` 反推核心配置的命令：迁移已有插件时，以对应样例为起点修改核心配置，再用 `add skills --from` 导入技能集合目录；只有单个技能时可用 `add skill --from`。
 
 ### 1.5 simulate
 
@@ -206,7 +207,7 @@ frontmatter 中的 `description` 要写明触发场景，例如“新建看板�
 |---|---|---|
 | 1. 定位 | 确认是新建还是修改；新建时确认插件放在哪个目录、插件 ID（提示发布后不可修改）、插件名 | —（新建时到第 2 步确认后再调用 `new`） |
 | 2. 建模 | 让开发者用自然语言描述流程，整理成“seq → 阶段（biz/dev/ops）→ 节点 → 技能 → 输出产物”表格回显，开发者确认后才写入；每个节点一个技能 | 新建：`new --yes --answers`（§1.4，D56）；修改：编辑 `workflow.json` 或调用 `add node`，写完运行 `lint` |
-| 3. 技能资源 | 对每个节点确认是导入已有技能，还是先不提供（由 build 生成空白 `SKILL.md`） | `add skill` |
+| 3. 技能资源 | 对每个节点确认是导入已有技能，还是先不提供（由 build 生成空白 `SKILL.md`）；同一来源有多个技能时批量导入 | `add skills --from` 或 `add skill` |
 | 4. 模块 | 询问目标平台、节点运行策略、是否需要知识模块（组装方由谁担任）、是否需要产物同步模块（从哪个节点起允许同步、上传哪些产物）；知识沉淀入口固定开启，不用问（D33） | 编辑 `modules/*.json` 和入口文件的引用，或 `module enable` |
 | 5. 生成 | 生成插件；对新生成的空白 `SKILL.md`，与开发者确认触发场景后填写 `description`，再执行一次 doctor：节点描述取自 `description`，改了不重新生成会报 `BUILD_STALE`（D49） | `doctor`（填写 `description` 后再执行一次） |
 | 6. 校验 | 执行完整校验，把 Issue 按原文转述给开发者，修改输入后重试 | `check` |

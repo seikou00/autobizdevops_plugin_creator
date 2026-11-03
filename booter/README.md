@@ -21,7 +21,8 @@
 ```bash
 python3 tools/make_pyz.py                                  # 打出 dist/autobiz-plugin.pyz 和 dist/autobiz-plugin-creator-<版本>.zip
 python3 dist/autobiz-plugin.pyz new ../../my-plugin        # 初始化向导；--from lite --yes 以样例为起点、不提问
-python3 dist/autobiz-plugin.pyz -C ../../my-plugin add skill autodev-plan --from ../../autobizdevops_lite/skills/autodev-plan
+python3 dist/autobiz-plugin.pyz -C ../../my-plugin add skills --from ../../autobizdevops_lite/skills  # 一次导入技能集合
+python3 dist/autobiz-plugin.pyz -C ../../my-plugin add skill doc-review --from ../../other-skills/doc-review  # 单独导入一个技能
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin add node review --name 评审 --skill doc-review --stage dev --seq 5 --output REVIEW.md
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin module enable artifactSync --set allowedFrom=plan:done
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin doctor     # 改了核心配置或更新脚手架后重新生成
@@ -33,3 +34,5 @@ python3 tests/check_schema_defaults.py                     # docs/input-config.m
 ```
 
 不打 `.pyz` 时，在 `booter/` 下用 `python3 -m scaffold <命令>` 效果相同。各命令的参数和输出见 [docs/interfaces.md §1](../docs/interfaces.md)。
+
+`add skills` 只导入来源目录下一级、含 `SKILL.md` 的技能目录；整批原子写入并只运行一次 doctor。`agents/` 是独立资源，需要单独放进插件目录。

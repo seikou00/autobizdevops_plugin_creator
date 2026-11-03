@@ -55,6 +55,8 @@ def build_parser() -> argparse.ArgumentParser:
     skill = targets.add_parser("skill", parents=[common], help="导入已有技能目录，或创建空白 SKILL.md")
     skill.add_argument("skill")
     skill.add_argument("--from", dest="source", help="已有技能目录")
+    skills = targets.add_parser("skills", parents=[common], help="从技能集合目录一次导入全部技能")
+    skills.add_argument("--from", dest="source", required=True, help="包含各技能子目录的目录")
 
     module = commands.add_parser("module", parents=[common], help="列出、启用或关闭模块")
     actions = module.add_subparsers(dest="action", parser_class=Parser)
@@ -101,7 +103,9 @@ def run(args) -> object:
                                  seq=args.seq, outputs=args.outputs, terminal=args.terminal)
         if args.target == "skill":
             return edit.add_skill(root, args.skill, source=Path(args.source) if args.source else None)
-        raise UsageError("用法：autobiz-plugin add node|skill …")
+        if args.target == "skills":
+            return edit.add_skills(root, source=Path(args.source))
+        raise UsageError("用法：autobiz-plugin add node|skill|skills …")
     if args.command == "module":
         from scaffold.commands import edit
 

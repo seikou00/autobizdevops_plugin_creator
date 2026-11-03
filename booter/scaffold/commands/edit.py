@@ -1,4 +1,4 @@
-"""编辑核心配置的便捷命令：add node、add skill、module list/enable/disable（interfaces.md §1.1，D56）。
+"""编辑核心配置的便捷命令：add node、add skill(s)、module list/enable/disable（interfaces.md §1.1，D56）。
 
 修改先在内存中完成（在原文上插入或替换片段，保留键序、缩进和换行），然后用叠加后的视图走 doctor 流水线，
 没有 error 时与生成结果一起写盘，否则什么都不写。"""
@@ -102,6 +102,37 @@ def add_skill(root: Path, skill: str, *, source: Path | None = None) -> CommandR
     result = doctor(root, overlay=overlay, extra_issues=issues)
     if notes:
         result.text = "\n".join(notes + ([result.text] if result.text else []))
+    return result
+
+
+def add_skills(root: Path, *, source: Path) -> CommandResult:
+    """从技能集合目录导入所有一级子目录中的技能，整批只运行一次 doctor。"""
+    tree = Tree(root)
+    if not tree.is_file("plugin.scaffold.json"):
+        raise UsageError(f"找不到入口文件 plugin.scaffold.json：{tree.path('plugin.scaffold.json')}")
+    source = Path(source).expanduser()
+    if not source.is_dir():
+        raise UsageError(f"技能集合目录不存在：{source}")
+    sources = sorted((child for child in source.iterdir() if child.is_dir() and (child / "SKILL.md").is_file()),
+                     key=lambda child: child.name)
+    if not sources:
+        raise UsageError(f"{source} 的一级子目录中没有找到含 SKILL.md 的技能")
+
+    bound = bound_skills(tree)
+    overlay, issues, notes = {}, [], []
+    for skill_source in sources:
+        skill = skill_source.name
+        imported, skill_issues, skill_notes = import_skill(tree, skill, skill_source, bound=skill in bound)
+        overlay.update(imported)
+        issues.extend(skill_issues)
+        notes.extend(f"{skill}：{note}" for note in skill_notes)
+
+    result = doctor(root, overlay=overlay, extra_issues=issues)
+    if not result.report.failed():
+        names = [skill_source.name for skill_source in sources]
+        result.extra["importedSkills"] = names
+        summary = f"已导入 {len(names)} 个技能：{'、'.join(names)}"
+        result.text = "\n".join([summary, *notes, *([result.text] if result.text else [])])
     return result
 
 
