@@ -2,7 +2,7 @@
   "schema": "autobiz.session.v1",
   "policies": {
     "default": {
-      "agentMode": "solo"
+      "agentMode": "multi"
     },
     "nodes": {
       "biz": [

@@ -1,16 +1,13 @@
 {
-  // 读法：properties 下面的键才是配置里能写的字段；required 列出必填字段；additionalProperties: false 表示不能写列表以外的字段，写错字段名会报错。
-  // definitions 是可复用的片段，用 $ref 引用，不会出现在配置文件里；default 是不写时取的值，默认值只写在 Schema 里（D27）。
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.workflow.v1",
   "title": "核心流程 workflow.json",
   "description": "人与 agent 共同维护的最小流程骨架。Schema 只检查字段名、类型和必填项；引用、路径安全等规则由 autobiz-plugin lint 检查（input-config.md §7）。插件运行时使用的是编译结果 runtime/config/flow.json。",
   "type": "object",
-  "additionalProperties": false, // 只能写 properties 里列出的字段（$schema、nodes），写错字段名会报错
-  "required": ["nodes"], // nodes 必须写
+  "additionalProperties": false,
+  "required": ["nodes"],
   "properties": {
     "$schema": { "type": "string" },
-    // 主干节点按阶段 biz、dev、ops 分组；执行顺序由节点的 seq 决定（只有节点有 seq，阶段没有），不看数组顺序；不用的阶段可以不写
     "nodes": {
       "type": "object",
       "additionalProperties": false,
@@ -24,11 +21,8 @@
     }
   },
   "definitions": {
-    // 节点 id：阶段已由分组表达，id 不加阶段前缀（写 plan，不写 dev.plan）；id 就是 checkpoint 前缀：plan → plan_in_progress、plan_done
     "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-    // 产物路径：相对 FEATURE_DIR 的文件名或路径，可含 glob；产物 id 由 build 从路径推导（input-config.md §2.3），不用写
     "path": { "type": "string", "minLength": 1, "description": "相对 FEATURE_DIR 的路径，可含 glob。" },
-    // 输出有两种写法：路径字符串、可选输出 { path, optional: true }。代码提交不作为产物，编码节点通常不写 outputs
     "output": {
       "description": "路径；可选输出写成 { path, optional: true }。完成时必需输出要存在且非空。",
       "oneOf": [
@@ -44,14 +38,12 @@
         }
       ]
     },
-    // 一个阶段下的节点数组：执行顺序看各节点的 seq，不看数组顺序
     "stageNodes": {
       "type": "array",
       "minItems": 1,
       "description": "本阶段的节点；执行顺序由节点的 seq 决定。",
       "items": { "$ref": "#/definitions/node" }
     },
-    // 节点：id、seq、name、skill 必填，其余可以省略；所属阶段由所在分组决定，输入、校验命令和流程规则不由用户配置（编译结果中保留，取默认值）
     "node": {
       "type": "object",
       "additionalProperties": false,
@@ -61,26 +53,22 @@
           "$ref": "#/definitions/nodeId",
           "description": "节点 id，不加阶段前缀（例如 plan）；直接作为 checkpoint 前缀。"
         },
-        // 编排顺序：手动填写的正整数，全部节点（各分组合起来）不能重复，按 biz → dev → ops 递增；可以跳号，方便以后插入节点
         "seq": {
           "type": "integer",
           "minimum": 1,
           "description": "节点的编排顺序，全部节点按 seq 从小到大执行。不能重复，要按 biz → dev → ops 递增，可以跳号。"
         },
         "name": { "type": "string", "minLength": 1, "description": "节点显示名。" },
-        // 绑定的技能：skills/<skill>/SKILL.md 或 skills/<分组>/<skill>/SKILL.md，一个技能只能绑定一个节点；不存在时 build 生成空白 SKILL.md（只有 frontmatter 和状态维护片段）
         "skill": {
           "type": "string",
           "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
           "description": "绑定的技能名，对应 skills/<skill>/SKILL.md 或 skills/<分组>/<skill>/SKILL.md；一个技能只能绑定一个节点。"
         },
-        // 产出的产物：文件名列表，不写产物 id
         "outputs": {
           "type": "array",
           "items": { "$ref": "#/definitions/output" },
           "description": "产出的产物：文件名（相对 FEATURE_DIR 的路径）列表；产物 id 由 build 推导。"
         },
-        // 终态节点（例如归档）：只能是 seq 最大的节点，只有 archived 一个 checkpoint，不能写 outputs
         "terminal": {
           "type": "boolean",
           "default": false,

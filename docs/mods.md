@@ -37,7 +37,7 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 | # | 原则 | 原因 |
 |---|---|---|
 | 1 | 插件内容是数据，mod 是通用解释器。所有插件的运行 mod 代码相同（managed，跟随 `coreVersion`），插件之间只有编译配置不同 | 日常修改只是数据变化，不需要改代码或重载代码；运行 mod 可以统一测试 |
-| 2 | 保留编译，改由 mod 自动触发 | 判断状态是否兼容，要比较前后两版编译结果；金样测试、CI、提交前检查都不用变 |
+| 2 | 保留编译，改由 mod 自动触发 | 判断状态是否兼容，要比较前后两版编译结果；金样测试不用变 |
 | 3 | `state.json` 仍然只由 `engine.py` 写入 | 不维护 TS、Python 两套状态逻辑；锁、原子替换、校验命令都留在 engine 中 |
 | 4 | 开发态放开，发布态设门槛 | 开发者在本机改完马上能看到效果；装到别人那里的插件，破坏性修改必须带迁移 |
 
@@ -208,17 +208,17 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 | 调用脚本 | 模型拼 `python3 "${pluginPath}/…"` | 调用注册好的工具（A3） |
 | 写 `workflow.json` | 模型确认后手写 JSON | 模型提交节点表，开发者确认后由 mod 写入（A4） |
 | 检测 | 技能规定每次修改后运行 | 修改后自动执行（A1） |
-| 试跑 | 打包、导入 DevClaw，或 `simulate` | 挂载为开发插件直接试（A5）；`simulate` 保留给 CI |
+| 试跑 | 打包、导入 DevClaw，或 `simulate` | 挂载为开发插件直接试（A5）；`simulate` 保留，供手动验证 |
 
 ### 3.2 流程
 
 | 步骤 | 开发者 | 开发 mod / 模型 | 产出 |
 |---|---|---|---|
 | 1. 发起 | `/autobiz new` | 打开工作台 | — |
-| 2. 基础信息 | 填表单 | 调用 `new --yes` 建骨架 | `plugin.scaffold.json`、目录 |
-| 3. 盘点技能 | 指定技能来源 | 列出、导入技能，工作台显示技能卡片 | `skills/<技能>/` |
+| 2. 基础信息 | 填表单 | 记下目录、插件 ID 和插件名，还不调用 CLI（`new` 要有节点才能通过 lint，D56） | — |
+| 3. 盘点技能 | 指定技能来源 | 列出技能，工作台显示技能卡片，记下要导入的目录 | — |
 | 4. 建模 | 用自己的话描述流程 | 模型整理节点表，提交到工作台 | 待确认的节点表 |
-| 5. 确认 | 点“确认写入”，或要求修改 | mod 按表写入，自动 lint | `workflow.json` |
+| 5. 确认 | 点“确认写入”，或要求修改 | 新建时 mod 把基础信息、节点表和要导入的技能作为 `--answers` 调用 `new --yes`；修改时按表写入 `workflow.json`，自动 lint | `plugin.scaffold.json`、`workflow.json`、`skills/<技能>/` |
 | 6. 模块 | 回答看板、会话、知识的问题（表单加对话） | 写需要的模块文件，自动 lint | `modules/*.json` |
 | 7. 生成并挂载 | — | lint 没有 error 后自动 build，挂载为开发插件 | 看板上出现新插件 |
 | 8. 试跑 | 在沙盒项目中建 Feature，逐节点运行 | 工作台显示状态推进和校验结果 | — |
@@ -265,7 +265,7 @@ build 编译出新流程后，与当前的 `runtime/config/flow.json` 比较，�
 | C2 策略 | `session.policies`、子代理、知识配置、看板可选能力的开关 | 只影响新会话 | 自动 build，新会话生效 | minor |
 | C3 流程扩展 | 追加或插入节点，给节点加输入或输出，改校验命令、产物路径 | checkpoint 仍然有效，但可能有 Feature 推进不了 | build 后做影响分析（§4.5）：没有受影响的 Feature 就自动生效；有就在工作台列出，开发者确认后生效 | minor |
 | C4 流程破坏 | 删除节点，改节点 id（checkpoint 名随之变化），调整节点顺序（改了 `seq` 的先后） | checkpoint 不存在或含义改变，按现有规则 `state.json` 会拒绝写入（[output-spec.md §4.2](output-spec.md)） | 必须在 `migrations.json` 中写迁移映射，否则不生效（`FLOW_BREAKING`） | major，必须带迁移 |
-| C5 身份 | `plugin.id`、`runtime.layout` | 状态找不到 | 禁止（`PLUGIN_ID_CHANGED`、`LAYOUT_CHANGED`） | 禁止 |
+| C5 身份 | `plugin.id`、`runtime.metaRoot` | 状态找不到 | 禁止（`PLUGIN_ID_CHANGED`、`LAYOUT_CHANGED`） | 禁止 |
 | 框架升级 | `coreVersion`、模块版本 | 可能涉及 `state.json.schemaVersion` | `upgrade` 后代码热更新 | 跟随框架版本 |
 
 C3 与 C4 的判定规则：旧 checkpoint 链是新链的子序列（顺序不变，只增不减）就是 C3，否则是 C4。
@@ -359,7 +359,7 @@ flowchart TD
 | D9、[interfaces.md §1.6](interfaces.md) | creator 从技能改为插件：技能 + 开发 mod |
 | D16、[output-spec.md §1](output-spec.md) | 新增 `runtime/mod/`；`plugin.json.hooks` 指向运行 mod；开发者的 mod 钩子放在 `hooks/extension.ts`，由 `plugin.modExtension` 声明 |
 | D11、D19 | 运行期只读编译配置不变 |
-| D20 | “agent 修改后”这一环由开发 mod 的钩子保证；提交前检查和 CI 不变 |
+| D20 | “agent 修改后”这一环由开发 mod 的钩子保证（提交前检查和 CI 已由 D41 去掉） |
 | D21 | 会话中的推送改为运行 mod 直接通知 DevClaw，并增加产物实时刷新（R6）；DevClaw 不给 mod 提供看板接口时才保留本机服务 |
 | [output-spec.md §4.2](output-spec.md) | Feature 增加 `flowRev`；“checkpoint 不在当前配置中时拒绝写入”改为先查迁移表 |
 | [output-spec.md §6.1](output-spec.md) | 状态维护片段保留；输入输出约定由技能展开时注入（R2） |
@@ -377,7 +377,7 @@ flowchart TD
 3. 能否给 mod 提供看板接口，用来刷新指定项目或 Feature 的看板（替代 D21 的推送）；
 4. mod 的生命周期是只随会话加载，还是有会话以外的常驻部分。这决定看板读取能否从 inspectCommands 改为由 mod 提供；
 5. mod 能否读到会话的环境变量 `FEATURE_ID`、`PLUGIN_WORKSPACE`、`PROJECT_DIR`（[interfaces.md §3.4](interfaces.md)），R2、R9 靠它们确定 Feature；
-6. 插件的 mod 在哪些会话中加载：只在该插件发起的会话中，还是所有会话都加载。这影响守卫的作用范围和多插件隔离（D3）；
+6. 插件的 mod 在哪些会话中加载：只在该插件发起的会话中，还是所有会话都加载。这影响守卫的作用范围和多插件隔离（D48）；
 7. 插件清单的 `hooks` 能否同时挂运行 mod 和开发者的命令钩子；
 8. 发布态插件怎么更新，新版本加载失败时能否回退到上一版；
 9. 开发态做影响分析需要知道哪些项目用了这个插件，DevClaw 能否提供项目列表；

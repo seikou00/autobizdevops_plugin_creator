@@ -26,7 +26,7 @@
 | | 核心配置 | 编译配置 |
 |---|---|---|
 | 文件 | `workflow.json`、`plugin.scaffold.json`、`modules/*.json` | `runtime/config/*.json`、`board_core/*.json` |
-| 谁写 | 开发者与 agent 共同维护 | 只由 `autobiz-plugin build` 写入 |
+| 谁写 | 开发者与 agent 共同维护 | 只由 build 流水线写入（`autobiz-plugin doctor`、`new`） |
 | 内容 | 只写决策；能推导或有默认值的都不写 | 填好全部默认值，展开引用，算出 checkpoint、标签、产物类型 |
 | 谁读 | 脚手架 | 运行框架与 DevClaw |
 | 是否随插件发布 | 否 | 是 |
@@ -261,7 +261,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 
 | 字段 | 必填 | 说明 | 输出位置 |
 |---|---|---|---|
-| `id` | 是 | 稳定 ID，小写连字符，不超过 64 字符，同时也是安装目录名和隔离布局下的元数据目录名（`<metaRoot>/<id>/`，§3.4）。不得使用保留名 `features`、`archive`、`issues`、`reviews`、`logs`、`plugins`。**发布后不可修改**，否则已有项目的状态无法找到或会被拒绝读取 | `state.json.pluginId`、hooks.ndjson `pluginId`、元数据目录名 |
+| `id` | 是 | 稳定 ID，小写连字符，不超过 64 字符，同时也是安装目录名。**发布后不可修改**，否则已有项目 state.json 中记录的 `pluginId` 对不上，会被拒绝读取 | `state.json.pluginId`、hooks.ndjson `pluginId` |
 | `name` | 是 | DevClaw 沿用的插件名，可含大写（例如 `AutoBizDevOps-Plugin-Lite`） | 根 `plugin.json.name` |
 | `version` | 是 | semver | 根 `plugin.json.version` |
 | `description` | 是 | — | 根 `plugin.json.description` |
@@ -277,10 +277,9 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | 字段 | 默认值 | 说明 |
 |---|---|---|
 | `metaRoot` | `.autobizdevops` | 元数据根目录，相对项目目录，状态和产物都在它下面。可以写多级相对路径（例如 `docs/autobiz`），不能是绝对路径，不能含 `..`、`\`、`:`，不能是 `.git` 或在 `.git` 下 |
-| `layout` | `isolated` | 元数据与产物目录布局（README §6.5）。`isolated`：`<metaRoot>/<plugin.id>/`，同一项目可以装多个插件；`legacy`：`<metaRoot>/` 本身，只用于迁移已有插件（例如 lite），保证其已有项目可用 |
 | `validateTimeoutSec` | `120` | 节点校验命令的超时秒数 |
 
-`metaRoot` 和 `layout` 一起决定 Feature 产物目录 `FEATURE_DIR`：isolated 为 `<项目目录>/<metaRoot>/<plugin.id>/features/<feature>/`，legacy 为 `<项目目录>/<metaRoot>/features/<feature>/`。两者发布后都不可修改，否则已有项目的状态和产物找不到，所以留在入口文件中，不放进模块配置。迁移 lite、全栈版时 `metaRoot` 保持默认值。覆写 `board.display.systemPromptInject` 时，其中写的产物目录要与它们一致。
+`metaRoot` 决定 Feature 产物目录 `FEATURE_DIR`：`<项目目录>/<metaRoot>/features/<feature>/`。同一项目安装多个插件时，各插件要配置不同的 `metaRoot`（D48）。它发布后不可修改，否则已有项目的状态和产物找不到，所以留在入口文件中，不放进模块配置。迁移 lite、全栈版时保持默认值。覆写 `board.display.systemPromptInject` 时，其中写的产物目录要与它一致。
 
 ## 4. 模块配置文件
 
@@ -315,7 +314,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `workflowLabel` | `plugin.name` |
 | `workflowDescription` | `{节点 name 以 " → " 连接}。` |
 | `dialogTips` | `当前为{workflowLabel}插件：{节点 name 以 " → " 连接}。请描述目标与验收标准。` |
-| `systemPromptInject` | `当前 Feature 为 ${feature}。产物目录 FEATURE_DIR=${pluginWorkspace}/${projectDir}/{metaDir}/features/${feature}。插件根目录 PLUGIN_ROOT=${pluginPath}。`，其中 `{metaDir}` 在构建时替换：`isolated` 布局为 `.autobizdevops/<plugin.id>`，`legacy` 布局为 `.autobizdevops` |
+| `systemPromptInject` | `当前 Feature 为 ${feature}。产物目录 FEATURE_DIR=${pluginWorkspace}/${projectDir}/{metaDir}/features/${feature}。插件根目录 PLUGIN_ROOT=${pluginPath}。`，其中 `{metaDir}` 在构建时替换为 `runtime.metaRoot`（D28、D48） |
 | `stateLabels` | `{"not_started":"未开始","in_progress":"进行中","done":"已完成","skipped":"已跳过","archived":"已归档"}`；`skipped` 只在 `flow.json` 的 `skip` 不为 `null` 时使用（v1 不会出现），`archived` 只在有终态节点时使用 |
 
 文案中只能使用该命令键允许的占位符（interfaces.md §3.2），否则报 `PLACEHOLDER_UNKNOWN`。覆写 `systemPromptInject` 时如果去掉了 `FEATURE_DIR`，会报 `FEATURE_DIR_MISSING` 警告，因为技能依赖这个变量定位产物目录。
@@ -338,7 +337,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 {
   "$schema": "../.scaffold/modules/session.schema.json",
   "policies": {
-    "default": { "agentMode": "solo" },
+    "default": { "agentMode": "multi" },
     "nodes": {
       "dev": [
         { "id": "plan", "agentMode": "multi",
@@ -351,7 +350,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 
 | 字段 | 默认值 | 说明 |
 |---|---|---|
-| `policies.default` | `{"agentMode":"solo"}` | 全局默认运行策略 |
+| `policies.default` | `{"agentMode":"multi"}` | 全局默认运行策略 |
 | `policies.nodes.biz` / `.dev` / `.ops` | — | 节点运行策略，与 `workflow.json` 一样按阶段分组，组内每项从 `id` 开始，`id` 必须是 `workflow.json` 同一分组中的节点；只写需要单独配置的节点。原样写入 `runtime/config/session.json`，看板数据中对应节点的 `runtimePolicy` 即该项去掉 `id` 后的内容 |
 
 运行策略字段：
@@ -376,11 +375,12 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 }
 ```
 
+知识目录固定为插件根目录下的 `sys/`，不由用户配置（D53）。由 DevClaw 自己维护知识时，目录由 DevClaw 通过会话入口的 `--knowledge-path-platform` 传入（interfaces.md §3.3.7）。
+
 | 字段 | 默认值 | 说明 |
 |---|---|---|
-| `root` | `sys` | 知识目录，相对插件根目录。知识模块入口和会话入口另接受 `--knowledge-path` 参数临时覆盖它（用于本地调试，或由自行管理知识目录的调用方传入），生成的宿主命令不带这个参数 |
 | `manifest.format` | `agents-manifest-v1` | 清单解析方式。v1 只支持 lite 的 `agents.manifest.json` 格式 |
-| `manifest.path` | `agents.manifest.json` | 清单文件，相对 `root` |
+| `manifest.path` | `agents.manifest.json` | 清单文件，相对知识目录 |
 | `assembly.enabled` | `true` | 是否组装知识上下文 |
 | `assembly.assembler` | `plugin` | 组装方。`plugin`：由插件执行组装脚本 `runtime/knowledge/render_collected_session_context.py`（§4.4），结果并入 `sessionContext`；`devclaw`：由 DevClaw 组装，插件只通过 `inspect_deploy_units.py` 提供清单解析结果，`sessionContext` 中不含知识段 |
 | `assembly.timeoutSec` | `30` | 组装脚本的超时秒数。超时、退出码非 0 或输出不是合法 JSON 时，本次会话不含知识段，并在 `message` 中说明 |
@@ -501,7 +501,7 @@ build 把核心配置编译成两类文件（output-spec.md §3、§5），都�
 | `artifacts.<id>` | id 按 §2.3 从路径推导；第一个输出它的节点为 `producer`；`label` 为路径本身（用户不配置产物名称，D39）；`paths` 为 `[路径]`；`type` 按扩展名推断 |
 | `nodes[i].outputs` | 按 `outputs` 顺序列出 `{id: 推导出的产物 id, required}`，可选输出 `required` 为 `false` |
 | `checkpoints.chain` | 主干按 `P[0]_in_progress → P[0]_done → P[1]_in_progress → …` 线性排列；最后一个主干节点是终态节点时以 `archived` 结尾 |
-| `checkpoints.labels` | 全部 checkpoint（含 `archived`）的标签，不由用户配置：`_in_progress` 为 `{name}进行中`，`_done` 为 `{name}完成`，`archived` 为 `stateLabels.archived`。DevClaw 不读这些标签，插件内部用于 Feature 记录的 `stage` 字段和回滚时按名称匹配节点 |
+| `checkpoints.labels` | 全部 checkpoint（含 `archived`）的标签，不由用户配置：`_in_progress` 为 `{name}进行中`，`_done` 为 `{name}完成`，`archived` 为终态节点的 id（D49）。DevClaw 不读这些标签，插件内部用于 Feature 记录的 `stage` 字段和回滚时按名称匹配节点 |
 | `dynamicStages` | `[]`（§2.7） |
 | `skip` | `null`（§2.8） |
 
@@ -532,30 +532,29 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 
 ### 7.1 检测时机
 
-核心配置由人和 agent 一起修改，所以在每个可能引入错误的环节都自动检测，而不是依赖人记得去跑（D20）：
+核心配置由人和 agent 一起修改，下面这些环节会检测（D20、D41）。脚手架生成的插件是成品，不假设插件仓库用 git 管理，所以没有提交前钩子和 CI 这类自动检测，`lint`、`check` 由开发者手动执行：
 
 | 时机 | 怎么触发 | 检查什么 | 发现问题时 |
 |---|---|---|---|
 | 编辑时 | IDE 读取文件头的 `$schema` | 字段名、类型、必填项 | 编辑器里即时标红 |
 | agent 修改后 | 插件开发技能每次改完配置都运行 `autobiz-plugin lint`（interfaces.md §1.6） | §7.2 全部规则 | agent 按 Issue 修正后再继续 |
-| 提交时 | 仓库内的 `.githooks/pre-commit` 运行 `autobiz-plugin lint`；每个协作者执行一次 `autobiz-plugin git-hook install` 启用 | §7.2 全部规则，包括编译配置是否过期 | 阻止提交 |
 | 重新生成时 | `autobiz-plugin doctor`（以及它调用的 `build`）先执行同样的检查 | §7.2 全部规则（`BUILD_STALE` 除外，过期正是要重新生成的原因） | 不写任何编译配置和技能文件 |
-| 合并时 | CI 运行 `autobiz-plugin check --strict`（本地钩子可能被 `--no-verify` 跳过，CI 是最后一道） | §7.2、§7.3 全部规则，加契约测试 | 阻止合并 |
+| 手动 | 开发者执行 `autobiz-plugin lint` 或 `autobiz-plugin check` | `lint`：§7.2 全部规则，包括编译配置是否过期；`check`：再加 §7.3 全部规则和契约测试 | 按 Issue 修正 |
 | 运行时 | 运行框架加载 `flow.json` | 编译配置自身的不变量（output-spec.md §5.2） | 拒绝执行并报错 |
 
-`lint` 只读、不联网，只看配置文件和它们引用的文件是否存在，通常在 1 秒内完成，适合放进钩子和 agent 的每轮修改之后。`check` 在 `lint` 的基础上再检查技能内容、生成文件漂移并跑契约测试。
+`lint` 只读、不联网，只看配置文件和它们引用的文件是否存在，通常在 1 秒内完成，适合在 agent 的每轮修改之后和开发者改完配置时执行。`check` 在 `lint` 的基础上再检查技能内容、生成文件漂移并跑契约测试。
 
-编译配置是否过期：build 把每份核心配置的摘要写进 `runtime/build-manifest.json`，并在 `flow.json` 中记录 `workflow.json` 的摘要。`lint` 发现当前文件与记录不一致时报 `BUILD_STALE`，提示执行 `autobiz-plugin doctor`，避免提交了新的核心配置却带着旧的编译配置和技能状态片段。
+编译配置是否过期：build 把每份核心配置的摘要，以及每个节点技能 SKILL.md 中 `description` 的摘要（节点描述由它编译进 `board.json`，D49）写进 `runtime/build-manifest.json`，并在 `flow.json` 中记录 `workflow.json` 的摘要。`lint` 发现当前文件与记录不一致时报 `BUILD_STALE`，提示执行 `autobiz-plugin doctor`，避免核心配置改了，编译配置和技能状态片段还是旧的。
 
 **修改核心配置后重新生成插件**：开发者或 agent 改了 `workflow.json`、`modules/*.json` 或入口文件之后，执行 `autobiz-plugin doctor`。它先 lint，再与上次构建比较、列出影响，然后重新生成编译配置，并同步各技能 `SKILL.md` 中的状态维护片段（interfaces.md §1.7）。`build` 仍是底层流水线，供 `new` 和 doctor 调用。
 
 ### 7.2 配置规则（lint，build 前同样执行）
 
-问题汇总后一次性输出（格式见 interfaces.md §1.3），由 Issue 的 `file` 字段标明出在哪个文件。`error` 会阻止提交和 build；`warning` 只提示，加 `--strict` 后视为 error。
+问题分两段汇总输出（格式见 interfaces.md §1.3）：先检查核心规则，没有 error 时再检查各模块的配置（D47）。由 Issue 的 `file` 字段标明出在哪个文件。`error` 会阻止 build；`warning` 只提示，加 `--strict` 后视为 error。`--strict` 只供手动使用，`package` 不使用它（D47）。
 
 | code | 级别 | 规则 |
 |---|---|---|
-| `INPUT_SCHEMA` | error | 入口文件、`workflow.json` 或某个模块配置文件不符合各自的 JSON Schema |
+| `INPUT_SCHEMA` | error | 入口文件、`workflow.json` 或某个模块配置文件不是合法 JSON（包括出现重复的键，D46），或不符合各自的 JSON Schema |
 | `MODULE_FILE_MISSING` | error | `modules` 引用的文件不存在 |
 | `NODE_DUP` | error | 节点 id 重复（各分组的节点一起算），推导出的 checkpoint 会重复（终态节点只有 `archived`，不参与 checkpoint 比较） |
 | `SEQ_DUP` | error | 两个节点的 `seq` 相同（各分组的节点一起算），无法确定先后（§2.2） |
@@ -565,7 +564,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `ARTIFACT_ID_INVALID` | error | 从输出路径推导出的产物 id 不符合 `^[a-z][a-z0-9_]*$`（§2.3） |
 | `ARTIFACT_ID_CONFLICT` | error | 两个不同的输出路径推导出同一个产物 id（§2.3） |
 | `OUTPUT_REDECLARED` | warning | 同一路径被多个节点输出（允许，用于后续阶段更新产物；以第一个节点为生产者） |
-| `PATH_UNSAFE` | error | 产物路径（数组中的每一项）或知识目录为绝对路径，含 `..`、`\`、`:`，或与保留文件名冲突 |
+| `PATH_UNSAFE` | error | 产物路径（数组中的每一项）为绝对路径，含 `..`、`\`、`:`，或与保留文件名冲突。知识目录的同类检查由 Schema 完成（D47） |
 | `SKILL_MISSING` | warning（lint）/ error（check） | `skills/<skill>/SKILL.md` 和 `skills/*/<skill>/SKILL.md` 都不存在；build 会在 `skills/<skill>/` 生成空白 `SKILL.md` |
 | `SKILL_AMBIGUOUS` | error | 同名技能目录出现在多处（§5），无法确定节点的技能目录 |
 | `SUBAGENT_FILE_MISSING` | warning | `customSubagentFiles` 指向的文件不存在；会话入口下发 `agentConfig` 时跳过该文件 |
@@ -575,25 +574,23 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `FEATURE_DIR_MISSING` | warning | 覆写后的 `systemPromptInject` 不含 `FEATURE_DIR` |
 | `MODULE_OPTION` | error | 模块或可选能力的参数非法，例如 `allowedFrom` 指向不存在的节点 |
 | `MODULE_SKILL_CONFLICT` | error | 模块技能名与某个节点的技能名冲突 |
-| `PLUGIN_ID_RESERVED` | error | `plugin.id` 是保留目录名 |
-| `LAYOUT_LEGACY` | warning | 使用了 `legacy` 布局：该插件不能与另一个 legacy 插件（例如 lite 与全栈版）装在同一个项目中 |
-| `PLUGIN_ID_CHANGED` | error | `plugin.id` 与 `runtime/build-manifest.json` 中记录的不一致（需加 `--allow-id-change`） |
-| `LAYOUT_CHANGED` | error | `runtime.layout` 或 `runtime.metaRoot` 与 build-manifest 中记录的不一致：已有项目的状态会找不到（需加 `--allow-layout-change`） |
-| `BUILD_STALE` | error | 核心配置的摘要与 build-manifest 中记录的不一致：配置改了但没有重新生成（从未 build 过时不报）。执行 `autobiz-plugin doctor` 即可消除 |
+| `MODULE_INACTIVE_FILES` | warning | 有模块已关闭，它以前生成的文件还在插件目录中（build-manifest 中标为 `inactive`）。这些文件不再生效、不会打包，可以删除（D52） |
+| `PLUGIN_ID_CHANGED` | error | `plugin.id` 与 `runtime/build-manifest.json` 中记录的不一致。确认要改时执行 `doctor --allow-id-change`（D47） |
+| `LAYOUT_CHANGED` | error | `runtime.metaRoot` 与 build-manifest 中记录的不一致：已有项目的状态会找不到。确认要改时执行 `doctor --allow-layout-change`（D47） |
+| `BUILD_STALE` | error（lint、check）/ warning（simulate） | 核心配置或节点技能 `description` 的摘要与 build-manifest 中记录的不一致：改了但没有重新生成（从未 build 过时不报，D49）。执行 `autobiz-plugin doctor` 即可消除。simulate 只报 warning，照常运行上次生成的插件（D55） |
 
 ### 7.3 资源与构建规则（check）
 
 | code | 级别 | 规则 |
 |---|---|---|
 | `SKILL_NAME_MISMATCH` | error | SKILL.md frontmatter 中的 `name` 与 `skill` 不一致 |
-| `SKILL_FRONTMATTER` | error | frontmatter 不符合 Codex 规则：只允许 `name`、`description`、`license`、`allowed-tools`、`metadata` 五个键；`description` 必填、不超过 1024 字符、不含 `<` `>`。版本号等自定义信息放进 `metadata`（例如 `metadata.version`）。DevClaw 不依赖顶层 `version`（D8），导入技能（`add skill --from`）时会自动迁移 |
+| `SKILL_FRONTMATTER` | error | frontmatter 不符合 Codex 规则：只允许 `name`、`description`、`license`、`allowed-tools`、`metadata` 五个键；`description` 必填、不超过 1024 字符、不含 `<` `>`。版本号等自定义信息放进 `metadata`（例如 `metadata.version`）。DevClaw 不依赖顶层 `version`（D8），导入技能（`add skill --from`）时会自动迁移。写法只支持单行 `键: 值` 和 `metadata:` 下一层缩进的 `键: 值`（D45） |
 | `SKILL_TOO_LONG` | warning | SKILL.md 超过 500 行，应把细节拆到 `references/` |
 | `SKILL_STATE_BLOCK` | error | 节点技能的 `SKILL.md` 缺少状态维护片段，片段内容与推导结果不一致（例如被手改，或改了节点却没有重新生成），或不再绑定节点的技能还留着片段。执行 `doctor` 即可修复（output-spec.md §6.1） |
-| `LEGACY_ENTRY_REF` | warning | 技能正文（状态维护片段以外）仍有状态维护内容：自己写的 `runtime/workflow/update_state.py` 调用，或引用旧入口路径：`hooks/update_state.py`、`hooks/update_checkpoint.py`、`hooks/route_checkpoint.py`、`hooks/skip_node.py`、`hooks/init_workspace.py`、根目录 `inspect_state.py`。旧版的 `scaffold:begin state` 片段由 build 直接替换成新片段，不报 |
-| `OPENAI_YAML` | error | `agents/openai.yaml` 不符合约束：`short_description` 应为 25–64 字符，`default_prompt` 必须以 `$<skill>` 形式提及技能 |
-| `TODO_PLACEHOLDER` | warning（check）/ error（package） | 空白 `SKILL.md`、骨架文件或清单中还有未填写的 `[TODO: …]` |
+| `LEGACY_ENTRY_REF` | error | 技能正文（跳过 frontmatter 和状态维护片段）逐行检查，命中一行报一条，`message` 写明行号和所在小节（D51）：节点技能中出现 `update_state.py`、`update_checkpoint.py`、`route_checkpoint.py`（节点状态只由状态维护片段维护）；所有技能中出现旧入口路径 `hooks/update_state.py`、`hooks/update_checkpoint.py`、`hooks/route_checkpoint.py`、`hooks/skip_node.py`、`hooks/init_workspace.py`、`${pluginPath}/inspect_state.py`（新目录结构中已不存在）。提示：删掉这一行；整节只剩状态命令时连同小节标题一起删；这一行前面有校验等步骤时，改写成“执行完成命令之前先……”。`add skill --from` 导入时同样检查，但只报 warning、照样导入（D56）。旧版的 `scaffold:begin state` 片段由 build 直接替换成新片段，不报 |
+| `TODO_PLACEHOLDER` | warning（check）/ error（package） | 空白 `SKILL.md`、骨架文件或清单中还有未填写的 `[TODO: …]`，包括 `module enable artifactSync` 预填在 `modules/artifactSync.json` 的 `artifacts` 中的简述（D56） |
 | `DRIFT_GENERATED` / `DRIFT_MANAGED` | error | 生成或托管的文件被手改过（内置知识组装脚本除外，插件可以替换它，§4.4） |
-| `CONTRACT_TEST` | error | 在临时工作区模拟宿主调用失败（interfaces.md §1.5） |
+| `CONTRACT_TEST` | error | 在临时目录中模拟宿主调用失败，每个失败的步骤报一条；`simulate` 报同一个 code（interfaces.md §1.5）。lint 或漂移检查有 error 时不跑契约测试（D55） |
 
 ## 8. 最小示例
 
@@ -643,7 +640,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 
 | 文件 | 内容 |
 |---|---|
-| `plugin.scaffold.json` | 插件信息、`layout: legacy`（保证 lite 已有项目可用）、对四个模块文件的引用 |
+| `plugin.scaffold.json` | 插件信息、对四个模块文件的引用 |
 | `workflow.json` | 4 个节点，分在 `biz`、`dev` 两组，`seq` 为 1–4，产物在 `outputs` 中定义 |
 | `modules/board.json` | `workflowLabel` |
 | `modules/session.json` | 三个节点的运行策略 |
@@ -658,7 +655,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 
 | 文件 | 内容 |
 |---|---|
-| `plugin.scaffold.json` | 插件信息、宿主钩子与 MCP 配置的透传路径、`layout: legacy`（保证全栈版已有项目可用）、对四个模块文件的引用 |
+| `plugin.scaffold.json` | 插件信息、宿主钩子与 MCP 配置的透传路径、对四个模块文件的引用 |
 | `workflow.json` | 7 个主干节点，分在 `biz`、`dev`、`ops` 三组，`seq` 为 1–7，最后的归档是终态节点；`code` 只输出证据流 `evidence/EVIDENCE.jsonl`；可选输出 `PR_BODY.md` |
 | `modules/board.json` | 工作流名称与描述、对话提示、系统提示注入 |
 | `modules/session.json` | 五个节点的运行策略（含子代理替换和 `toolCustomConfig`） |

@@ -1,6 +1,4 @@
 {
-  // properties 下面的键才是配置里能写的字段；required 列出必填字段；additionalProperties: false 表示不能写列表以外的字段，写错字段名会报错。
-  // definitions 是可复用的片段，用 $ref 引用，不会出现在配置文件里；default 是不写时取的值，默认值只写在 Schema 里（D27）。
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.module.board.v1",
   "title": "AutoBiz 看板模块配置 v1（modules/board.json）",
@@ -9,9 +7,7 @@
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string" },
-    // 目标平台和解释器：决定生成哪些平台的宿主命令 win32 darwin linux
     "target": { "$ref": "#/definitions/target" },
-    // 看板文案：都能推导，只写要覆盖的；节点文案和看板能力（知识沉淀入口）不由用户配置，见 input-config.md §4.1
     "display": { "$ref": "#/definitions/display" }
   },
   "definitions": {
@@ -23,12 +19,10 @@
       "properties": {
         "platforms": {
           "type": "array",
-          "uniqueItems": true,
           "minItems": 1,
           "items": { "enum": ["darwin", "linux", "win32"] },
           "default": ["darwin", "linux", "win32"]
         },
-        // 宿主命令用的解释器名：posix 用于 darwin、linux，win32 用于 Windows
         "python": {
           "type": "object",
           "additionalProperties": false,
@@ -46,12 +40,10 @@
       "default": {},
       "description": "展示设置。",
       "properties": {
-        // workflowLabel、workflowDescription、dialogTips、systemPromptInject 不写时由 build 推导，默认文案见各自的 description
         "workflowLabel": { "type": "string", "description": "workflow.templates.standard.label，缺省取 plugin.name。" },
         "workflowDescription": { "type": "string", "description": "缺省为节点 name 以“ → ”连接加“。”。" },
         "dialogTips": { "type": "string", "description": "缺省：当前为{workflowLabel}插件：{节点链}。请描述目标与验收标准。" },
         "systemPromptInject": { "type": "string", "description": "缺省模板包含 FEATURE_DIR 与 PLUGIN_ROOT；覆写时应保留 FEATURE_DIR。" },
-        // 节点状态的显示名
         "stateLabels": {
           "type": "object",
           "additionalProperties": false,

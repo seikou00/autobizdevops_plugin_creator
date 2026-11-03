@@ -15,9 +15,6 @@
     "mcpServers": "./.mcp.json",
     "hooks": "./hooks/hooks.json"
   },
-  "runtime": {
-    "layout": "legacy"
-  },
   "workflow": "./workflow.json",
   "modules": {
     "board": "./modules/board.json",

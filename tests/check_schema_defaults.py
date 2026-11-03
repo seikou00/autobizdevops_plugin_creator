@@ -21,9 +21,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-DEFAULT_DOCS = [REPO / "docs" / "input-config.md",
-                REPO / "demo" / "autobiz-plugin-creator-demo" / "skills" / "autobiz-plugin-creator" / "references"
-                / "input-config.md"]
+DEFAULT_DOCS = [REPO / "docs" / "input-config.md"]
 # 章节编号 → (Schema 文件, Schema 内的起点)。起点是 #/definitions/<名> 或用 . 连接的属性路径，空串为根
 SECTIONS = {
     "3.4": ("plugin-scaffold.schema.json", "runtime"),
@@ -120,6 +118,16 @@ def is_json_literal(code):
     return True
 
 
+def expand_names(names):
+    """展开简写：`policies.nodes.biz` / `.dev` / `.ops` 中以 . 开头的项沿用前一项的上级路径。"""
+    result = []
+    for name in names:
+        if name.startswith(".") and result:
+            name = result[-1].rsplit(".", 1)[0] + name
+        result.append(name)
+    return result
+
+
 def default_tables(text):
     """返回 [(章节编号, 行号, 字段单元格, 默认值单元格)]。"""
     rows, section, in_table = [], None, False
@@ -154,7 +162,7 @@ def check(doc, schemas):
             continue
         file, start = SECTIONS[section]
         root = schemas[file]
-        names = CODE.findall(field_cell)
+        names = expand_names(CODE.findall(field_cell))
         if not names or any("<" in name for name in names):
             continue
         codes = CODE.findall(default_cell)

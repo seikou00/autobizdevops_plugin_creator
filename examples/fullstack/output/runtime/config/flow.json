@@ -304,7 +304,7 @@
       "code_done": "代码实现完成",
       "cicd_in_progress": "CI/CD进行中",
       "cicd_done": "CI/CD完成",
-      "archived": "已归档"
+      "archived": "archive"
     }
   }
 }

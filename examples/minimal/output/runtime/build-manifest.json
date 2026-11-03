@@ -3,7 +3,6 @@
   "scaffoldVersion": "1.0.0",
   "coreVersion": "1.0.0",
   "pluginId": "doc-review",
-  "layout": "isolated",
   "metaRoot": ".autobizdevops",
   "modules": {
     "board": "1.0.0",
@@ -11,42 +10,24 @@
   },
   "inputs": {
     "plugin.scaffold.json": "sha256:b99b8694bbd3110cc46159d17e85f071705f1737649f0ed3af885eab31c4f542",
-    "workflow.json": "sha256:2e57ad627387c9866d4f5fd77373f0cefe8f27b106ed6e8f6ca97d5336e2d3d0"
+    "workflow.json": "sha256:2e57ad627387c9866d4f5fd77373f0cefe8f27b106ed6e8f6ca97d5336e2d3d0",
+    "skills/doc-draft/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
+    "skills/doc-review/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545"
   },
   "files": {
-    "runtime/workflow/update_state.py": {
+    ".scaffold/modules/artifactSync.schema.json": {
       "ownership": "managed",
       "sha256": "…"
     },
-    "runtime/adapters/init_workspace.py": {
+    ".scaffold/modules/board.schema.json": {
       "ownership": "managed",
       "sha256": "…"
     },
-    "runtime/adapters/init_feature.py": {
+    ".scaffold/modules/knowledge.schema.json": {
       "ownership": "managed",
       "sha256": "…"
     },
-    "runtime/adapters/inspect_state.py": {
-      "ownership": "managed",
-      "sha256": "…"
-    },
-    "runtime/adapters/inspect_workflow_templates.py": {
-      "ownership": "managed",
-      "sha256": "…"
-    },
-    "runtime/adapters/board_events.py": {
-      "ownership": "managed",
-      "sha256": "…"
-    },
-    "runtime/session/render_session_context.py": {
-      "ownership": "managed",
-      "sha256": "…"
-    },
-    "runtime/common/query.py": {
-      "ownership": "managed",
-      "sha256": "…"
-    },
-    "runtime/common/engine.py": {
+    ".scaffold/modules/session.schema.json": {
       "ownership": "managed",
       "sha256": "…"
     },
@@ -58,29 +39,9 @@
       "ownership": "managed",
       "sha256": "…"
     },
-    ".scaffold/modules/board.schema.json": {
-      "ownership": "managed",
-      "sha256": "…"
-    },
-    ".scaffold/modules/session.schema.json": {
-      "ownership": "managed",
-      "sha256": "…"
-    },
-    ".scaffold/modules/knowledge.schema.json": {
-      "ownership": "managed",
-      "sha256": "…"
-    },
-    ".scaffold/modules/artifactSync.schema.json": {
-      "ownership": "managed",
-      "sha256": "…"
-    },
-    ".gitignore": {
-      "ownership": "seeded",
-      "sha256": "sha256:32dae3052f331ee34d628ef535709b301259a45df7c7522c4d35dcf49873f00b"
-    },
     "board_core/board_config.json": {
       "ownership": "generated",
-      "sha256": "sha256:dcd5c1f84544f9f7359886b0a57fe6461c4cff159175c6ebda8c9eb3a69cb9ca"
+      "sha256": "sha256:67be9f8c6c666741e2720a48c5ec0065c2f8112840e9d1fbc0d776487dc06590"
     },
     "board_core/modules.json": {
       "ownership": "generated",
@@ -89,6 +50,34 @@
     "plugin.json": {
       "ownership": "generated",
       "sha256": "sha256:b1be45a4456d75d80a7c2957a8306d09fc48bc46969f5ea7f3eba530f6519a0a"
+    },
+    "runtime/adapters/board_events.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/init_feature.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/init_workspace.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/inspect_state.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/inspect_workflow_templates.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/engine.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/query.py": {
+      "ownership": "managed",
+      "sha256": "…"
     },
     "runtime/config/board.json": {
       "ownership": "generated",
@@ -100,11 +89,19 @@
     },
     "runtime/config/runtime.json": {
       "ownership": "generated",
-      "sha256": "sha256:a596d0d9323ff50e9b20cff0928e31be676f47f793969173b27b562481e5424e"
+      "sha256": "sha256:0005ed2e3372c810b90edfd0ebe3bd1fe83d0ace4fee45d037aa8682b17b3dc0"
     },
     "runtime/config/session.json": {
       "ownership": "generated",
-      "sha256": "sha256:9b2b9cdd63491e7cb85e5b99b73b55cf101a8e3342a21b12162f02b30940c0be"
+      "sha256": "sha256:89e5a67097380edb31d779edcac912f17bdc0caef1e45528da5b0856d351c3e5"
+    },
+    "runtime/session/render_session_context.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/workflow/update_state.py": {
+      "ownership": "managed",
+      "sha256": "…"
     },
     "skills/doc-draft/SKILL.md": {
       "ownership": "seeded",
@@ -117,10 +114,6 @@
       "regions": {
         "state": "sha256:1cec2b21036e17d819495b22811abbcb00cd68ded79ed7960496fbcce5fb3ad2"
       }
-    },
-    ".githooks/pre-commit": {
-      "ownership": "seeded",
-      "sha256": "…"
     }
   }
 }

@@ -1,6 +1,4 @@
 {
-  // properties 下面的键才是配置里能写的字段；required 列出必填字段；additionalProperties: false 表示不能写列表以外的字段，写错字段名会报错。
-  // definitions 是可复用的片段，用 $ref 引用，不会出现在配置文件里；default 是不写时取的值，默认值只写在 Schema 里（D27）。
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.module.session.v1",
   "title": "AutoBiz 会话与 Agent 配置 v1（modules/session.json）",
@@ -9,24 +7,26 @@
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string" },
-    // 运行策略：default 是全局默认，nodes 按节点覆盖
     "policies": {
       "type": "object",
       "additionalProperties": false,
       "default": {},
       "properties": {
-        // 全局默认策略：节点策略与它深合并，节点没写的字段沿用这里的；只有这里的 agentMode 有默认值 solo
         "default": {
-          // allOf：结构与 runtimePolicy 相同，再单独给 agentMode 加默认值；不加在 runtimePolicy 上，否则节点策略会被补成 solo，盖掉全局设置
-          "allOf": [{ "$ref": "#/definitions/runtimePolicy" }],
-          "properties": { "agentMode": { "default": "solo" } },
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "agentMode": { "$ref": "#/definitions/agentMode", "default": "multi" },
+            "subagentConfig": { "$ref": "#/definitions/subagentConfig" },
+            "toolCustomConfig": { "$ref": "#/definitions/toolCustomConfig" }
+          },
           "default": {},
-          "description": "全局默认策略。只有这里的 agentMode 有默认值 solo：节点策略与它深合并，节点不写 agentMode 时沿用这里的。"
+          "description": "全局默认策略。只有这里的 agentMode 有默认值 multi：节点策略与它深合并，节点不写 agentMode 时沿用这里的。"
         },
-        // 按节点覆盖：与 workflow.json 一样按 biz、dev、ops 分组，组内每项从 id 开始；原样写进 runtime/config/session.json，即看板数据中对应节点的 runtimePolicy
         "nodes": {
           "type": "object",
           "additionalProperties": false,
+          "default": {},
           "description": "节点策略，按阶段 biz、dev、ops 分组；每项的 id 必须是 workflow.json 同一分组中的节点。原样写入 runtime/config/session.json，id 以外的字段即看板数据中对应节点的 runtimePolicy。",
           "properties": {
             "biz": { "$ref": "#/definitions/stagePolicies" },
@@ -37,15 +37,13 @@
       }
     }
   },
-  "definitions": { // definitions 是可复用的片段，被上面的 $ref 引用，不是配置字段，所以 example 里没有
+  "definitions": {
     "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-    // 一个阶段下的节点策略数组
     "stagePolicies": {
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/definitions/nodePolicy" }
     },
-    // 节点策略：id 加上 runtimePolicy 的字段
     "nodePolicy": {
       "type": "object",
       "additionalProperties": false,
@@ -57,31 +55,18 @@
         "toolCustomConfig": { "$ref": "#/definitions/toolCustomConfig" }
       }
     },
-    "runtimePolicy": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "agentMode": { "$ref": "#/definitions/agentMode" },
-        "subagentConfig": { "$ref": "#/definitions/subagentConfig" },
-        "toolCustomConfig": { "$ref": "#/definitions/toolCustomConfig" }
-      }
-    },
-    // 代理模式，取值由 DevClaw 解释
     "agentMode": { "enum": ["solo", "multi", "agent_team", "workflow"] },
-    // 子代理：disabledBuiltinSubagents 禁用 DevClaw 内置子代理，customSubagentFiles 换成插件自己的，两者通常成对使用
     "subagentConfig": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "disabledBuiltinSubagents": { "type": "array", "items": { "type": "string" } },
-        // 插件内的 agents/*.md；agents/ 目录可选，文件不存在时 lint 只报 warning，会话入口下发时跳过它
         "customSubagentFiles": {
           "type": "array",
           "items": { "type": "string", "pattern": "^agents/(?!.*\\.\\.)[^\\\\:]+\\.md$" }
         }
       }
     },
-    // 宿主工具开关，例如 { task: { enabled: true } }；脚手架不解释，原样透传
     "toolCustomConfig": {
       "type": "object",
       "description": "宿主工具的定制开关，例如 { \"task\": { \"enabled\": true } }。脚手架不解释其内容，原样写入 runtimePolicy 和 agentConfig。"

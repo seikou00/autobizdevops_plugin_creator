@@ -18,7 +18,6 @@
 │   └── modules.json                      # generated  已开启的模块与看板入口
 ├── skills/                               #            业务技能、模板、脚本及校验器；技能目录也可以在一层分组下（skills/<分组>/<node-skill>/）
 │   ├── <node-skill>/SKILL.md             # seeded     每个节点一个，开头是 build 维护的状态维护片段（§6.1）
-│   ├── <node-skill>/agents/openai.yaml   # seeded     Codex 技能展示信息（可选）
 │   ├── <node-skill>/templates/…          # developer  模板，技能自己维护，脚手架不登记、不生成（D29）
 │   ├── <node-skill>/scripts/…            # developer  执行脚本、业务校验器
 │   ├── <node-skill>/references/…         # developer
@@ -33,7 +32,6 @@
 │   │   ├── init_feature.py               # managed    DevClaw 创建 Feature（create_feature）
 │   │   ├── inspect_state.py              # managed    DevClaw 查询项目与 Feature（project_status / feature_status）
 │   │   ├── inspect_workflow_templates.py # managed    DevClaw 动态工作流（dynamic_workflow）
-│   │   ├── skip_node.py                  # managed    DevClaw 跳过节点（skip_node，开启 skip 时调用）
 │   │   └── board_events.py               # managed    写入口提交后推送看板事件（interfaces.md §3.5）
 │   ├── session/
 │   │   └── render_session_context.py     # managed    DevClaw 会话机制（session_collector_context_inject）
@@ -48,16 +46,14 @@
 │   ├── config/                           # generated  编译后的内部配置（§5），DevClaw 不读
 │   │   └── runtime.json  flow.json  board.json  session.json  knowledge.json
 │   └── build-manifest.json               # generated  生成文件及构建信息记录（§8）
-├── .scaffold/                            # managed    输入配置的 Schema（IDE 补全）
-│   ├── plugin-scaffold.schema.json  workflow.schema.json
-│   └── modules/board.schema.json  session.schema.json  knowledge.schema.json
-├── .githooks/pre-commit                  # seeded     提交前运行 autobiz-plugin lint（input-config.md §7.1）
-└── .gitignore                            # seeded
+└── .scaffold/                            # managed    输入配置的 Schema（IDE 补全），拷贝脚手架 schemas/ 下的这 6 个文件（显式列出，不含 schemas/host/，D55）
+    ├── plugin-scaffold.schema.json  workflow.schema.json
+    └── modules/board.schema.json  session.schema.json  knowledge.schema.json  artifactSync.schema.json
 ```
 
 `runtime/` 各级目录下的 `__init__.py` 省略未列。入口脚本通过 `__file__` 定位插件根目录，把它加入 `sys.path` 后导入 `runtime.common`。
 
-打包产物（`autobiz-plugin package`）包含：`plugin.json`、`board_core/`、`runtime/`、`skills/`、`hooks/`、`agents/`（存在时），以及清单中引用的 `.mcp.json`。不包含 `plugin.scaffold.json`、`workflow.json`、`modules/`、`.scaffold/`、`__pycache__/`。知识目录（`knowledge.root`，默认 `sys/`）在声明了 `knowledge.source` 时是运行期缓存，不打包；未声明时视为开发者提供的资源，原样打包。
+打包产物（`autobiz-plugin package`）包含：`plugin.json`、`board_core/`、`runtime/`、`skills/`、`hooks/`、`agents/`（存在时），以及清单中引用的 `.mcp.json`。不包含 `plugin.scaffold.json`、`workflow.json`、`modules/`、`.scaffold/`、`__pycache__/`，也不包含 build-manifest 中标了 `inactive` 的文件（§8）。知识目录 `sys/` 在声明了 `knowledge.source` 时是运行期缓存，不打包；未声明时视为开发者提供的资源，原样打包。
 
 ## 2. 插件清单
 
@@ -115,9 +111,9 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
 | `plugin_dir_hook` | `${pluginWorkspace}/${projectDir}` | 必有 |
 | `dialog_tips` | `board.display.dialogTips` | 必有 |
 | `system_prompt_inject` | `board.display.systemPromptInject` | 必有 |
-| `session_collector_context_inject` | `{py} "${pluginPath}/runtime/session/render_session_context.py" --platform <platform> --plugin-workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path "${sessionWorkspacePath}"` | 必有 |
-| `knowledge_path` | `${pluginPath}/<knowledge.root>` | 知识模块 |
-| `deploy_units` | `{py} "${pluginPath}/runtime/knowledge/inspect_deploy_units.py"` | 知识模块；DevClaw 由它取得支持的发布单元。键名待与 DevClaw 确认（README §9） |
+| `session_collector_context_inject` | `{py} "${pluginPath}/runtime/session/render_session_context.py" --platform <platform> --plugin-workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path "${sessionWorkspacePath}"`；启用知识模块时末尾再加 `--knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledge-path}"`（D53） | 必有 |
+| `knowledge_path` | `${pluginPath}/sys` | 知识模块 |
+| `deploy_units` | `{py} "${pluginPath}/runtime/knowledge/inspect_deploy_units.py" --knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledge-path}"`（D53） | 知识模块；DevClaw 由它取得支持的发布单元。键名待与 DevClaw 确认（README §9） |
 | `pull_knowledge` | `{py} "${pluginPath}/runtime/knowledge/sync_knowledge.py"` | 声明 `knowledge.source` |
 | `skip_node` | `{py} "${pluginPath}/runtime/adapters/skip_node.py" --workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" --node "${nodeId}"` | `flow.json` 的 `skip` 不为 `null`（v1 不会出现） |
 
@@ -160,14 +156,7 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
 
 ### 4.1 目录布局
 
-所有业务状态写在项目目录下，不得写入插件安装目录（运行框架会拒绝）。每个插件只读写自己的元数据目录 `{metaDir}`（D3，设计说明见 README §6.5）：
-
-| `runtime.layout` | `{metaDir}`（相对项目目录） | 用途 |
-|---|---|---|
-| `isolated`（默认） | `<metaRoot>/<pluginId>` | 新插件；同一项目可以安装多个插件 |
-| `legacy` | `<metaRoot>` | 迁移已有插件（例如 lite），保证其已有项目可用 |
-
-`<metaRoot>` 是元数据根目录，取 `runtime.metaRoot`，默认 `.autobizdevops`（input-config.md §3.4）。
+所有业务状态写在项目目录下，不得写入插件安装目录（运行框架会拒绝）。每个插件只读写自己的元数据目录 `{metaDir}`，即项目目录下的 `<metaRoot>`（取 `runtime.metaRoot`，默认 `.autobizdevops`，input-config.md §3.4）。同一项目安装多个插件时，各插件配置不同的 `metaRoot`（D48，设计说明见 README §6.5）。
 
 ```text
 <pluginWorkspace>/<projectDir>/{metaDir}/
@@ -180,8 +169,7 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
     └── ARTIFACT_CATALOG.json  # 产物同步能力
 ```
 
-- `{metaDir}` 由运行框架根据 `runtime/config/runtime.json` 中的 `metaRoot`、`layout`、`pluginId` 推导。框架入口和模块通过 `runtime.common.query` 的 `metadata_dir()` / `feature_dir()` 获取，不得自行拼接；开发者的校验器通过 `${featureDir}` 占位符获取；
-- isolated 布局下，`plugin.id` 不得是元数据根目录下的保留目录名：`features`、`archive`、`issues`、`reviews`、`logs`、`plugins`；
+- `{metaDir}` 由运行框架根据 `runtime/config/runtime.json` 中的 `metaRoot` 推导。框架入口和模块通过 `runtime.common.query` 的 `metadata_dir()` / `feature_dir()` 获取，不得自行拼接；开发者的校验器通过 `${featureDir}` 占位符获取；
 - `<feature>` 必须是安全的路径分量：非空，不是 `.` 或 `..`，不含 `/`、`\`、NUL。不同插件可以有同名 Feature。
 
 ### 4.2 state.json
@@ -281,12 +269,11 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
   "schema": "autobiz.runtime.v1",
   "pluginId": "doc-review",
   "metaRoot": ".autobizdevops",
-  "layout": "isolated",
   "validateTimeoutSec": 120
 }
 ```
 
-`pluginId`、`metaRoot` 和 `layout` 在插件发布后不得修改：改了之后，已有项目的状态会找不到或被拒绝读取。`build` 发现它们与 build-manifest 中记录的不一致时报错（`PLUGIN_ID_CHANGED`、`LAYOUT_CHANGED`）。
+`pluginId` 和 `metaRoot` 在插件发布后不得修改：改了之后，已有项目的状态会找不到或被拒绝读取。`build` 发现它们与 build-manifest 中记录的不一致时报错（`PLUGIN_ID_CHANGED`、`LAYOUT_CHANGED`），确认要改时加 `--allow-id-change` 或 `--allow-layout-change`（interfaces.md §1.1）。
 
 ### 5.2 flow.json（流程契约及状态规则）
 
@@ -341,7 +328,7 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
   "checkpoints": {
     "chain": [ "…", "cicd_done", "archived" ],                // 只含主干
     "initial": "prd_in_progress",
-    "labels": { "…": "…", "detail_design_in_progress": "详细设计进行中", "archived": "已归档" }
+    "labels": { "…": "…", "detail_design_in_progress": "详细设计进行中", "archived": "archive" }
   }
 }
 ```
@@ -395,7 +382,7 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
 {
   "schema": "autobiz.session.v1",
   "policies": {
-    "default": { "agentMode": "solo" },
+    "default": { "agentMode": "multi" },
     "nodes": {
       "dev": [ { "id": "plan", "agentMode": "multi", "subagentConfig": { "customSubagentFiles": ["agents/explore.md"] } } ]
     }
@@ -452,7 +439,7 @@ description: 将工作拆解为有序任务。当你已有规格说明……时�
 | 规则 | 说明 |
 |---|---|
 | 对应关系 | 节点与技能一一对应（input-config.md §2.2，`SKILL_SHARED`），片段中的 checkpoint 就是该节点的 `<id>_in_progress`、`<id>_done` |
-| 内容 | 普通节点两行：技能开始执行推进到 `_in_progress`，技能完成执行推进到 `_done`。终态节点没有 `_in_progress`，只有一行：技能完成执行推进到 `archived` |
+| 内容 | 普通节点两行：技能开始执行推进到 `_in_progress`，技能完成执行推进到 `_done`。终态节点没有 `_in_progress`，只有一行：技能完成执行推进到 `archived`。片段只包含状态维护，文案固定，不开放配置；脚手架不在 SKILL.md 中生成产物相关的内容（D45） |
 | 解释器 | 固定写 `python -X utf8`（D40） |
 | 占位符 | `${pluginPath}`、`${feature}` 是宿主占位符，由 DevClaw 在技能正文中替换（interfaces.md §3.2） |
 | 位置 | SKILL.md 开头：紧接 frontmatter，在正文之前。没有 frontmatter 时放在第一行（同时报 `SKILL_FRONTMATTER`） |
@@ -493,7 +480,8 @@ description: [TODO: 做什么；在什么情况下使用]
 
 要求：
 
-- frontmatter 遵循 Codex 技能规则：只允许 `name`、`description`、`license`、`allowed-tools`、`metadata` 五个键。`name` 等于目录名和节点的 `skill`；`description` 必填，不超过 1024 字符，不含 `<` `>`。版本号等自定义信息放在 `metadata` 下（例如 `metadata: {version: "v3.0"}`）。现有插件中有 19 个技能把 `version` 写在顶层、2 个写了 `author`。DevClaw 不依赖这两个字段（D8），导入技能（`add skill --from`）时会自动把它们迁到 `metadata`；
+- frontmatter 遵循 Codex 技能规则：只允许 `name`、`description`、`license`、`allowed-tools`、`metadata` 五个键。`name` 等于目录名和节点的 `skill`；`description` 必填，不超过 1024 字符，不含 `<` `>`。版本号等自定义信息放在 `metadata` 下，写成 `metadata:` 换行后缩进两格的 `键: 值`（例如下一行写 `  version: v3.0`）。现有插件中有 19 个技能把 `version` 写在顶层、2 个写了 `author`。DevClaw 不依赖这两个字段（D8），导入技能（`add skill --from`）时会自动把它们迁到 `metadata`；
+- frontmatter 只支持两种写法：单行 `键: 值`（值可以加单引号或双引号），以及 `metadata:` 下一层缩进的单行 `键: 值`。块标量（`>`、`|`）、多层嵌套和列表报 `SKILL_FRONTMATTER`（D45）；
 - `description` 是技能的触发依据，“什么时候用”要写在这里，而不是正文：正文只有在技能被触发后才会加载。空白 SKILL.md 的 description 预置为 `[TODO: 做什么；在什么情况下使用]`；
 - 技能的详细要求写在正文中。正文建议不超过 500 行，细节放到 `references/`，并在正文中写明什么时候读哪个文件（渐进式加载）；
 - 正文不再另写状态命令：开始、完成时执行什么只看状态维护片段。正文中自己写的 `update_state.py` 调用和旧入口路径由 `check` 报 `LEGACY_ENTRY_REF`；
@@ -524,7 +512,7 @@ description: [TODO: 做什么；在什么情况下使用]
 
 另外会在 `inspectCommands` 中加入 `knowledge_path`、`deploy_units`（声明 `source` 时再加 `pull_knowledge`），在 `modules.json` 中写入知识模块的开启信息，生成 `runtime/config/knowledge.json`，在 `session.json` 中写入 `knowledgeAssembly`（仅 `assembler = plugin`，§5.4）。
 
-支持的发布单元由 DevClaw 执行 `deploy_units` 取得，`pull_knowledge` 同步后也会在输出中给出（interfaces.md §3.3.8、§3.3.9）。全栈版 board_config 中的 `supported_deploy_units` 和 `agentsRepo` 不再生成：前者改由命令给出，后者是同步脚本自己的配置，放在 `knowledge.json` 的 `source`。声明 `source` 时还会在 `.gitignore` 中追加 `<root>/`、`.knowledge.lock`、`.knowledge-sync-*`。
+支持的发布单元由 DevClaw 执行 `deploy_units` 取得，`pull_knowledge` 同步后也会在输出中给出（interfaces.md §3.3.8、§3.3.9）。全栈版 board_config 中的 `supported_deploy_units` 和 `agentsRepo` 不再生成：前者改由命令给出，后者是同步脚本自己的配置，放在 `knowledge.json` 的 `source`。
 
 ### 7.2 产物同步模块（modules/artifactSync.json）
 
@@ -571,7 +559,7 @@ skills/<skillName>/
 }
 ```
 
-同步脚本属于框架模块，与运行框架同版本发布，通过 `runtime.common.query` 定位 Feature 目录和状态，因此同时支持 isolated 和 legacy 布局。上传路径（`{PROJECT_CODE}/DEV/Features/{feature}/{employeeId}/`）是否加入 `pluginId`，见 README §9。
+同步脚本属于框架模块，与运行框架同版本发布，通过 `runtime.common.query` 定位 Feature 目录和状态，因此 `metaRoot` 配置成其他目录也能用。上传路径（`{PROJECT_CODE}/DEV/Features/{feature}/{employeeId}/`）是否加入 `pluginId`，见 README §9。
 
 脚本相对全栈版的改动见 [README.md §6.3](README.md)。v1 配置（无 `schemaVersion`、`stages` 只有 biz/dev）和 v2 配置（额外路径写在 `stages` 的节点下，没有顶层 `extraPaths`）仍需能读取，以兼容全栈版现有插件。
 
@@ -596,21 +584,27 @@ skills/<skillName>/
   "scaffoldVersion": "1.0.0",
   "coreVersion": "1.0.0",
   "pluginId": "autodev-planning-kanban",
-  "layout": "legacy",
   "metaRoot": ".autobizdevops",
   "modules": { "board": "1.0.0", "session": "1.0.0", "knowledge": "1.0.0", "artifactSync": "1.0.0" },
   "inputs": { "plugin.scaffold.json": "sha256:…", "workflow.json": "sha256:…",
               "modules/board.json": "sha256:…", "modules/session.json": "sha256:…", "modules/knowledge.json": "sha256:…",
-              "modules/artifactSync.json": "sha256:…" },
+              "modules/artifactSync.json": "sha256:…",
+              "skills/autodev-plan/SKILL.md#description": "sha256:…" },
   "files": {
-    "runtime/common/engine.py": { "ownership": "managed", "sha256": "…" },
-    "board_core/board_config.json": { "ownership": "generated", "sha256": "…" },
-    "board_core/modules.json": { "ownership": "generated", "sha256": "…" },
+    "runtime/common/engine.py": { "ownership": "managed", "sha256": "sha256:…" },
+    "board_core/board_config.json": { "ownership": "generated", "sha256": "sha256:…" },
+    "board_core/modules.json": { "ownership": "generated", "sha256": "sha256:…" },
     "skills/autodev-plan/SKILL.md": { "ownership": "seeded", "regions": { "state": "sha256:…" } }
   }
 }
 ```
 
 节点技能的 `SKILL.md` 归属为 `seeded`，只记录状态维护片段的摘要（`regions.state`，取两个标记之间去掉首尾换行后的内容）。doctor 和 build 靠这些记录找到上次写过片段的技能：技能不再绑定节点时删掉它的片段（§6.1）。
+
+`inputs` 记录每份核心配置的摘要，以及每个节点技能 SKILL.md 中 `description` 的摘要（键为 SKILL.md 的路径加 `#description`，值按 frontmatter 解析出的 `description` 字符串计算）：节点描述由它编译进 `runtime/config/board.json`，改了它同样要重新生成（D49）。技能还没有 SKILL.md 时不记录这一项。
+
+`files` 按路径排序（D52）。模块关闭后，它以前生成的文件保留在插件目录中，build-manifest 继续记录，并加上 `"inactive": true`：build 不再更新它们，`package` 不打包，lint 报 `MODULE_INACTIVE_FILES`；重新启用模块时去掉标记（D52）。
+
+所有摘要都写成 `sha256:<hex>`（D43）。文本文件（能以 UTF-8 解码且不含 NUL 字节）先把 CRLF 换成 LF 再计算，同一份内容在 Windows 和其他平台上摘要相同（D42）。
 
 不记录构建时间，保证同样的输入构建出同样的文件。build-manifest 应纳入版本控制。

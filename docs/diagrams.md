@@ -138,7 +138,7 @@ flowchart LR
     O1["runtime/config/flow.json<br/>流程契约与状态规则"]
     O2["runtime/config/session.json<br/>策略 · 知识组装脚本"]
     O3["runtime/config/knowledge.json"]
-    O4["runtime/config/runtime.json<br/>pluginId · layout"]
+    O4["runtime/config/runtime.json<br/>pluginId · metaRoot"]
     O7["runtime/config/board.json<br/>看板文案"]
     O5["board_core/board_config.json · modules.json<br/>宿主命令 · 模块与入口"]
     O6["runtime/build-manifest.json<br/>输入摘要 · 文件哈希"]
@@ -177,12 +177,12 @@ flowchart LR
   subgraph LINT["lint（build 的前三步）"]
     direction LR
     S1["load<br/>读入口及其引用的文件<br/>按 Schema 校验结构"]
-    S2["normalize<br/>填默认值 · 汇总产物<br/>推断类型 · 算 checkpoint"]
+    S2["normalize<br/>按 Schema 补默认值<br/>去掉 $schema"]
     S3["validate<br/>语义规则<br/>input-config §7.2"]
     S1 --> S2 --> S3
   end
 
-  S4["compile<br/>生成 PluginIR"]
+  S4["compile<br/>汇总产物 · 推断类型<br/>算 checkpoint · 生成 PluginIR"]
   S5["contribute<br/>board · session<br/>knowledge · artifactSync"]
   S6["emit<br/>按归属写文件<br/>同步 SKILL.md 状态片段<br/>检查漂移"]
   S7["manifest<br/>写 build-manifest.json"]
@@ -195,29 +195,26 @@ flowchart LR
 
 ### 5. 自动检测
 
-核心配置会被多人和 agent 修改，所以每个可能引入错误的环节都自动检测。本地钩子可以被 `--no-verify` 跳过，CI 是最后一道。见 [input-config.md §7.1](input-config.md)。
+核心配置会被多人和 agent 修改，所以在修改后和 build 前都会检测。插件是成品，不假设插件仓库用 git 管理，没有提交前钩子和 CI，`lint`、`check` 由开发者手动执行（D41）。见 [input-config.md §7.1](input-config.md)。
 
 ```mermaid
 flowchart TB
   EDIT["修改核心配置<br/>（人或 agent）"]
   IDE["编辑时：IDE 按 $schema 即时提示<br/>只查结构"]
   AG["agent 修改后：运行 lint"]
+  MAN["开发者手动：lint / check<br/>check = lint + 技能 + 漂移 + 契约测试"]
   BLD["build 前：同样执行 lint<br/>有 error 不写编译配置"]
-  HOOK["提交时：pre-commit 运行 lint<br/>含 BUILD_STALE 检测"]
-  CI["合并时：CI 运行 check --strict<br/>lint + 技能 + 漂移 + 契约测试"]
-  PKG["package 发布"]
+  PKG["package 发布<br/>先执行 check"]
   RUN["运行时：加载 flow.json<br/>校验不变量"]
   FIX["按 Issue 修正<br/>再运行 doctor 重新生成"]
 
-  EDIT --> IDE & AG
-  IDE & AG --> BLD
-  BLD --> HOOK
-  HOOK -->|"通过"| CI
-  CI -->|"通过"| PKG
-  PKG --> RUN
+  EDIT --> IDE & AG & MAN
+  IDE & AG & MAN --> BLD
+  BLD -->|"通过"| PKG
+  PKG -->|"check 通过"| RUN
+  MAN -->|"error"| FIX
   BLD -->|"error"| FIX
-  HOOK -->|"error"| FIX
-  CI -->|"失败"| FIX
+  PKG -->|"check 失败"| FIX
   FIX --> EDIT
 ```
 
@@ -316,24 +313,21 @@ flowchart LR
 
 ### 10. 多插件隔离
 
-每个插件只读写自己的元数据目录，状态、锁和产物互不干扰；legacy 布局只为迁移已有插件保留，一个项目最多一个。见 [README §6.5](README.md)。
+每个插件只读写自己的元数据根目录 `runtime.metaRoot`，状态、锁和产物互不干扰；同一项目安装多个插件时，各插件配置不同的 `metaRoot`（D48）。见 [README §6.5](README.md)。
 
 ```mermaid
 flowchart TB
   subgraph PLUGINS["同一项目中安装的插件"]
     direction LR
-    PA["doc-review<br/>layout: isolated"]
-    PB["another-plugin<br/>layout: isolated"]
-    PL["lite<br/>layout: legacy（最多一个）"]
+    PL["lite<br/>metaRoot: .autobizdevops（默认）"]
+    PA["doc-review<br/>metaRoot: .doc-review"]
   end
 
-  A[".autobizdevops/doc-review/<br/>state.json · .state.lock · features/"]
-  B[".autobizdevops/another-plugin/<br/>state.json · .state.lock · features/"]
-  L[".autobizdevops/<br/>state.json · features/"]
+  L[".autobizdevops/<br/>state.json · .state.lock · features/"]
+  A[".doc-review/<br/>state.json · .state.lock · features/"]
 
-  PA -->|"只读写"| A
-  PB -->|"只读写"| B
   PL -->|"只读写"| L
+  PA -->|"只读写"| A
 ```
 
 ### 11. 看板事件推送

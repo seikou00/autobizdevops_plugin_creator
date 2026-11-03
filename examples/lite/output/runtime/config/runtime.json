@@ -2,6 +2,5 @@
   "schema": "autobiz.runtime.v1",
   "pluginId": "autodev-planning-kanban",
   "metaRoot": ".autobizdevops",
-  "layout": "legacy",
   "validateTimeoutSec": 120
 }

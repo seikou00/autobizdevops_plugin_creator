@@ -11,9 +11,6 @@
     },
     "keywords": ["requirements", "specs", "planning", "incremental-code", "kanban"]
   },
-  "runtime": {
-    "layout": "legacy"
-  },
   "workflow": "./workflow.json",
   "modules": {
     "board": "./modules/board.json",

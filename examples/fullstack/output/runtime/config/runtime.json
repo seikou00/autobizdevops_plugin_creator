@@ -2,6 +2,5 @@
   "schema": "autobiz.runtime.v1",
   "pluginId": "autobizdevops-plugin",
   "metaRoot": ".autobizdevops",
-  "layout": "legacy",
   "validateTimeoutSec": 120
 }

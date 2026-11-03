@@ -10,9 +10,9 @@
       "plugin_dir_hook": "${pluginWorkspace}/${projectDir}",
       "dialog_tips": "**您正在开发${projectCode} 项目**\n请描述要新增或修改的特性，并说明验收标准。当前产物目录：`${pluginWorkspace}/${projectDir}`",
       "system_prompt_inject": "\n- FEATURE_DIR：`${pluginWorkspace}/${projectDir}/.autobizdevops/features/${feature}`，这是当前 Feature 产物目录，不得自行定义特性/feature/slug 名称。\n- 调用 `${pluginPath}` 下的脚本时，execute/shell 工具请求省略 `cwd` 字段；状态和产物路径由环境变量或显式参数定位。",
-      "session_collector_context_inject": "python3 -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform darwin --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\"",
+      "session_collector_context_inject": "python3 -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform darwin --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\" --knowledge-path \"${pluginPath}/sys\" --knowledge-path-platform \"${knowledge-path}\"",
       "knowledge_path": "${pluginPath}/sys",
-      "deploy_units": "python3 -X utf8 \"${pluginPath}/runtime/knowledge/inspect_deploy_units.py\"",
+      "deploy_units": "python3 -X utf8 \"${pluginPath}/runtime/knowledge/inspect_deploy_units.py\" --knowledge-path \"${pluginPath}/sys\" --knowledge-path-platform \"${knowledge-path}\"",
       "pull_knowledge": "python3 -X utf8 \"${pluginPath}/runtime/knowledge/sync_knowledge.py\""
     },
     "linux": {
@@ -24,9 +24,9 @@
       "plugin_dir_hook": "${pluginWorkspace}/${projectDir}",
       "dialog_tips": "**您正在开发${projectCode} 项目**\n请描述要新增或修改的特性，并说明验收标准。当前产物目录：`${pluginWorkspace}/${projectDir}`",
       "system_prompt_inject": "\n- FEATURE_DIR：`${pluginWorkspace}/${projectDir}/.autobizdevops/features/${feature}`，这是当前 Feature 产物目录，不得自行定义特性/feature/slug 名称。\n- 调用 `${pluginPath}` 下的脚本时，execute/shell 工具请求省略 `cwd` 字段；状态和产物路径由环境变量或显式参数定位。",
-      "session_collector_context_inject": "python3 -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform linux --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\"",
+      "session_collector_context_inject": "python3 -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform linux --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\" --knowledge-path \"${pluginPath}/sys\" --knowledge-path-platform \"${knowledge-path}\"",
       "knowledge_path": "${pluginPath}/sys",
-      "deploy_units": "python3 -X utf8 \"${pluginPath}/runtime/knowledge/inspect_deploy_units.py\"",
+      "deploy_units": "python3 -X utf8 \"${pluginPath}/runtime/knowledge/inspect_deploy_units.py\" --knowledge-path \"${pluginPath}/sys\" --knowledge-path-platform \"${knowledge-path}\"",
       "pull_knowledge": "python3 -X utf8 \"${pluginPath}/runtime/knowledge/sync_knowledge.py\""
     },
     "win32": {
@@ -38,9 +38,9 @@
       "plugin_dir_hook": "${pluginWorkspace}/${projectDir}",
       "dialog_tips": "**您正在开发${projectCode} 项目**\n请描述要新增或修改的特性，并说明验收标准。当前产物目录：`${pluginWorkspace}/${projectDir}`",
       "system_prompt_inject": "\n- FEATURE_DIR：`${pluginWorkspace}/${projectDir}/.autobizdevops/features/${feature}`，这是当前 Feature 产物目录，不得自行定义特性/feature/slug 名称。\n- 调用 `${pluginPath}` 下的脚本时，execute/shell 工具请求省略 `cwd` 字段；状态和产物路径由环境变量或显式参数定位。",
-      "session_collector_context_inject": "python -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform win32 --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\"",
+      "session_collector_context_inject": "python -X utf8 \"${pluginPath}/runtime/session/render_session_context.py\" --platform win32 --plugin-workspace \"${pluginWorkspace}\" --project \"${projectDir}\" --feature \"${feature}\" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path \"${sessionWorkspacePath}\" --knowledge-path \"${pluginPath}/sys\" --knowledge-path-platform \"${knowledge-path}\"",
       "knowledge_path": "${pluginPath}/sys",
-      "deploy_units": "python -X utf8 \"${pluginPath}/runtime/knowledge/inspect_deploy_units.py\"",
+      "deploy_units": "python -X utf8 \"${pluginPath}/runtime/knowledge/inspect_deploy_units.py\" --knowledge-path \"${pluginPath}/sys\" --knowledge-path-platform \"${knowledge-path}\"",
       "pull_knowledge": "python -X utf8 \"${pluginPath}/runtime/knowledge/sync_knowledge.py\""
     }
   }
