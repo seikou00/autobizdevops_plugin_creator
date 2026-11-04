@@ -198,6 +198,8 @@ python3 "<pyz>" -C "<插件目录>" package --json
 | `artifacts` | 要上传的产物：键是产物路径，必须与 `workflow.json` 某个节点 `outputs` 中的写法**完全一致**；值是简述 |
 | `excludeCheckpoints`、`extraPaths` | 可选：不允许同步的 checkpoint；产物之外要一起上传的路径（glob → 简述） |
 
+同步技能每次同步前会按实际代码生成接口交付文档 `FEATURE_API_DETAIL.md`，并自动把它加进同步范围。它不是节点输出，**不要写进 `artifacts`**，否则报 `ARTIFACT_REF_UNKNOWN`；只有要改它的简述时，才在 `extraPaths` 里写 `"FEATURE_API_DETAIL.md": "<简述>"`。
+
 ### modules/globalHooks.json
 
 骨架里已经列出全部可用的全局钩子，**删掉不需要的**即可，不用自己写 id。每个钩子做什么以 `hook list` 的说明为准，目前有：

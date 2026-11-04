@@ -24,5 +24,7 @@
       }
     }
   },
-  "extraPaths": {}
+  "extraPaths": {
+    "FEATURE_API_DETAIL.md": "当前 Feature 涉及接口的详细说明。"
+  }
 }

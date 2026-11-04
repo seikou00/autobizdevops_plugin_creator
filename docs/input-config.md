@@ -435,7 +435,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `artifacts` | — | 必填。要上传的产物：产物路径 → 同步目录中的简述。路径必须出现在某个节点的 `outputs` 中 |
 | `uploadUrl` | `https://tscode-cos-plugin.paasuat.cmbchina.cn/file/upload` | 上传服务地址，默认值取自全栈版 `sync_artifacts.py` |
 | `maxFileSizeMiB` | `5` | 超过上限的文件跳过并报告 |
-| `extraPaths` | `{}` | 不属于任何节点输出、但需要同步的路径：`{路径模式: 简述}`，路径相对 `FEATURE_DIR`，不记录阶段和节点 |
+| `extraPaths` | `{}` | 不属于任何节点输出、但需要同步的路径：`{路径模式: 简述}`，路径相对 `FEATURE_DIR`，不记录阶段和节点。同步技能生成的 `FEATURE_API_DETAIL.md` 总会同步：没有作为节点输出列进 `artifacts`、这里也没写时，生成的同步配置自动追加（D66）；要改它的简述就写在这里 |
 
 ### 4.6 modules/globalHooks.json（插件全局钩子模块）
 

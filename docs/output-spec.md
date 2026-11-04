@@ -542,9 +542,12 @@ skills/<skillName>/
 ├── SKILL.md                         # module（文案中的技能名、路径会按 skillName 渲染）
 ├── config/artifact-sync.json        # generated（由节点输出推导）
 ├── references/sync-runtime.md       # module
-├── references/feature-api-detail.md # module
+├── references/feature-api-detail.md # module（接口交付文档的生成规则与模板）
+├── references/ask-user-question.md  # module（全栈版共享的提问协议原文）
 └── scripts/sync_artifacts.py  scripts/artifact_sync_utils.py   # module
 ```
+
+技能取自全栈版 `autobizdevops-artifact-sync`，只改脚本的导入和路径、技能文案中的路径说明，并去掉对全栈版独有文件的依赖（D66）：常规同步前仍按实际代码生成或更新 `FEATURE_API_DETAIL.md`，但代码仓库取 `--check` 输出的 `deploy_units`（Feature 记录中的发布单元，interfaces.md §3.3.2），没有时取会话工作区中的 Git 仓库，实现范围取这些仓库中带“cmbdevclaw提交”的提交，不再读 `plan.json` 的 `codeWorkspaces`、Batch manifest 和 implementation evidence；`ARTIFACT_CATALOG.json` 中条目的 `source` 按是否来自 `extraPaths` 判断，不再按全栈版的固定文件名；`category` 对照表另外认 lite 的 `plan.md`（与 `PLAN.md` 同为 `implementation_plan`）。
 
 `config/artifact-sync.json` v3 格式：
 
@@ -559,7 +562,7 @@ skills/<skillName>/
     "Dev": { "specs": { "proposal.md": "变更提案。", "specs/*/spec.md": "行为规格。", "design.md": "技术设计。" },
              "plan":  { "plan.md": "实施计划。" } }
   },
-  "extraPaths": { "prd_original/**/*": "原始需求文档或参考材料。" }
+  "extraPaths": { "prd_original/**/*": "原始需求文档或参考材料。", "FEATURE_API_DETAIL.md": "当前 Feature 涉及接口的详细说明。" }
 }
 ```
 
@@ -567,7 +570,7 @@ skills/<skillName>/
 
 - `stages[阶段名][nodeId][path] = 简述`，阶段名取节点的 `stage`；按流程顺序遍历每个节点的 `outputs`，只取 `artifacts` 中列出的产物；简述取 `artifacts[路径]`；
 - 每个产物只登记到第一个产出它的节点下；
-- `extraPaths` 原样取自 `artifactSync.extraPaths`，写在顶层，不归入任何阶段和节点，没有时为 `{}`；同步脚本把它们直接放在 Feature 的同步目录下；
+- `extraPaths` 原样取自 `artifactSync.extraPaths`，写在顶层，不归入任何阶段和节点；同步技能生成的 `FEATURE_API_DETAIL.md` 没有作为节点输出登记、`extraPaths` 中也没写时，追加在末尾，简述为“当前 Feature 涉及接口的详细说明。”；同步脚本把它们直接放在 Feature 的同步目录下；
 - `allowedCheckpoints` 优先用显式列表；否则取主干 checkpoint 链（含 `archived`，不含动态阶段节点）上 `allowedFrom` 及之后的全部 checkpoint，再去掉 `excludeCheckpoints`；
 - 没有任何可同步路径的节点和阶段不输出。
 

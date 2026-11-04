@@ -69,7 +69,7 @@ python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz"
 | `modules/board.json` | 改看板名称、描述、对话提示、系统提示，或目标平台、解释器 |
 | `modules/session.json` | 改默认运行策略（`agentMode`），或给节点单独配置策略、子代理 |
 | `modules/knowledge.json` | 需要按所选发布单元加载知识；`assembly.assembler` 选 `plugin`（插件组装）或 `devclaw`；声明 `source` 表示由插件拉取知识仓库 |
-| `modules/artifactSync.json` | 需要把产物上传到外部服务；`allowedFrom` 或 `allowedCheckpoints` 二选一，`artifacts` 显式列出要上传的产物路径及简述 |
+| `modules/artifactSync.json` | 需要把产物上传到外部服务；`allowedFrom` 或 `allowedCheckpoints` 二选一，`artifacts` 显式列出要上传的产物路径及简述。同步技能每次同步前按实际代码生成 `FEATURE_API_DETAIL.md` 并自动上传，不要把它写进 `artifacts`（不是节点输出，会报 `ARTIFACT_REF_UNKNOWN`），改简述时写在 `extraPaths` |
 
 知识沉淀入口固定开启，不用问。不需要改默认值的模块不写文件。
 

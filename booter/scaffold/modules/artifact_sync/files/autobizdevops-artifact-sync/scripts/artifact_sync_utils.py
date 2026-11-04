@@ -29,9 +29,6 @@ CATALOG_FILE_NAME = "ARTIFACT_CATALOG.json"
 CATALOG_SCHEMA_VERSION = "autobizdevops.artifact-catalog.v1"
 PRD_ORIGINAL_DIR_NAME = "prd_original"
 SOURCE_SNAPSHOT_DIR_NAME = "sources"
-EXTRA_CATALOG_PATHS = (
-    "FEATURE_API_DETAIL.md",
-)
 LEGACY_SYNC_DIR_NAME = "artifact-sync"
 LEGACY_OUTBOX_FILE_NAME = "outbox.ndjson"
 LEGACY_MANIFESTS_DIR_NAME = "manifests"
@@ -241,6 +238,7 @@ CATALOG_EXACT_METADATA = {
     "design.md": ("technical_design", "process"),
     ".design-contract.lock.json": ("technical_design_contract", "process"),
     "PLAN.md": ("implementation_plan", "process"),
+    "plan.md": ("implementation_plan", "process"),
     "plan.json": ("implementation_plan", "final"),
     "SMOKE_TEST_PLAN.json": ("smoke_test_plan", "process"),
     "SMOKE_RESULT.json": ("smoke_result", "evidence"),
@@ -263,14 +261,9 @@ CATALOG_EXACT_METADATA = {
 }
 
 
-def catalog_source_for_path(relative_path: str) -> str:
-    if (
-        relative_path.startswith(f"{PRD_ORIGINAL_DIR_NAME}/")
-        or relative_path.startswith(f"{SOURCE_SNAPSHOT_DIR_NAME}/")
-        or relative_path in EXTRA_CATALOG_PATHS
-    ):
-        return "extra"
-    return "workflow"
+def catalog_source_for_stage(stage: str) -> str:
+    # 同步配置 extraPaths 中的路径是额外约定的文件，其余都是节点产物。
+    return "extra" if stage == EXTRA_NODE else "workflow"
 
 
 def catalog_metadata_for_path(relative_path: str) -> dict[str, str]:
@@ -468,7 +461,7 @@ def catalog_content(feature: str, employee_id: str, selected: dict[str, dict[str
             continue
         metadata = catalog_metadata_for_path(path)
         entries.append({
-            "path": path, "stage": artifact["stage"], "source": catalog_source_for_path(path),
+            "path": path, "stage": artifact["stage"], "source": catalog_source_for_stage(artifact["stage"]),
             **metadata, "upload_status": "uploaded", "description": artifact["description"],
             # If an update failed, these still describe the last uploaded version.
             "size": published["size"], "sha256": published["sha256"],
@@ -534,6 +527,8 @@ class SyncSession:
         self.config = load_config()
         record = current_feature_record(workspace, feature)
         self.checkpoint = record["checkpoint"]
+        # 创建 Feature 时选定的发布单元（deployUnitId、localRepoPath），生成接口文档时据此定位代码仓库
+        self.deploy_units = [dict(unit) for unit in record.get("deployUnits") or [] if isinstance(unit, dict)]
         if self.checkpoint not in self.config["allowedCheckpoints"]:
             raise ValueError(f"当前 checkpoint {self.checkpoint} 不允许产物同步；允许值: "
                              + ", ".join(self.config["allowedCheckpoints"]))

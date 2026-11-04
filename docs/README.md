@@ -262,6 +262,7 @@ DevClaw 通过 `session_collector_context_inject` 拿到会话内容。默认会
 - 同步配置 `config/artifact-sync.json` 按 `artifacts` 中列出的产物生成（路径和归属节点从节点输出推导），`allowedCheckpoints` 由 `allowedFrom` 推导；
 - 看板入口：全栈版在 `9411fc3` 新增了顶层键 `artifact_sync`（与 `knowledge_config` 同构，用于在看板上带出同步技能），改由模块生成，写入 `board_core/modules.json`，对应子选项 `entry`；
 - 工号确认（`--employee-id`，上传路径为 `{PROJECT_CODE}/DEV/Features/{feature}/{employeeId}/`）也在 `9411fc3` 中加入。模块以该提交为起点，照搬这套确认流程。
+- 技能文案保持通用（D66）：保留“生成接口交付文档”步骤（`FEATURE_API_DETAIL.md`），但不再依赖全栈版独有的 `plan.json` 的 `codeWorkspaces`、Batch manifest、implementation evidence：代码仓库取 Feature 记录中的发布单元（`--check` 输出 `deploy_units`），没有时取会话工作区中的 Git 仓库，实现范围取带“cmbdevclaw提交”的提交，多仓库时代码依据注明 `deployUnitId`；同步配置默认把 `FEATURE_API_DETAIL.md` 列入 `extraPaths`；共享提问协议 `ask-user-question.md` 带上全栈版原文，链接从 `../references/` 改为技能自己的 `references/`；同步配置由 build 生成，文案说明运行时只读、改同步范围要改模块配置。
 
 **知识模块**（来源：lite 的 `sync_agents.py`、`agents_repo.py`、`paths.py`；全栈版的 `render_collected_session_context.py`、`collect-knowledge.js`）：
 
@@ -444,6 +445,7 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 | D63 | 核心配置骨架（2026-11-04）：`new <dir> --skeleton [--module <id> …]` 只写出带 `[TODO: …]` 占位的入口文件、`workflow.json`（biz、dev 各一个节点）、所选模块配置和 `.scaffold/` Schema，不执行 doctor；load 在 Schema 校验时逐项报出占位 `TODO_FIELD`（默认 error，doctor 不生成；`artifactSync` 的简述为 warning，沿用 D56，打包前由 `TODO_PLACEHOLDER` 拦下），占位处的 Schema 问题不再另报 `INPUT_SCHEMA`；开发者填完后 `lint` → `doctor` → `package` | interfaces.md §1.1、§1.4.1；input-config.md §7.1 |
 | D64 | 节点技能按阶段分组（2026-11-04）：节点技能放在 `skills/autobiz\|autodev\|autoops/<技能>/`，分组由节点所属阶段决定（biz、dev、ops），与技能名无关；空白 `SKILL.md` 直接生成在分组目录；找到的技能不在分组目录时 lint 报 `SKILL_LAYOUT` warning，doctor 先挪整个技能目录，并把 `skills/` 下开发者文件中对旧目录的引用改成新目录，结果列在 `changes.skills.moved`；目标已存在报 `SKILL_LAYOUT_CONFLICT`；`add skills` 导入平铺的技能集合（如 lite）后同样挪进分组；不绑定节点的辅助技能和模块生成的技能不分组 | input-config.md §5、§7.1；interfaces.md §1.7；output-spec.md §1 |
 | D65 | 骨架引导的易用性修订（2026-11-04）：`plugin.id` 改为只含英文字母、数字、短横线和下划线（`^[A-Za-z0-9_-]+$`，不超过 64 字符），向导规范化时不再转小写；`new --skeleton` 的 `modules/globalHooks.json` 直接列出全部可用钩子，用户删掉不需要的；`hook list` 不在插件目录中也能运行；骨架引导技能用 `request_user_input` 出选择题（起点、目录、模块、填写方式、技能来源），并内置 workflow 与各模块的填写指南 | input-config.md §3.3；interfaces.md §1.1、§1.4.1 |
+| D66 | 产物同步技能取全栈版原文（2026-11-05）：`artifactSync` 模块带入全栈版 `autobizdevops-artifact-sync` 最新提交的技能，只改脚本的导入和路径（运行框架 `runtime.common.query`、生成的同步配置）和文案中的路径说明，并去掉对全栈版独有文件的依赖：① 生成 `FEATURE_API_DETAIL.md` 的步骤保留，代码仓库改取 Feature 记录的 `deployUnits`（`--check` 输出 `deploy_units`），没有时取会话工作区的 Git 仓库，实现范围取带“cmbdevclaw提交”的提交，不再读 `plan.json` 的 `codeWorkspaces`、Batch manifest、implementation evidence，多仓库时代码依据注明 `deployUnitId`；② 同步配置默认把 `FEATURE_API_DETAIL.md` 列入 `extraPaths`（已作为节点输出登记或 `extraPaths` 中已写时不追加）；③ `ARTIFACT_CATALOG.json` 的 `source` 按是否来自 `extraPaths` 判断，`category` 对照表另外认 lite 的 `plan.md`；④ `references/ask-user-question.md` 用全栈版共享协议的完整原文 | output-spec.md §7.2；input-config.md §4.5 |
 
 ## 9. 遗留问题
 

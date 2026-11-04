@@ -116,6 +116,18 @@ P/
 | `excludeCheckpoints` | 排除的 checkpoint |
 | `extraPaths` | 产物之外要同步的路径 glob → 简述 |
 
+启用后会生成同步技能 `skills/autobizdevops-artifact-sync/`（技能名可用 `skillName` 修改），看板上带出“发起产物同步”入口。技能每次执行时：
+
+1. 先向用户确认工号、Feature 和上传目录 `{PROJECT_CODE}/DEV/Features/{feature}/{工号}/`，确认后才继续；
+2. 常规同步前，按实际代码生成或更新 Feature 目录下的接口交付文档 `FEATURE_API_DETAIL.md`。代码仓库取创建 Feature 时选定的发布单元（`localRepoPath`），没有时取会话工作区中的 Git 仓库；实现范围取这些仓库中带“cmbdevclaw提交”的提交。没有源码或没有接口变更时，在文档中说明，不阻断其他产物的同步；
+3. 按同步配置上传有变化的产物，再上传产物清单 `ARTIFACT_CATALOG.json`；失败的上传保留记录，修复后可以重试。
+
+注意：
+
+- `FEATURE_API_DETAIL.md` 总会同步，不用自己配置：它不是节点输出，**不要写进 `artifacts`**（会报 `ARTIFACT_REF_UNKNOWN`）；生成的同步配置会自动把它加进 `extraPaths`，要改简述就在 `extraPaths` 里写上这一项；
+- 同步配置 `skills/<技能>/config/artifact-sync.json` 每次重新生成都会按本文件重写，不要手改；
+- 产物清单中的 `category` 按文件名对照（如 `PRD.md` 为 `requirement`，`plan.md`、`PLAN.md` 为 `implementation_plan`），对照表中没有的文件为 `artifact`。
+
 ### 3.7 钩子与产物检查
 
 生成的插件默认注册一个宿主钩子：脚本是 `hooks/artifact_guard.py`，注册在 `hooks/hooks.json` 的 `PreToolUse`（`execute`）第一条，`plugin.json` 的 `hooks` 固定指向 `./hooks/hooks.json`。

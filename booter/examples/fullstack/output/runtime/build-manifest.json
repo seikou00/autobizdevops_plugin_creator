@@ -192,7 +192,7 @@
     },
     "skills/autobizdevops-artifact-sync/config/artifact-sync.json": {
       "ownership": "generated",
-      "sha256": "sha256:8e8539d6a0d289b284489ed7e9f1bfe32bcc89538e681e9c864c9f5e726de484"
+      "sha256": "sha256:124ce52e57ca2310b85c3c795c7ec434a9cfb77af79fdf40d6e7942cefe4eddf"
     },
     "skills/autobizdevops-artifact-sync/references/ask-user-question.md": {
       "ownership": "module",

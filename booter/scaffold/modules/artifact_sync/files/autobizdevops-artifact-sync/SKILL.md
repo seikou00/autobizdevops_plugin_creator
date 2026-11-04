@@ -22,7 +22,7 @@ python -X utf8 "${pluginPath}/skills/autobizdevops-artifact-sync/scripts/sync_ar
 
 所有产物及 `ARTIFACT_CATALOG.json` 均上传到 `{PROJECT_CODE}/DEV/Features/{feature}/{employee_id}/` 下，保留产物的相对路径。Feature 名和本地产物目录不追加工号。
 
-准入 checkpoint、节点、产物路径与简述统一维护在 [同步配置](config/artifact-sync.json)。需要调整同步范围时修改该配置。
+准入 checkpoint、节点、产物路径与简述统一维护在 [同步配置](config/artifact-sync.json)。该文件在生成插件时按产物同步模块的配置写出，执行本技能时只读取、不修改；需要调整同步范围时，由插件开发者修改模块配置后重新生成插件。
 
 ## 生成接口交付文档
 
@@ -30,9 +30,9 @@ python -X utf8 "${pluginPath}/skills/autobizdevops-artifact-sync/scripts/sync_ar
 
 读取 [接口文档生成规则与模板](references/feature-api-detail.md)。保留文件名 `FEATURE_API_DETAIL.md`。
 
-- 用 `plan.json` 的 `codeWorkspaces`、当前 Feature 的 implementation evidence、Batch manifest 与 Git 变更（commit中带有“cmbdevclaw提交”的提交）确定仓库和实现范围。文档以当前 Feature 实际交付的代码为依据，不能把整个仓库或其他 Feature 的接口算入本次交付。
-- 读取接口入口、请求/响应类型、返回包装、Service、Mapper/Repository、错误码与枚举；多仓库代码依据同时注明 `workspaceRef` 和仓库相对路径。记录可确认的提交或变更范围，便于判断旧文档是否需要更新。
-- 需求和设计只用于定位范围，不能据此编造接口字段或实现逻辑。按模板展开复杂字段，给出真实 SQL/查询构造片段和调用顺序。
+- 用 `--check` 返回的 `deploy_units`（创建 Feature 时选定的发布单元，`localRepoPath` 为其代码目录）确定代码仓库；没有记录发布单元，或记录的代码目录都不可用时，以当前会话工作区中的 Git 仓库为准。再用这些仓库的 Git 变更（commit 中带有“cmbdevclaw提交”的提交）确定当前 Feature 的实现范围。文档以当前 Feature 实际交付的代码为依据，不能把整个仓库或其他 Feature 的接口算入本次交付。
+- 读取接口入口、请求/响应类型、返回包装、Service、Mapper/Repository、错误码与枚举；涉及多个仓库时，代码依据同时注明 `deployUnitId`（没有记录发布单元时写仓库目录名）和仓库相对路径。记录可确认的提交或变更范围，便于判断旧文档是否需要更新。
+- `feature_dir` 中的需求、设计、计划等产物只用于定位范围，不能据此编造接口字段或实现逻辑。按模板展开复杂字段，给出真实 SQL/查询构造片段和调用顺序。
 - 无法确认的信息标为“代码中未确认”；检索后不存在的内容标为“代码中未发现”。确认没有接口变更时，在文档中说明并列出检查范围。
 - 源码不可用时保留已有文档并报告未更新的原因，不宣称文档已反映最新代码；缺失文档不阻断其他已存在产物的同步。
 
@@ -67,4 +67,4 @@ python -X utf8 "${pluginPath}/skills/autobizdevops-artifact-sync/scripts/sync_ar
 
 网络、凭据或服务错误未解决时保留失败记录并报告，不循环重试。
 
-以退出码和 `sync-status.json` 的事件状态确认结果；本地生成目录清单不代表上传成功。汇报已确认的工号、上传目录、接口文档是否更新、成功/失败/未变化的同步结果，以及缺失和超过 5 MiB 被跳过的文件。同步失败不修改业务代码或测试结论。
+以退出码和 `sync-status.json` 的事件状态确认结果；本地生成目录清单不代表上传成功。汇报已确认的工号、上传目录、接口文档是否更新、成功/失败/未变化的同步结果，以及缺失和超过大小上限（同步配置的 `maxFileSizeMiB`）被跳过的文件。同步失败不修改业务代码或测试结论。

@@ -13,6 +13,9 @@ FILE = "modules/artifactSync.json"
 SOURCE_SKILL = "autobizdevops-artifact-sync"
 SKILL_FILES = ("SKILL.md", "references/sync-runtime.md", "references/feature-api-detail.md", "references/ask-user-question.md",
                "scripts/sync_artifacts.py", "scripts/artifact_sync_utils.py")
+# 同步技能每次常规同步都会在 Feature 目录生成接口交付文档，同步配置默认把它列为额外路径（D66）
+API_DETAIL = "FEATURE_API_DETAIL.md"
+API_DETAIL_DESCRIPTION = "当前 Feature 涉及接口的详细说明。"
 
 
 def allowed_checkpoints(ir, options: dict) -> list:
@@ -33,13 +36,16 @@ def sync_config(ir, options: dict) -> dict:
                 continue
             registered.add(path)
             stages.setdefault(node.stage, {}).setdefault(node.id, {})[path] = wanted[path]
+    extra = dict(options.get("extraPaths", {}))
+    if API_DETAIL not in registered:
+        extra.setdefault(API_DETAIL, API_DETAIL_DESCRIPTION)
     return {
         "schemaVersion": 3,
         "allowedCheckpoints": allowed_checkpoints(ir, options),
         "uploadUrl": options["uploadUrl"],
         "maxFileSizeMiB": options["maxFileSizeMiB"],
         "stages": stages,
-        "extraPaths": dict(options.get("extraPaths", {})),
+        "extraPaths": extra,
     }
 
 

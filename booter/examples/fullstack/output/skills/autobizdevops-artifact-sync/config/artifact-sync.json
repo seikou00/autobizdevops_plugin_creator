@@ -30,6 +30,7 @@
   },
   "extraPaths": {
     "prd_original/**/*": "原始需求文档或参考材料。",
-    "sources/**/*": "外部资料原件或 Feature 固定快照。"
+    "sources/**/*": "外部资料原件或 Feature 固定快照。",
+    "FEATURE_API_DETAIL.md": "当前 Feature 涉及接口的详细说明。"
   }
 }

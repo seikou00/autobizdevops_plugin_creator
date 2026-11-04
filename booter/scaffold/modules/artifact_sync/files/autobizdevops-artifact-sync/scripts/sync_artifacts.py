@@ -107,7 +107,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.check:
             print(json.dumps({"feature": feature, "checkpoint": session.checkpoint,
                               "feature_dir": str(session.feature_dir), "employee_id": session.employee_id,
-                              "upload_base": session.upload_base}, ensure_ascii=False))
+                              "upload_base": session.upload_base, "deploy_units": session.deploy_units},
+                             ensure_ascii=False))
             return 0
         if args.event_id:
             event_ids = [args.event_id]
