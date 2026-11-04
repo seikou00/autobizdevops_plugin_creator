@@ -43,7 +43,7 @@ P/
 
 | 字段 | 说明 |
 |---|---|
-| `plugin.id` | 小写字母、数字、连字符；发布后修改要 `doctor --allow-id-change` |
+| `plugin.id` | 英文字母、数字、短横线和下划线，不超过 64 字符；发布后修改要 `doctor --allow-id-change` |
 | `plugin.name`、`version`、`description` | 必填（连同 `id`），写进 `plugin.json` |
 | `plugin.author{name,email,url}`、`homepage`、`repository`、`license`、`keywords` | 可选，写进 `plugin.json` |
 | `plugin.mcpServers` | 指向 `.mcp.json`，原样透传 |
@@ -221,7 +221,7 @@ python3 -m scaffold new P --skeleton --module board --module artifactSync --modu
 ```
 
 - 写出 `plugin.scaffold.json`、`workflow.json`（biz、dev 各一个节点）、`--module` 选中的模块配置，以及 IDE 补全用的 `.scaffold/` Schema；可选模块：`board`、`session`、`knowledge`、`artifactSync`、`globalHooks`；
-- 要填的地方都写成 `[TODO: 说明]`；`lint` 每个占位报一条 `TODO_FIELD`，带文件和 JSON Pointer。还有占位时 `doctor` 不生成（`artifactSync` 的简述除外：可以先生成，打包前填完）；
+- 要填的地方都写成 `[TODO: 说明]`；`modules/globalHooks.json` 例外：直接列出全部可用的全局钩子，删掉不需要的即可；`lint` 每个占位报一条 `TODO_FIELD`，带文件和 JSON Pointer。还有占位时 `doctor` 不生成（`artifactSync` 的简述除外：可以先生成，打包前填完）；
 - 填完后：
 
 ```bash

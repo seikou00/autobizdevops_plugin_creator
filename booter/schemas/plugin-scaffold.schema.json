@@ -43,9 +43,9 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "pattern": "^[A-Za-z0-9_-]+$",
           "maxLength": 64,
-          "description": "插件稳定 ID：state.json.pluginId 与安装目录名相同。发布后不可修改，否则已有项目的状态会被拒绝读取。"
+          "description": "插件稳定 ID，只含英文字母、数字、短横线和下划线：state.json.pluginId 与安装目录名相同。发布后不可修改，否则已有项目的状态会被拒绝读取。"
         },
         "name": { "$ref": "#/definitions/nonEmpty", "description": "根 plugin.json.name（DevClaw 沿用的展示名，可含大写）。" },
         "version": {

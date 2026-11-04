@@ -197,8 +197,16 @@ SKELETON_MODULES = {
                              "ref": "main"}},
     "artifactSync": {"allowedFrom": "[TODO: 从哪个节点完成起允许同步，写成 <节点 id>:done]",
                      "artifacts": {"[TODO: 要上传的产物路径，与 workflow.json 中的 outputs 一致]": "[TODO: 简述]"}},
-    "globalHooks": {"hooks": ["[TODO: 全局钩子 id，见 autobiz-plugin hook list]"]},
 }
+
+
+def skeleton_module(key: str) -> dict:
+    """模块骨架。globalHooks 直接列出全部可用的全局钩子，用户删掉不需要的（id 不用自己查）。"""
+    if key == "globalHooks":
+        from scaffold.modules.global_hooks.catalog import catalog
+
+        return {"hooks": list(catalog())}
+    return SKELETON_MODULES[key]
 
 
 def skeleton_files(modules: list) -> dict:
@@ -206,7 +214,7 @@ def skeleton_files(modules: list) -> dict:
     from scaffold.build.framework import SCHEMA_FILES
 
     entry = {"$schema": schema_ref("plugin.scaffold.json"), "scaffoldVersion": 1,
-             "plugin": {"id": "[TODO: 插件 id，小写字母、数字和连字符，发布后不能改]", "name": "[TODO: 插件名]",
+             "plugin": {"id": "[TODO: 插件 id，英文字母、数字、短横线和下划线，发布后不能改]", "name": "[TODO: 插件名]",
                         "version": "0.1.0", "description": "[TODO: 一句话描述]"},
              "workflow": "./workflow.json"}
     if modules:
@@ -216,7 +224,7 @@ def skeleton_files(modules: list) -> dict:
     files = {"plugin.scaffold.json": dump_config(entry), "workflow.json": dump_config(workflow)}
     for key in modules:
         rel = f"modules/{key}.json"
-        files[rel] = dump_config({"$schema": schema_ref(rel), **SKELETON_MODULES[key]})
+        files[rel] = dump_config({"$schema": schema_ref(rel), **skeleton_module(key)})
     for name in SCHEMA_FILES:
         files[f".scaffold/{name}"] = resources.read_bytes(f"schemas/{name}")
     return files

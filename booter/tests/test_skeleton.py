@@ -55,6 +55,9 @@ class SkeletonTest(unittest.TestCase):
         workflow = json.loads((root / "workflow.json").read_text("utf-8"))
         self.assertEqual(list(workflow["nodes"]), ["biz", "dev"])
         self.assertEqual(list(workflow["nodes"]["biz"][0]), ["id", "seq", "name", "skill", "outputs"])
+        # 全局钩子直接列出全部可选项，用户删掉不需要的
+        hooks = json.loads((root / "modules/globalHooks.json").read_text("utf-8"))
+        self.assertEqual(hooks["hooks"], ["performance-check", "secrets-check"])
 
     def test_lint_lists_every_unfilled_field_and_doctor_writes_nothing(self):
         root = self.skeleton("artifactSync")

@@ -35,7 +35,7 @@ class WizardTest(unittest.TestCase):
         prompter = ScriptedPrompter(WIZARD)
         result = new(root, prompter=prompter)
         self.assertFalse(result.report.failed(), result.report.to_text())
-        self.assertIn("  已规范化为 doc-review", prompter.lines)
+        self.assertIn("  已规范化为 Doc-Review", prompter.lines)
         workflow = json.loads((root / "workflow.json").read_text("utf-8"))
         self.assertEqual([node["id"] for node in workflow["nodes"]["biz"]], ["draft", "review"])
         self.assertIn('"outputs": ["DRAFT.md"]', (root / "workflow.json").read_text("utf-8"))

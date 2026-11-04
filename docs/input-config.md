@@ -263,7 +263,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 
 | 字段 | 必填 | 说明 | 输出位置 |
 |---|---|---|---|
-| `id` | 是 | 稳定 ID，小写连字符，不超过 64 字符，同时也是安装目录名（`package` 生成的 zip 以它为顶层目录，D57）。**发布后不可修改**，否则已有项目 state.json 中记录的 `pluginId` 对不上，会被拒绝读取 | `state.json.pluginId`、hooks.ndjson `pluginId` |
+| `id` | 是 | 稳定 ID，只含英文字母、数字、短横线和下划线（`^[A-Za-z0-9_-]+$`），不超过 64 字符（D65），同时也是安装目录名（`package` 生成的 zip 以它为顶层目录，D57）。**发布后不可修改**，否则已有项目 state.json 中记录的 `pluginId` 对不上，会被拒绝读取 | `state.json.pluginId`、hooks.ndjson `pluginId` |
 | `name` | 是 | DevClaw 沿用的插件名，可含大写（例如 `AutoBizDevOps-Plugin-Lite`） | 根 `plugin.json.name` |
 | `version` | 是 | semver | 根 `plugin.json.version` |
 | `description` | 是 | — | 根 `plugin.json.description` |
@@ -272,7 +272,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `hooks` | 否 | 宿主钩子配置，固定为 `./hooks/hooks.json`，可以不写；写了其他路径报 `PLUGIN_HOOKS_PATH`。`hooks/hooks.json` 由脚手架和开发者共用：脚手架只维护自己的条目——命令指向 `hooks/artifact_guard.py` 或 `hooks/<全局钩子 id>/` 下脚本的条目，每次重新生成都排在各事件的最前面并按当前配置重写；其他条目是开发者的，按原顺序原样保留。生成的条目也是给开发者打样的写法 | 根 `plugin.json.hooks` 固定为 `./hooks/hooks.json`（D7、D61，interfaces.md §4.7） |
 
 
-初始化向导会像 Codex plugin-creator 那样规范化用户输入的名称：转小写，非字母数字字符改为 `-`，合并连续的 `-`，去掉首尾的 `-`（`My Plugin` → `my-plugin`），并提示规范化后的结果。
+初始化向导会规范化用户输入的插件 ID：英文字母、数字、短横线和下划线以外的字符改为 `-`，合并连续的 `-`，去掉首尾的 `-`，保留大小写（`My Plugin` → `My-Plugin`），并提示规范化后的结果（D65）。
 
 ### 3.4 runtime
 

@@ -447,8 +447,8 @@ def hook_list(root: Path) -> CommandResult:
     from scaffold.modules.global_hooks.catalog import catalog
 
     tree = Tree(root)
-    _, entry = entry_of(tree)
-    enabled = _global_hooks(tree, entry)
+    # 不在插件目录中时也能列出全部钩子（新建插件前选择用），启用状态都是 false
+    enabled = _global_hooks(tree, entry_of(tree)[1]) if tree.is_file(ENTRY) else []
     hooks, lines = [], []
     for hook_id, spec in catalog().items():
         hooks.append({"id": hook_id, "title": spec.title, "description": spec.description,

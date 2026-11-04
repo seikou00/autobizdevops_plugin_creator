@@ -75,7 +75,7 @@ python3 -m scaffold new ~/Documents/GitHub/my-plugin
 
 | 向导问题 | 怎么填 |
 |---|---|
-| 插件 ID | 英文小写加连字符，如 `my-plugin`，发布后不能改 |
+| 插件 ID | 英文字母、数字、短横线和下划线，如 `my-plugin`、`Doc_Review`，发布后不能改 |
 | 插件名、一句话描述 | 随意填写，会显示在 DevClaw 中 |
 | 节点 id、显示名 | 每个节点起一个英文 id（如 `prd`）和一个中文名（如 `需求`） |
 | 所属阶段 | 需求类选 `biz`，开发类选 `dev`，发布、运维类选 `ops`；顺序必须是 biz → dev → ops |

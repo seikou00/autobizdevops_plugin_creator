@@ -12,7 +12,7 @@ from typing import Protocol
 
 from scaffold.lib import derive
 
-PLUGIN_ID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+PLUGIN_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 SKILL = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 AGENT_MODES = ("solo", "multi", "agent_team", "workflow")
 PLATFORMS = ("darwin", "linux", "win32")
@@ -70,8 +70,8 @@ class ScriptedPrompter:
 
 
 def normalize_id(text: str) -> str:
-    """像 Codex plugin-creator 那样规范化：转小写，非字母数字改为 -，合并连续的 -，去掉首尾的 -（input-config.md §3.3）。"""
-    return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", text.lower())).strip("-")
+    """规范化插件 ID：英文字母、数字、短横线和下划线以外的字符改为 -，合并连续的 -，去掉首尾的 -（input-config.md §3.3）。"""
+    return re.sub(r"-+", "-", re.sub(r"[^A-Za-z0-9_-]+", "-", text)).strip("-")
 
 
 def yes(prompter: Prompter, question: str, default: bool) -> bool:
@@ -87,7 +87,7 @@ def ask_plugin(prompter: Prompter, seed: dict) -> dict:
             if plugin_id != raw:
                 prompter.say(f"  已规范化为 {plugin_id}")
             break
-        prompter.say("  插件 ID 只能含小写字母、数字和连字符，不超过 64 字符")
+        prompter.say("  插件 ID 只能含英文字母、数字、短横线和下划线，不超过 64 字符")
     name = prompter.ask("插件名", default=seed.get("name") or plugin_id)
     version = prompter.ask("版本", default=seed.get("version", "0.1.0"))
     description = prompter.ask("一句话描述", default=seed.get("description") or name)
