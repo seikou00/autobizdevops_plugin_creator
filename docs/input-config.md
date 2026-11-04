@@ -467,7 +467,11 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `agents/`（可选） | 自定义子代理等外挂资源，由会话策略引用 | 不创建，需要时由开发者创建，或用 `add skills --agents`、`new --answers` 的 `agents` 拷入 | 存在时原样交付 |
 | `hooks/` | 宿主钩子与开发者自定义扩展，例如节点校验脚本及其配置 | 创建目录，生成 `hooks.json`、`artifact_guard.py` | `hooks.json` 中脚手架维护的条目、`artifact_guard.py` 和全局钩子脚本由 build 维护，其余原样交付（D61、D62） |
 
-技能目录的查找规则：build 按节点的 `skill` 在 `skills/<skill>/` 和 `skills/*/<skill>/` 两处查找含 `SKILL.md` 的目录，只找这两层。两处都有、或在多个分组下都有时报 `SKILL_AMBIGUOUS`；都没有时在 `skills/<skill>/` 生成空白 `SKILL.md`。找到的目录就是该节点的技能目录，`${skillPath}` 指向它。分组目录自己的 `SKILL.md`（例如 `skills/autodev/SKILL.md`）和分组下不被节点绑定的技能（例如回滚、评审等辅助技能）都按开发者资源原样交付，不写状态维护片段。
+技能目录的查找规则：build 按节点的 `skill` 在 `skills/<skill>/` 和 `skills/*/<skill>/` 两处查找含 `SKILL.md` 的目录，只找这两层。两处都有、或在多个分组下都有时报 `SKILL_AMBIGUOUS`。
+
+节点技能按节点所属阶段放进分组目录（D64）：biz 节点的技能在 `skills/autobiz/<skill>/`，dev 在 `skills/autodev/<skill>/`，ops 在 `skills/autoops/<skill>/`，与技能名无关。都没找到时在这个分组目录生成空白 `SKILL.md`；找到的目录不在这里时（平铺在 `skills/<skill>/`、在别的分组下，或节点换了阶段），lint 报 `SKILL_LAYOUT` warning，doctor 先把整个技能目录挪过去，并把 `skills/` 下开发者文件中对旧目录的引用（例如 `${pluginPath}/skills/<skill>/references/…`）改成新目录，再生成；目标目录已经存在时报 `SKILL_LAYOUT_CONFLICT`，什么都不写。挪动结果在 doctor 的 `changes.skills.moved` 中列出。不绑定节点的辅助技能和模块生成的技能（例如产物同步的 `autobizdevops-artifact-sync`）不分组，按原位置交付。
+
+找到的目录就是该节点的技能目录，`${skillPath}` 指向它。找到的目录就是该节点的技能目录，`${skillPath}` 指向它。分组目录自己的 `SKILL.md`（例如 `skills/autodev/SKILL.md`）和分组下不被节点绑定的技能（例如回滚、评审等辅助技能）都按开发者资源原样交付，不写状态维护片段。
 
 开发者创建插件时可以带上自己的 `SKILL.md`，也可以不带：
 
@@ -589,7 +593,9 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `ARTIFACT_ID_CONFLICT` | error | 两个不同的输出路径推导出同一个产物 id（§2.3） |
 | `OUTPUT_REDECLARED` | warning | 同一路径被多个节点输出（允许，用于后续阶段更新产物；以第一个节点为生产者） |
 | `PATH_UNSAFE` | error | 产物路径（数组中的每一项）为绝对路径，含 `..`、`\`、`:`，或与保留文件名冲突。知识目录的同类检查由 Schema 完成（D47） |
-| `SKILL_MISSING` | warning（lint）/ error（check） | `skills/<skill>/SKILL.md` 和 `skills/*/<skill>/SKILL.md` 都不存在；build 会在 `skills/<skill>/` 生成空白 `SKILL.md` |
+| `SKILL_MISSING` | warning（lint）/ error（check） | `skills/<skill>/SKILL.md` 和 `skills/*/<skill>/SKILL.md` 都不存在；build 会在节点阶段对应的分组目录 `skills/autobiz\|autodev\|autoops/<skill>/` 生成空白 `SKILL.md`（D64） |
+| `SKILL_LAYOUT` | warning | 节点技能不在节点阶段对应的分组目录（§5）；doctor 会挪过去并改掉 `skills/` 下对旧目录的引用（D64） |
+| `SKILL_LAYOUT_CONFLICT` | error | 要把技能挪进分组目录，但目标目录已经存在；doctor 不写任何文件（D64） |
 | `SKILL_AMBIGUOUS` | error | 同名技能目录出现在多处（§5），无法确定节点的技能目录 |
 | `SUBAGENT_FILE_MISSING` | warning | `customSubagentFiles` 指向的文件不存在；会话入口下发 `agentConfig` 时跳过该文件 |
 | `POLICY_NODE_UNKNOWN` | error | `session.policies.nodes` 某一项的 `id` 不是 workflow 中的节点、不在 workflow 的同一分组中，或同一节点出现多次 |

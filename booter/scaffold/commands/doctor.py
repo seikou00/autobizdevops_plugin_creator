@@ -5,7 +5,8 @@
 
 from __future__ import annotations
 
-from scaffold.build import emit
+from scaffold.build import emit, layout
+from scaffold.build.framework import skill_dir
 from scaffold.build.manifest import MANIFEST
 from scaffold.build.pipeline import analyze, build
 from scaffold.commands import CommandResult
@@ -61,8 +62,7 @@ def recheck(tree: Tree, result) -> list:
     """生成后复查：不应再有 BUILD_STALE，各节点技能的片段与推导结果一致。"""
     issues = [issue for issue in analyze(tree, stale=True).report.issues if issue.code == "BUILD_STALE"]
     for node in result.ir.nodes:
-        found, _ = result.skill_dirs.get(node.skill, (None, []))
-        path = f"{found or f'skills/{node.skill}'}/SKILL.md"
+        path = f"{skill_dir(result.skill_dirs, node.skill)}/SKILL.md"
         data = tree.read_bytes(path)
         expected = skillmd.block_digest(skillmd.render_state_block(node.id, node.terminal))
         if data is None or skillmd.state_digest(skillmd.read_text(data)) != expected:
@@ -75,6 +75,16 @@ def doctor(root, *, dry_run: bool = False, force: bool = False, allow: frozenset
     tree = Tree(root, overlay)
     report = Report(extra_issues)
     analysis = analyze(tree, stale=False, allow=allow)
+    if not analysis.report.failed():
+        # 节点技能先挪进按阶段的分组目录（D64），再按挪好的目录分析和生成
+        moved_overlay, moves, layout_issues = layout.relocate(analysis, tree)
+        report.extend(layout_issues)
+        if moved_overlay:
+            overlay = {**(overlay or {}), **moved_overlay}
+            tree = Tree(root, overlay)
+            analysis = analyze(tree, stale=False, allow=allow)
+    else:
+        moves = []
     report.extend(analysis.report.issues)
     if report.failed():
         return CommandResult(report)
@@ -84,7 +94,7 @@ def doctor(root, *, dry_run: bool = False, force: bool = False, allow: frozenset
     report.extend(issue for issue in result.report.issues if issue not in report.issues)
     if result.report.failed():
         return CommandResult(report)
-    changes["skills"] = result.skills.to_json()
+    changes["skills"] = {**result.skills.to_json(), "moved": [{"from": old, "to": new} for old, new in moves]}
     changes["versions"] = analysis.versions.to_json()
     extra = {"changes": changes}
     if dry_run:
@@ -123,6 +133,8 @@ def _summary(changes: dict, files: list, *, dry_run: bool = False) -> str:
     moved += [f"模块 {key} {value['from']} → {value['to']}" for key, value in (versions.get("modules") or {}).items()]
     if moved:
         lines.append("版本变化：" + "、".join(moved))
+    if changes["skills"].get("moved"):
+        lines.append("技能挪进分组目录：" + "、".join(f"{item['from']} → {item['to']}" for item in changes["skills"]["moved"]))
     for key, label in (("created", "生成空白 SKILL.md"), ("stateInserted", "插入状态维护片段"),
                        ("stateUpdated", "更新状态维护片段"), ("stateRemoved", "删除状态维护片段")):
         if changes["skills"][key]:

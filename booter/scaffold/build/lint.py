@@ -21,7 +21,7 @@ ENTRY = "plugin.scaffold.json"
 class LintContext:
     normalized: Normalized
     previous: dict | None
-    skills: dict                                  # 节点技能 → find_skill_dir 的结果
+    skills: dict                                  # 节点技能 → (找到的目录, 候选, 应在的分组目录)
     allow: frozenset = field(default_factory=frozenset)
 
     @property
@@ -34,8 +34,9 @@ class LintContext:
 
 
 def skill_dirs(normalized: Normalized) -> dict:
+    """节点技能 → (唯一找到的目录或 None, 全部候选, 应在的分组目录)。"""
     tree = normalized.inputs.tree
-    return {ref.node["skill"]: find_skill_dir(tree, ref.node["skill"])
+    return {ref.node["skill"]: (*find_skill_dir(tree, ref.node["skill"]), derive.skill_target(ref.group, ref.node["skill"]))
             for ref in derive.grouped_nodes(normalized.workflow)}
 
 
@@ -135,14 +136,18 @@ def _outputs(ctx):
 def _skills(ctx):
     for ref in derive.grouped_nodes(ctx.normalized.workflow):
         skill = ref.node["skill"]
-        found, candidates = ctx.skills.get(skill, (None, []))
+        found, candidates, target = ctx.skills.get(skill, (None, [], derive.skill_target(ref.group, skill)))
         if len(candidates) > 1:
             yield error("SKILL_AMBIGUOUS", f"技能 {skill} 出现在多处：" + "、".join(candidates),
                         file=ctx.workflow_file, pointer=f"{ref.pointer}/skill", hint="只保留一个同名技能目录")
         elif found is None:
             yield warning("SKILL_MISSING", f"skills/{skill}/SKILL.md 和 skills/*/{skill}/SKILL.md 都不存在",
                           file=ctx.workflow_file, pointer=f"{ref.pointer}/skill",
-                          hint=f"doctor 会在 skills/{skill}/ 生成空白 SKILL.md，由你填写正文")
+                          hint=f"doctor 会在 {target}/ 生成空白 SKILL.md，由你填写正文")
+        elif found != target:
+            yield warning("SKILL_LAYOUT", f"技能 {skill} 在 {found}/，节点属于 {ref.group} 阶段，应在 {target}/",
+                          file=ctx.workflow_file, pointer=f"{ref.pointer}/skill",
+                          hint="doctor 会把整个技能目录挪过去，并改掉 skills/ 下文件中对旧路径的引用")
 
 
 def _identity(ctx):

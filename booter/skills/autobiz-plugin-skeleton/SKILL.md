@@ -89,7 +89,7 @@ python3 "<pyz>" -C "<插件目录>" add skills --from "<技能集合目录>" [--
 
 - `<技能集合目录>` 下一级是各个技能目录，也可以多一层分组（`<集合>/<分组>/<技能>/SKILL.md`），分组结构和共享的 `references/`、`hooks/` 会原样保留；只有一个技能时用 `add skill <技能名> --from "<技能目录>"`；
 - 技能目录名就是技能名，要与 `workflow.json` 中节点的 `skill` 一致；导入后仍报 `SKILL_MISSING` 的节点，说明名字对不上或者缺技能，告诉用户；
-- 这条命令会同时生成插件，没有技能的节点自动生成空白 `SKILL.md`；
+- 这条命令会同时生成插件：节点技能按节点阶段挪进 `skills/autobiz/`、`skills/autodev/`、`skills/autoops/`（正文里对旧路径的引用一并改掉，挪动列在 `changes.skills.moved`），没有技能的节点自动生成空白 `SKILL.md`；
 - 报出 `LEGACY_ENTRY_REF` 时，是技能正文里残留的旧状态命令（调用 `update_state.py`、`hooks/update_checkpoint.py` 等）：把行号和所在小节告诉用户，用户确认后再删，或由用户自己删。状态只由文件开头的状态维护片段维护。
 
 **没有技能**：先生成插件，为每个节点生成空白 `SKILL.md`：
@@ -98,7 +98,7 @@ python3 "<pyz>" -C "<插件目录>" add skills --from "<技能集合目录>" [--
 python3 "<pyz>" -C "<插件目录>" doctor --json
 ```
 
-然后列出生成的空白文件（`changes.skills.created`），引导用户逐个填写，**停下来**等用户填完：
+然后列出生成的空白文件（`changes.skills.created`，按节点阶段在 `skills/autobiz/`、`skills/autodev/`、`skills/autoops/` 下），引导用户逐个填写，**停下来**等用户填完：
 
 - frontmatter 的 `description`：写清楚“做什么、在什么情况下使用”，看板上的节点描述也取自这里；
 - 正文：这个节点的工作步骤、产出要求、完成前要满足的条件（例如测试通过、评审结论明确）；

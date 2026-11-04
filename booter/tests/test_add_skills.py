@@ -52,12 +52,16 @@ class AddSkillsTest(unittest.TestCase):
 
         self.assertEqual(code, 0, payload)
         self.assertEqual(payload["importedSkills"], sorted(LITE_SKILLS))
+        # 平铺的技能集合导入后按节点阶段挪进分组目录（D64）
         for name in LITE_SKILLS:
-            path = root / "skills" / name / "SKILL.md"
+            group = "autobiz" if name.startswith("autobiz") else "autodev"
+            path = root / "skills" / group / name / "SKILL.md"
             self.assertIn(f"{name} 的正文。", path.read_text("utf-8"))
-            self.assertIn(f"skills/{name}/SKILL.md", payload["written"])
-        self.assertEqual((root / "skills/autodev-plan/references/guide.md").read_text("utf-8"), "计划指南")
-        self.assertTrue((root / "skills/autodev-plan/variants/deep/SKILL.md").is_file())
+            self.assertIn(f"skills/{group}/{name}/SKILL.md", payload["written"])
+            self.assertFalse((root / "skills" / name).exists())
+        self.assertEqual(len(payload["changes"]["skills"]["moved"]), len(LITE_SKILLS))
+        self.assertEqual((root / "skills/autodev/autodev-plan/references/guide.md").read_text("utf-8"), "计划指南")
+        self.assertTrue((root / "skills/autodev/autodev-plan/variants/deep/SKILL.md").is_file())
         self.assertFalse((root / "skills/deep").exists())
 
     def test_calls_doctor_once_for_the_whole_collection(self):

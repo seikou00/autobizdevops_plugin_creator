@@ -39,7 +39,7 @@ class WizardTest(unittest.TestCase):
         workflow = json.loads((root / "workflow.json").read_text("utf-8"))
         self.assertEqual([node["id"] for node in workflow["nodes"]["biz"]], ["draft", "review"])
         self.assertIn('"outputs": ["DRAFT.md"]', (root / "workflow.json").read_text("utf-8"))
-        self.assertTrue((root / "skills/doc-draft/SKILL.md").is_file())
+        self.assertTrue((root / "skills/autobiz/doc-draft/SKILL.md").is_file())
         self.assertEqual(json.loads((root / "modules/globalHooks.json").read_text("utf-8"))["hooks"], ["secrets-check"])
         self.assertTrue((root / "hooks/secrets-check/check_secrets.py").is_file())
 

@@ -136,8 +136,8 @@ class DoctorTest(unittest.TestCase):
         self.assertEqual(payload["written"], [])
         code, payload = cli("-C", str(root), "doctor")
         self.assertEqual(code, 0, payload)
-        self.assertEqual(payload["changes"]["skills"]["stateRemoved"], ["skills/autodev-code/SKILL.md"])
-        self.assertNotIn("plugin workflow", (root / "skills/autodev-code/SKILL.md").read_text("utf-8"))
+        self.assertEqual(payload["changes"]["skills"]["stateRemoved"], ["skills/autodev/autodev-code/SKILL.md"])
+        self.assertNotIn("plugin workflow", (root / "skills/autodev/autodev-code/SKILL.md").read_text("utf-8"))
 
     def test_add_skill_from_reference_plugin(self):
         source = SIBLINGS / "autobizdevops_lite" / "skills" / "autodev-plan"
@@ -148,7 +148,7 @@ class DoctorTest(unittest.TestCase):
         code, payload = cli("-C", str(root), "add", "skill", "autodev-plan", "--from", str(source))
         self.assertEqual(code, 0, payload)
         self.assertIn("LEGACY_ENTRY_REF", codes(payload, "warning"))
-        text = (root / "skills/autodev-plan/SKILL.md").read_text("utf-8")
+        text = (root / "skills/autodev/autodev-plan/SKILL.md").read_text("utf-8")
         self.assertIn("--checkpoint plan_done", text)
         code, payload = cli("-C", str(root), "check")
         self.assertIn("LEGACY_ENTRY_REF", codes(payload, "error"))

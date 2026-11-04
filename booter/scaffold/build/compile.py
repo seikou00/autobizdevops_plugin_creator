@@ -36,7 +36,7 @@ def compile_ir(normalized: Normalized, skills: dict) -> PluginIR:
             if artifact not in artifacts:
                 artifacts[artifact] = ArtifactIR(artifact, path, (path,), derive.artifact_type(path), node["id"])
             outputs.append(OutputRef(artifact, required))
-        found, _ = skills.get(node["skill"], (None, []))
+        found = skills.get(node["skill"], (None,))[0]
         description = skill_description(tree, found)
         if skillmd.is_placeholder(description):
             description = derived_description(node["name"], paths)

@@ -16,11 +16,14 @@
 ├── board_core/                           #            DevClaw 读取的全部静态内容（§3）
 │   ├── board_config.json                 # generated  宿主命令 inspectCommands
 │   └── modules.json                      # generated  已开启的模块与看板入口
-├── skills/                               #            业务技能、模板、脚本及校验器；技能目录也可以在一层分组下（skills/<分组>/<node-skill>/）
-│   ├── <node-skill>/SKILL.md             # seeded     每个节点一个，开头是 build 维护的状态维护片段（§6.1）
-│   ├── <node-skill>/templates/…          # developer  模板，技能自己维护，脚手架不登记、不生成（D29）
-│   ├── <node-skill>/scripts/…            # developer  执行脚本、业务校验器
-│   ├── <node-skill>/references/…         # developer
+├── skills/                               #            业务技能、模板、脚本及校验器；节点技能按节点阶段分组（D64）
+│   ├── autobiz|autodev|autoops/          #            biz、dev、ops 节点的技能分别在这三个分组目录下
+│   │   ├── <node-skill>/SKILL.md         # seeded     每个节点一个，开头是 build 维护的状态维护片段（§6.1）
+│   │   ├── <node-skill>/templates/…      # developer  模板，技能自己维护，脚手架不登记、不生成（D29）
+│   │   ├── <node-skill>/scripts/…        # developer  执行脚本、业务校验器
+│   │   ├── <node-skill>/references/…     # developer
+│   │   └── SKILL.md、references/、hooks/  # developer  分组自己的共享资源（可选）
+│   ├── <辅助技能>/…                      # developer  不绑定节点的技能，不分组
 │   └── <sync-skill>/…                    # module     产物同步模块（§7.2）
 ├── hooks/                                #            宿主钩子与自定义扩展（D61）
 │   ├── hooks.json                        # seeded     宿主钩子配置：开头是脚手架维护的条目（产物检查钩子、启用的全局钩子），其余是开发者的条目（interfaces.md §4.7）

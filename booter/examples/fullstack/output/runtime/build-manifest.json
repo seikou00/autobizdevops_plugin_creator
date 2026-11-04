@@ -17,13 +17,13 @@
     "modules/session.json": "sha256:b62fb2653e8113d5aeeba312a362da4f02c0fe34b348241e70f1fefb050c4508",
     "modules/knowledge.json": "sha256:10351ec24714d7554c1640cf63c086eeba299727a8cbb33ecb33910ea18d648a",
     "modules/artifactSync.json": "sha256:d1de5e629c39bab20eb66f4bfab0ddab0a612bb09f50606db36ac402abb07db8",
-    "skills/autobiz-requirement-discuss/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
-    "skills/autodev-code/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
-    "skills/autodev-design/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
-    "skills/autodev-plan/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
-    "skills/autodev-specs/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
-    "skills/autoops-archive/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
-    "skills/autoops-cicd/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545"
+    "skills/autobiz/autobiz-requirement-discuss/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
+    "skills/autodev/autodev-code/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
+    "skills/autodev/autodev-design/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
+    "skills/autodev/autodev-plan/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
+    "skills/autodev/autodev-specs/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
+    "skills/autoops/autoops-archive/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
+    "skills/autoops/autoops-cicd/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545"
   },
   "files": {
     ".scaffold/modules/artifactSync.schema.json": {
@@ -130,7 +130,7 @@
     },
     "runtime/config/flow.json": {
       "ownership": "generated",
-      "sha256": "sha256:8503ce0194bd21516b48c192bccd6f20a1403a2da226241dd91b3030588d70b3"
+      "sha256": "sha256:229490491fc296697a57e4200c90195535cb519f4c8a2bd361ddead01c01d24e"
     },
     "runtime/config/knowledge.json": {
       "ownership": "generated",
@@ -180,7 +180,7 @@
       "ownership": "managed",
       "sha256": "…"
     },
-    "skills/autobiz-requirement-discuss/SKILL.md": {
+    "skills/autobiz/autobiz-requirement-discuss/SKILL.md": {
       "ownership": "seeded",
       "regions": {
         "state": "sha256:408b796c175bbf1e5f9e85cb5fc19305a68e40bad759191420faf3c301a89218"
@@ -214,37 +214,37 @@
       "ownership": "module",
       "sha256": "…"
     },
-    "skills/autodev-code/SKILL.md": {
+    "skills/autodev/autodev-code/SKILL.md": {
       "ownership": "seeded",
       "regions": {
         "state": "sha256:6b13b97548d71e9ccd38b96d4e3d5ab1db20e0b12e8107533084261799122abe"
       }
     },
-    "skills/autodev-design/SKILL.md": {
+    "skills/autodev/autodev-design/SKILL.md": {
       "ownership": "seeded",
       "regions": {
         "state": "sha256:5b96344d500a09cdab9433e85f9afbe23464ed553757da4a26caf9ceaa9e5107"
       }
     },
-    "skills/autodev-plan/SKILL.md": {
+    "skills/autodev/autodev-plan/SKILL.md": {
       "ownership": "seeded",
       "regions": {
         "state": "sha256:9567b3125b8066a7d96059d87188ac8a456bfeb6032ec00588de7dcf910c0cdb"
       }
     },
-    "skills/autodev-specs/SKILL.md": {
+    "skills/autodev/autodev-specs/SKILL.md": {
       "ownership": "seeded",
       "regions": {
         "state": "sha256:2af56a17bb4b855e23cd767dd33590dd8259774505474ce1ad877f46a5fb4f1d"
       }
     },
-    "skills/autoops-archive/SKILL.md": {
+    "skills/autoops/autoops-archive/SKILL.md": {
       "ownership": "seeded",
       "regions": {
         "state": "sha256:0c69aabb678cf73616b45271ff5fc53c822d409de3fe2bd5050104292a8b9fd0"
       }
     },
-    "skills/autoops-cicd/SKILL.md": {
+    "skills/autoops/autoops-cicd/SKILL.md": {
       "ownership": "seeded",
       "regions": {
         "state": "sha256:7db4117a167ddbe574e389855d096eb397d68b2e294e7242d66c8cd22a58bbf6"

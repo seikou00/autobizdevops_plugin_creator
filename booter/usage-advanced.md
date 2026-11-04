@@ -26,7 +26,7 @@ P/
 │   ├── session.json          # 会话与 Agent 策略
 │   ├── knowledge.json        # 知识模块（可选）
 │   └── artifactSync.json     # 产物同步（可选）
-├── skills/<skill>/           # 也支持分组 skills/<group>/<skill>/
+├── skills/autobiz|autodev|autoops/<skill>/   # 节点技能按节点阶段分组；辅助技能可以直接放 skills/<skill>/
 ├── agents/                   # 子代理文件，由 session.json 引用（可选）
 ├── hooks/                    # hooks.json（脚手架的条目 + 你的条目）、artifact_guard.py、全局钩子脚本，以及你自己的钩子脚本
 ├── .mcp.json                 # 可选，透传进 plugin.json
@@ -262,12 +262,25 @@ python3 -m scaffold -C P add skills --from ../skills --agents ../agents     # �
   - 来源本身是一个分组（自己含 `SKILL.md`、下面是技能，例如 `autobiz_kanban/skills/autodev`）时按 `skills/autodev/<skill>/` 导入，所以分组逐个导入和整体导入的结果一致；
   - 共享资源已存在时，内容相同就跳过，不同就拒绝导入；其中的 `SKILL.md` 同样迁移 frontmatter；
   - 脚手架生成的技能（如产物同步模块的 `autobizdevops-artifact-sync`）跳过不导入；同名技能在集合中出现两次时拒绝导入；
-  - `new` 生成的空白 `skills/<skill>/SKILL.md` 会被分组下的同名技能替换；
+  - 生成的空白 `SKILL.md` 会被导入的同名技能替换；
+  - 导入后 doctor 把节点技能挪进节点阶段对应的分组目录（biz → `skills/autobiz/`，dev → `skills/autodev/`，ops → `skills/autoops/`），平铺的集合（如 lite）也一样，见下文「技能目录」；
   - 未被节点绑定的技能也会导入，原样交付；
 - 导入时 frontmatter 的 `name` 改为目标技能名，顶层 `version`、`author` 迁到 `metadata`；
 - 技能已存在或其他分组下有同名技能时拒绝导入（同一集合重复导入也会被拒绝）；只有 build 生成的空白 `SKILL.md` 可以被导入覆盖；
 - `--agents`：已有同名文件且内容相同时跳过，内容不同时拒绝导入；
 - 正文中的旧状态命令（`LEGACY_ENTRY_REF`）导入时只报 warning，`check`、`package` 时是 error，必须手工删掉。状态维护片段由脚手架写在 `SKILL.md` 开头，不要手改。
+
+**技能目录**：节点技能按节点所属阶段放进分组目录，与技能名无关：
+
+| 节点阶段 | 技能目录 |
+|---|---|
+| biz | `skills/autobiz/<skill>/` |
+| dev | `skills/autodev/<skill>/` |
+| ops | `skills/autoops/<skill>/` |
+
+- 空白 `SKILL.md` 直接生成在这里；
+- 技能放在别处（平铺在 `skills/<skill>/`、在别的分组，或节点换了阶段）时，`lint` 报 `SKILL_LAYOUT`，`doctor` 会把整个技能目录挪过去，并把 `skills/` 下文件中对旧路径的引用（如 `${pluginPath}/skills/<skill>/references/…`）改成新路径；挪了哪些列在 `changes.skills.moved`。目标目录已存在时报 `SKILL_LAYOUT_CONFLICT`，什么都不写；
+- 不绑定节点的辅助技能（如回滚、评审）和模块生成的技能（如产物同步）不分组，放在哪里就在哪里。
 
 ### 5.3 模块
 

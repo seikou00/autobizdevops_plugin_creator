@@ -39,7 +39,7 @@ python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz"
 | 文件 | 能否修改 |
 |---|---|
 | `plugin.scaffold.json`、`workflow.json`、`modules/*.json` | 能，这是本技能的主要产出 |
-| `skills/<技能>/` 中状态维护片段以外的内容、`hooks/`、`agents/` | 只有用户确认后才改 |
+| `skills/<分组>/<技能>/` 中状态维护片段以外的内容、`hooks/`、`agents/` | 只有用户确认后才改；节点技能按节点阶段放在 `skills/autobiz\|autodev\|autoops/` 下，doctor 会把放错位置的挪过去 |
 | `SKILL.md` 中 `<!-- plugin workflow: begin state -->` 到 `<!-- plugin workflow: end state -->` 之间 | 不能，由 doctor 维护 |
 | `plugin.json`、`board_core/`、`runtime/`、`.scaffold/` | 不能；要改就改核心配置再 doctor |
 

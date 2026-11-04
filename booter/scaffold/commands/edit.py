@@ -49,11 +49,11 @@ def bound_skills(tree: Tree) -> set:
             if isinstance(node, dict)}
 
 
-def is_blank(tree: Tree, skill: str) -> bool:
-    """skills/<skill>/ 下只有 build 生成的空白 SKILL.md（frontmatter 和状态维护片段，description 仍是占位）。"""
-    if tree.walk(f"skills/{skill}") != [f"skills/{skill}/SKILL.md"]:
+def is_blank(tree: Tree, directory: str) -> bool:
+    """技能目录下只有 build 生成的空白 SKILL.md（frontmatter 和状态维护片段，description 仍是占位）。"""
+    if tree.walk(directory) != [f"{directory}/SKILL.md"]:
         return False
-    text = skillmd.read_text(tree.read_bytes(f"skills/{skill}/SKILL.md"))
+    text = skillmd.read_text(tree.read_bytes(f"{directory}/SKILL.md"))
     front = skillmd.parse_frontmatter(text)
     body = skillmd.remove_state(text[front.body_start:])
     return skillmd.is_placeholder(front.fields.get("description")) and not body.strip()
@@ -92,17 +92,17 @@ def import_agents(tree: Tree, source: Path) -> dict:
 def import_skill(tree: Tree, skill: str, source: Path | None, *, bound: bool, prefix: str | None = None) -> tuple:
     """返回 (overlay, issues, notes)：导入时发现的内容问题只报 warning，照样导入（Q12.5）。
 
-    prefix 是导入到的目录，默认 skills/<skill>，分组技能为 skills/<分组>/<skill>。build 生成的空白
-    skills/<skill>/SKILL.md 可以被导入替换；导入到分组目录时，overlay 中把它标为删除（None）。
+    prefix 是导入到的目录，分组技能为 skills/<分组>/<skill>；不指定时导入到 build 生成的空白 SKILL.md 所在的
+    目录（替换它），没有空白技能时导入到 skills/<skill>，doctor 再按节点阶段挪进分组目录（D64）。
+    空白技能不在 prefix 时，overlay 中把它标为删除（None）。
     """
     if len(skill) > 64 or not SKILL_NAME.match(skill):
         raise UsageError(f"技能名 {skill} 不合法：只能用小写字母、数字和连字符，不超过 64 字符")
-    flat = f"skills/{skill}"
-    prefix = prefix or flat
     _, candidates = skillmd.find_skill_dir(tree, skill)
-    blank = source is not None and flat in candidates and is_blank(tree, skill)
-    blockers = [candidate for candidate in candidates if not (blank and candidate == flat)]
-    if blockers or (tree.is_dir(prefix) and not (blank and prefix == flat)):
+    blanks = [candidate for candidate in candidates if is_blank(tree, candidate)] if source is not None else []
+    blockers = [candidate for candidate in candidates if candidate not in blanks]
+    prefix = prefix or (blanks[0] if blanks else f"skills/{skill}")
+    if blockers or (tree.is_dir(prefix) and prefix not in blanks):
         where = "、".join(blockers or [prefix])
         raise UsageError(f"技能 {skill} 已存在（{where}），不能重复导入")
     overlay, issues, notes = {}, [], []
@@ -112,9 +112,10 @@ def import_skill(tree: Tree, skill: str, source: Path | None, *, bound: bool, pr
     source = Path(source).expanduser()
     if not (source / "SKILL.md").is_file():
         raise UsageError(f"{source} 下没有 SKILL.md")
-    if blank and prefix != flat:
-        overlay[f"{flat}/SKILL.md"] = None
-        notes.append(f"已删除 build 生成的空白 {flat}/SKILL.md")
+    for blank in blanks:
+        if blank != prefix:
+            overlay[f"{blank}/SKILL.md"] = None
+            notes.append(f"已删除 build 生成的空白 {blank}/SKILL.md")
     for rel, data in source_files(source):
         overlay[f"{prefix}/{rel}"] = data
     text = skillmd.read_text(overlay[f"{prefix}/SKILL.md"])

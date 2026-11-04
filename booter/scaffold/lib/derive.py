@@ -6,6 +6,14 @@ import re
 from dataclasses import dataclass
 
 GROUPS = ("biz", "dev", "ops")
+# 节点技能所在的分组目录：skills/<分组目录>/<技能>/（D64）
+SKILL_GROUP_DIRS = {"biz": "autobiz", "dev": "autodev", "ops": "autoops"}
+
+
+def skill_target(group: str, skill: str) -> str:
+    """节点技能应在的目录：按节点所属阶段放进 skills/autobiz|autodev|autoops/<技能>/。"""
+    return f"skills/{SKILL_GROUP_DIRS[group]}/{skill}"
+
 GLOB_CHARS = ("*", "?", "[")
 ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 RESERVED_PATHS = ("state.json", "hooks.ndjson", "sync-status.json", "ARTIFACT_CATALOG.json")

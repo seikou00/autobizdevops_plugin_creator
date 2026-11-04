@@ -296,15 +296,18 @@ autobiz-plugin doctor [-C <plugin-dir>] [--dry-run] [--force] [--allow-id-change
   "changes": {
     "inputs": ["workflow.json"],
     "nodes": { "added": ["design"], "removed": ["detail_design"], "reordered": false },
-    "skills": { "created": ["skills/autodev-design/SKILL.md"], "stateInserted": [], "stateUpdated": [],
-                "stateRemoved": ["skills/autodev-detail-design/SKILL.md"] },
+    "skills": { "created": ["skills/autodev/autodev-design/SKILL.md"], "stateInserted": [], "stateUpdated": [],
+                "stateRemoved": ["skills/autodev/autodev-detail-design/SKILL.md"],
+                "moved": [ { "from": "skills/autodev-plan", "to": "skills/autodev/autodev-plan" } ] },
     "versions": { "scaffold": null, "core": null, "modules": {} }
   },
-  "written": ["runtime/config/flow.json", "runtime/config/board.json", "skills/autodev-design/SKILL.md", "…"]
+  "written": ["runtime/config/flow.json", "runtime/config/board.json", "skills/autodev/autodev-design/SKILL.md", "…"]
 }
 ```
 
 触发方式：开发者手动执行；插件开发技能完成一组修改后执行（§1.6）；`add`、`module` 写完配置后自动执行。`lint`、`check` 只检查不生成，发现 `BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` 或 `SKILL_STATE_BLOCK` 时提示执行 doctor。
+
+`changes.skills.moved` 列出 doctor 挪进分组目录的节点技能（input-config.md §5，D64）：挪动在 lint 之后、生成之前进行，与生成结果一起写盘。
 
 `changes.versions` 中有变化的项写成 `{"from": 记录的版本, "to": 当前版本}`，例如 `"core": {"from": "1.0.0", "to": "1.1.0"}`；`modules` 只列版本有变化的模块。
 

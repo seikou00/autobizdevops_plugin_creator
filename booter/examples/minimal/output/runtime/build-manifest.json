@@ -11,8 +11,8 @@
   "inputs": {
     "plugin.scaffold.json": "sha256:b99b8694bbd3110cc46159d17e85f071705f1737649f0ed3af885eab31c4f542",
     "workflow.json": "sha256:2e57ad627387c9866d4f5fd77373f0cefe8f27b106ed6e8f6ca97d5336e2d3d0",
-    "skills/doc-draft/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
-    "skills/doc-review/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545"
+    "skills/autobiz/doc-draft/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
+    "skills/autobiz/doc-review/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545"
   },
   "files": {
     ".scaffold/modules/artifactSync.schema.json": {
@@ -119,7 +119,7 @@
     },
     "runtime/config/flow.json": {
       "ownership": "generated",
-      "sha256": "sha256:c3875744bff37b1838e1b847a333ab6d20c9a1a6e0b50c54b44de4b18e89d528"
+      "sha256": "sha256:4d85e2eed4a0ab9f8771ad899e0fb575dade4aafbc753ad134f5857750d6a1e4"
     },
     "runtime/config/runtime.json": {
       "ownership": "generated",
@@ -145,13 +145,13 @@
       "ownership": "managed",
       "sha256": "…"
     },
-    "skills/doc-draft/SKILL.md": {
+    "skills/autobiz/doc-draft/SKILL.md": {
       "ownership": "seeded",
       "regions": {
         "state": "sha256:9e9e5754bb185bd49fadda63d410d45a4168b8d69a380607fabc469ebcb68e98"
       }
     },
-    "skills/doc-review/SKILL.md": {
+    "skills/autobiz/doc-review/SKILL.md": {
       "ownership": "seeded",
       "regions": {
         "state": "sha256:1cec2b21036e17d819495b22811abbcb00cd68ded79ed7960496fbcce5fb3ad2"

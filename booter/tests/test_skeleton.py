@@ -84,7 +84,7 @@ class SkeletonTest(unittest.TestCase):
 
         self.assertEqual(code, 0, payload)
         self.assertTrue((root / "plugin.json").is_file())
-        self.assertTrue((root / "skills/my-prd/SKILL.md").is_file())
+        self.assertTrue((root / "skills/autobiz/my-prd/SKILL.md").is_file())
         self.assertNotIn("TODO_FIELD", [issue["code"] for issue in payload["issues"]])
 
     def test_artifact_descriptions_may_stay_until_package(self):

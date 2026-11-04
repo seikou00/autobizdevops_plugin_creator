@@ -34,8 +34,9 @@ BOARD_EVENTS = {"protocol": "autobiz.board-events.v1"}
 
 
 def skill_dir(skill_dirs: dict, skill: str) -> str:
-    found, _ = skill_dirs.get(skill, (None, []))
-    return found or f"skills/{skill}"
+    """节点技能的目录：找到了用找到的，否则用应在的分组目录（doctor 先把技能挪到分组目录，D64）。"""
+    found, _, target = skill_dirs.get(skill, (None, [], f"skills/{skill}"))
+    return found or target
 
 
 def plugin_manifest(plugin: dict) -> dict:
