@@ -22,7 +22,7 @@
 | `autobiz-plugin new <dir> [--from blank\|lite\|fullstack] [--answers <file\|->] [--yes]` | 初始化向导：按 §1.4 的七类输入问答，生成入口文件 `plugin.scaffold.json`、`workflow.json`、需要的 `modules/*.json` 和工程目录，随后执行 doctor。`<dir>` 必须不存在或为空；`--answers` 给出回答（§1.4），`--yes` 不提问 |
 | `autobiz-plugin add node <id> --name <name> --skill <skill> --stage biz\|dev\|ops --seq <n> [--output <path> …] [--optional-output <path> …] [--terminal]` | 在 `workflow.json` 的 `nodes.<stage>` 中添加节点，按 `seq` 插到组内对应位置，不改其他节点的 `seq`。`--output` 是必需输出，`--optional-output` 是可选输出（写成 `{path, optional: true}`），两者按命令行上的顺序追加到 `outputs`；含 glob 的路径要加引号，避免被 shell 展开。`--terminal` 表示终态节点，不能带输出。写完后执行 doctor（技能不存在时生成空白 `SKILL.md`） |
 | `autobiz-plugin add skill <skill> [--from <dir>]` | 导入已有技能资源（正文、模板、脚本、校验器）到 `skills/<skill>/`；不带 `--from` 时创建空白 `SKILL.md`（只有 frontmatter 和状态维护片段，技能已绑定节点时才有片段）。导入时 frontmatter 的 `name` 改为 `<skill>`，顶层 `version`、`author` 迁到 `metadata`；正文中的旧状态命令（`LEGACY_ENTRY_REF`）等技能内容问题报 warning，照样导入，check 和 package 时报 error（input-config.md §7.3）。目标目录已存在，或其他分组下有同名技能时拒绝导入（D56） |
-| `autobiz-plugin add skills --from <skills-dir>` | 批量导入 `<skills-dir>` 下每个直接子目录中含 `SKILL.md` 的技能，以子目录名作为技能名；跳过其他条目。每个技能沿用 `add skill --from` 的迁移、冲突检查和 warning 规则。整批先在内存中完成导入与一次 doctor，任一 error 均不写文件；成功时 JSON 输出增加 `importedSkills` 技能名数组。`agents/` 不属于技能集合，需单独提供 |
+| `autobiz-plugin add skills --from <skills-dir> [--agents <agents-dir>]` | 把 `<skills-dir>` 当作插件的 `skills/` 导入，保留一层分组：一级子目录含 `SKILL.md`、且它的子目录都不含 `SKILL.md` 时是技能，导入到 `skills/<skill>/`；一级子目录下有含 `SKILL.md` 的子目录时是分组，这些子目录是分组下的技能，导入到 `skills/<分组>/<skill>/`（与 build 查找技能的两层一致，input-config.md §7.3）。`<skills-dir>` 自己含 `SKILL.md`、有技能子目录且没有带 `SKILL.md` 的分组子目录时，它本身就是一个分组（例如 `skills/autodev`），按 `skills/<目录名>/<skill>/` 导入。技能以目录名作为技能名，技能目录内部更深层的 `SKILL.md` 是技能自己的资源。其余内容（集合根目录和分组目录自己的 `SKILL.md`、`references/`、`hooks/` 等）是共享资源，按原路径拷到 `skills/` 下：不存在时写入，内容相同时跳过，内容不同时拒绝导入；其中的 `SKILL.md` 同样迁移 frontmatter。上次构建登记为脚手架生成的技能（例如产物同步模块的 `autobizdevops-artifact-sync`）跳过不导入。同名技能在集合中出现两次时拒绝导入。build 生成的空白 `skills/<skill>/SKILL.md` 会被分组下的同名技能替换（删除空白文件）。每个技能沿用 `add skill --from` 的迁移、冲突检查和 warning 规则。整批先在内存中完成导入与一次 doctor，任一 error 均不写文件；成功时 JSON 输出增加 `importedSkills` 技能名数组。`agents/` 不属于技能集合，不会自动查找或创建：给了 `--agents` 时把该目录原样拷到插件的 `agents/`，与技能同批写入；已有同名文件内容相同时跳过，内容不同时拒绝导入 |
 | `autobiz-plugin module list` | 列出可用模块与可选能力、版本及启用状态 |
 | `autobiz-plugin module enable <id> [--set key=value …]` / `disable <id>` | 启用或关闭 `knowledge`、`artifactSync`（看板能力固定开启，不能用这个命令关闭）。`enable knowledge` / `enable artifactSync` 在 `modules/knowledge.json` / `modules/artifactSync.json` 不存在时创建骨架，并在入口文件中引用；`disable` 只去掉引用，`modules/*.json` 和模块以前生成的文件都保留；这些文件不再生效：宿主命令和看板入口不再生成，build-manifest 中标为 `inactive`，`package` 不打包，lint 报 `MODULE_INACTIVE_FILES`（D52）。已存在时不重建，只加回引用。`--set` 的 key 沿模块 Schema 的属性用 `.` 逐级指定（例如 `assembly.assembler=devclaw`、`source.url=…`），value 按 Schema 的类型转换：字符串原样保留，其余按 JSON 解析；`artifacts`、`extraPaths` 这类以路径为键的映射不能用 `--set` 指定。`enable artifactSync` 必须用 `--set` 给出 `allowedFrom` 或 `allowedCheckpoints`；它会把扩展名不是 `.json` 的输出路径预填进 `artifacts`，简述写成 `[TODO: 简述]`，开发者删掉不需要上传的、补上简述即可（D56） |
 | `autobiz-plugin doctor [--dry-run] [--force] [--allow-id-change] [--allow-layout-change] [--allow-major-upgrade]` | 修改核心配置（`workflow.json`、`modules/*.json`、入口文件）或更新脚手架后重新生成插件：lint → 与上次构建比较并列出影响 → build → 复查（§1.7） |
@@ -132,12 +132,14 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
   "nodes": [
     { "id": "draft", "name": "起草", "stage": "biz", "seq": 1, "skill": "doc-draft", "outputs": ["DRAFT.md"] },
     { "id": "review", "name": "评审", "stage": "biz", "seq": 2, "skill": "doc-review", "outputs": ["REVIEW.md"] } ],
-  "skills": { "doc-draft": null, "doc-review": "/path/to/doc-review" }
+  "skills": { "doc-draft": null, "doc-review": "/path/to/doc-review" },
+  "agents": "/path/to/agents"
 }
 ```
 
 - `nodes` 每项的字段同 `workflow.json` 的节点，另加 `stage`；终态节点写 `"terminal": true`；
 - `skills` 为技能名 → 导入目录，`null` 表示不提供；导入规则同 `add skill --from`；
+- `agents` 可选，为 agents 目录的路径，规则同 `add skills --agents`；不写时不创建 `agents/`；
 - `board`、`session`、`knowledge`、`artifactSync` 可选，内容与对应的模块配置文件相同；写了 `knowledge`、`artifactSync` 即表示启用；
 - 与 `--from` 一起使用时，`plugin` 按字段覆盖样例，其余写了的类别整体替换样例中的对应内容。
 

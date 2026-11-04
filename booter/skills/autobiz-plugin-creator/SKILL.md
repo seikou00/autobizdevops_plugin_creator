@@ -26,7 +26,7 @@ python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz"
 |---|---|
 | 新建 | `new "<插件目录>" --yes --answers -`（回答从 stdin 读入，格式见下文）；迁移时用 `--from lite` 或 `--from fullstack` |
 | 加节点 | `add node <id> --name <名称> --skill <技能> --stage biz\|dev\|ops --seq <n> [--output <路径> …] [--optional-output <路径> …] [--terminal]` |
-| 导入技能 | `add skills --from "<已有技能集合目录>"` 一次导入下一级所有含 `SKILL.md` 的技能目录；单个技能用 `add skill <技能名> --from "<已有技能目录>"`，不带 `--from` 时生成空白 `SKILL.md` |
+| 导入技能 | `add skills --from "<已有技能集合目录>"` 一次导入集合中的全部技能，支持 `<集合>/<分组>/<技能>/` 一层分组，共享资源按原路径拷入；单个技能用 `add skill <技能名> --from "<已有技能目录>"`，不带 `--from` 时生成空白 `SKILL.md` |
 | 模块 | `module list`；`module enable knowledge [--set assembly.assembler=devclaw]`；`module enable artifactSync --set allowedFrom=plan:done`；`module disable <id>` |
 | 重新生成 | `doctor`（先看影响时加 `--dry-run`） |
 | 检查 | `lint`（只查核心配置）、`check`（再加技能内容、漂移和契约测试） |
@@ -93,7 +93,7 @@ python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz"
 
 1. **定位**：确认是新建还是修改。插件目录中已有 `plugin.scaffold.json` 就是修改，先读取现有配置。新建时确认插件目录、插件 ID（提醒发布后不可修改）、插件名；这一步不调用 CLI。
 2. **建模**：让用户用自然语言描述流程，按 [建模指南](references/modeling-guide.md) 整理成“seq → 阶段 → 节点 → 技能 → 输出产物”表格回显，用户确认后才写入。新建时调用 `new --yes --answers -`；修改时调用 `add node` 或编辑 `workflow.json`，写完运行 `lint`。
-3. **技能资源**：对每个节点确认是导入已有技能，还是先不提供（生成空白 `SKILL.md`）。同一目录下有多个技能时用 `add skills --from` 一次导入；单个技能用 `add skill --from`。`agents/` 需单独提供。导入后报出的 `LEGACY_ENTRY_REF` 是技能正文里的旧状态命令：按 hint 与用户确认后删掉，状态只由开头的状态维护片段维护。
+3. **技能资源**：对每个节点确认是导入已有技能，还是先不提供（生成空白 `SKILL.md`）。同一目录下有多个技能时用 `add skills --from` 一次导入；单个技能用 `add skill --from`。`agents/` 不会自动创建：来源旁边有 agents 目录时加 `--agents <目录>` 一并导入。导入后报出的 `LEGACY_ENTRY_REF` 是技能正文里的旧状态命令：按 hint 与用户确认后删掉，状态只由开头的状态维护片段维护。
 4. **模块**：询问目标平台、节点运行策略、是否需要知识模块（组装方由谁担任）、是否需要产物同步模块（从哪个节点起允许同步、上传哪些产物）。用 `module enable` 或编辑 `modules/*.json`。
 5. **生成**：运行 `doctor`。对新生成的空白 `SKILL.md`，与用户确认触发场景后填写 `description`，再运行一次 `doctor`：节点描述取自 `description`，改了不重新生成会报 `BUILD_STALE`。
 6. **校验**：运行 `check`，把 Issue 按原文转述给用户，修改输入后重试。

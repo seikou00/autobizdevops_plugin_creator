@@ -92,6 +92,10 @@ def doctor(root, *, dry_run: bool = False, force: bool = False, allow: frozenset
         return CommandResult(report, extra=extra, text=_summary(changes, pending, dry_run=True))
     written = []
     for rel, data in sorted((overlay or {}).items()):
+        if data is None:
+            if fsio.remove_file(tree.path(rel), stop=tree.root):
+                written.append(rel)
+            continue
         if not fsio.same_content(Tree(root).read_bytes(rel), data):
             fsio.atomic_write(tree.path(rel), data)
             written.append(rel)

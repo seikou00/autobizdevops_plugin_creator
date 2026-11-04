@@ -13,6 +13,7 @@ from scaffold.commands import CommandResult
 from scaffold.commands.check import frontmatter_issues, legacy_refs
 from scaffold.commands.doctor import doctor
 from scaffold.build.load import ENTRY, MODULE_KEYS, rel_path
+from scaffold.build.manifest import read_manifest
 from scaffold.lib import derive, fsio, jsonedit, jsonschema, skillmd
 from scaffold.lib.issues import UsageError, warning
 from scaffold.lib.tree import Tree
@@ -58,16 +59,52 @@ def is_blank(tree: Tree, skill: str) -> bool:
     return skillmd.is_placeholder(front.fields.get("description")) and not body.strip()
 
 
-def import_skill(tree: Tree, skill: str, source: Path | None, *, bound: bool) -> tuple:
-    """返回 (overlay, issues, notes)：导入时发现的内容问题只报 warning，照样导入（Q12.5）。"""
+def source_files(source: Path) -> list:
+    """来源目录下要拷贝的文件 (相对路径, 内容)，跳过缓存和系统文件。"""
+    files = []
+    for path in sorted(source.rglob("*")):
+        rel = path.relative_to(source).as_posix()
+        if not path.is_file() or any(part in SKIPPED for part in rel.split("/")) or rel.endswith(".pyc"):
+            continue
+        files.append((rel, path.read_bytes()))
+    return files
+
+
+def import_agents(tree: Tree, source: Path) -> dict:
+    """把 agents 目录原样拷到插件的 agents/：已有同名文件内容相同时跳过，不同时拒绝导入。"""
+    source = Path(source).expanduser()
+    if not source.is_dir():
+        raise UsageError(f"agents 目录不存在：{source}")
+    files = source_files(source)
+    if not files:
+        raise UsageError(f"agents 目录 {source} 中没有文件")
+    overlay = {}
+    for rel, data in files:
+        target = f"agents/{rel}"
+        existing = tree.read_bytes(target)
+        if existing is None:
+            overlay[target] = data
+        elif not fsio.same_content(existing, data):
+            raise UsageError(f"{target} 已存在且内容不同，不能覆盖")
+    return overlay
+
+
+def import_skill(tree: Tree, skill: str, source: Path | None, *, bound: bool, prefix: str | None = None) -> tuple:
+    """返回 (overlay, issues, notes)：导入时发现的内容问题只报 warning，照样导入（Q12.5）。
+
+    prefix 是导入到的目录，默认 skills/<skill>，分组技能为 skills/<分组>/<skill>。build 生成的空白
+    skills/<skill>/SKILL.md 可以被导入替换；导入到分组目录时，overlay 中把它标为删除（None）。
+    """
     if len(skill) > 64 or not SKILL_NAME.match(skill):
         raise UsageError(f"技能名 {skill} 不合法：只能用小写字母、数字和连字符，不超过 64 字符")
+    flat = f"skills/{skill}"
+    prefix = prefix or flat
     _, candidates = skillmd.find_skill_dir(tree, skill)
-    replace_blank = candidates == [f"skills/{skill}"] and is_blank(tree, skill)
-    if (tree.is_dir(f"skills/{skill}") or candidates) and not (replace_blank and source is not None):
-        where = "、".join(candidates) or f"skills/{skill}"
+    blank = source is not None and flat in candidates and is_blank(tree, skill)
+    blockers = [candidate for candidate in candidates if not (blank and candidate == flat)]
+    if blockers or (tree.is_dir(prefix) and not (blank and prefix == flat)):
+        where = "、".join(blockers or [prefix])
         raise UsageError(f"技能 {skill} 已存在（{where}），不能重复导入")
-    prefix = f"skills/{skill}"
     overlay, issues, notes = {}, [], []
     if source is None:
         overlay[f"{prefix}/SKILL.md"] = f"---\nname: {skill}\ndescription: {skillmd.TODO_DESCRIPTION}\n---\n".encode()
@@ -75,11 +112,11 @@ def import_skill(tree: Tree, skill: str, source: Path | None, *, bound: bool) ->
     source = Path(source).expanduser()
     if not (source / "SKILL.md").is_file():
         raise UsageError(f"{source} 下没有 SKILL.md")
-    for path in sorted(source.rglob("*")):
-        rel = path.relative_to(source).as_posix()
-        if not path.is_file() or any(part in SKIPPED for part in rel.split("/")) or rel.endswith(".pyc"):
-            continue
-        overlay[f"{prefix}/{rel}"] = path.read_bytes()
+    if blank and prefix != flat:
+        overlay[f"{flat}/SKILL.md"] = None
+        notes.append(f"已删除 build 生成的空白 {flat}/SKILL.md")
+    for rel, data in source_files(source):
+        overlay[f"{prefix}/{rel}"] = data
     text = skillmd.read_text(overlay[f"{prefix}/SKILL.md"])
     text, renamed = skillmd.set_name(text, skill)
     if renamed:
@@ -105,34 +142,114 @@ def add_skill(root: Path, skill: str, *, source: Path | None = None) -> CommandR
     return result
 
 
-def add_skills(root: Path, *, source: Path) -> CommandResult:
-    """从技能集合目录导入所有一级子目录中的技能，整批只运行一次 doctor。"""
+def _is_skill_dir(path: Path) -> bool:
+    return path.is_dir() and path.name not in SKIPPED and (path / "SKILL.md").is_file()
+
+
+def scan_collection(source: Path) -> tuple:
+    """按插件 skills/ 的布局解析技能集合目录，返回 (技能 [(名字, 来源, 目标目录)], 资源 [(skills/ 下的路径, 内容)])。
+
+    一级子目录本身含 SKILL.md、且它的子目录都不含 SKILL.md 时是技能；它的子目录中有含 SKILL.md 的，
+    这个一级子目录是分组，这些子目录是分组下的技能（与 build 查找技能的两层一致，input-config.md §7.3）。
+    其余内容（集合根目录和分组目录自己的 SKILL.md、references/、hooks/ 等）都是共享资源，按原路径拷入。
+    技能目录内部更深层的 SKILL.md 属于技能自己的资源，随技能一起拷贝。
+    来源目录自己含 SKILL.md、有技能子目录，且没有同样带 SKILL.md 的分组子目录时，它本身就是一个分组
+    （例如 skills/autodev，其中 hooks/ 下的技能是分组资源），按分组导入。
+    """
+    children = [path for path in sorted(source.iterdir(), key=lambda path: path.name) if path.name not in SKIPPED]
+    has_group = any(_is_skill_dir(child) and any(_is_skill_dir(path) for path in child.iterdir())
+                    for child in children)
+    if (source / "SKILL.md").is_file() and not has_group and any(_is_skill_dir(child) for child in children):
+        names = {child.name for child in children if _is_skill_dir(child)}
+        skills = [(name, source / name, f"skills/{source.name}/{name}") for name in sorted(names)]
+        resources = [(f"skills/{source.name}/{rel}", data) for rel, data in source_files(source)
+                     if rel.split("/")[0] not in names]
+        return skills, resources
+    skills, resources = [], []
+    for child in children:
+        if child.is_file():
+            resources.append((f"skills/{child.name}", child.read_bytes()))
+            continue
+        nested = [path for path in sorted(child.iterdir(), key=lambda path: path.name) if _is_skill_dir(path)]
+        if nested:
+            skills += [(path.name, path, f"skills/{child.name}/{path.name}") for path in nested]
+            names = {path.name for path in nested}
+            resources += [(f"skills/{child.name}/{rel}", data) for rel, data in source_files(child)
+                          if rel.split("/")[0] not in names]
+        elif _is_skill_dir(child):
+            skills.append((child.name, child, f"skills/{child.name}"))
+        else:
+            resources += [(f"skills/{child.name}/{rel}", data) for rel, data in source_files(child)]
+    return skills, resources
+
+
+def owned_paths(tree: Tree) -> set:
+    """上次构建登记为脚手架所有（managed、module、generated）的文件。"""
+    manifest = read_manifest(tree) or {}
+    return {path for path, entry in (manifest.get("files") or {}).items()
+            if isinstance(entry, dict) and entry.get("ownership") in ("managed", "module", "generated")}
+
+
+def add_skills(root: Path, *, source: Path, agents: Path | None = None) -> CommandResult:
+    """导入技能集合目录中的全部技能（支持一层分组）和共享资源，给了 agents 目录时一并拷到 agents/，
+    整批只运行一次 doctor。"""
     tree = Tree(root)
     if not tree.is_file("plugin.scaffold.json"):
         raise UsageError(f"找不到入口文件 plugin.scaffold.json：{tree.path('plugin.scaffold.json')}")
     source = Path(source).expanduser()
     if not source.is_dir():
         raise UsageError(f"技能集合目录不存在：{source}")
-    sources = sorted((child for child in source.iterdir() if child.is_dir() and (child / "SKILL.md").is_file()),
-                     key=lambda child: child.name)
-    if not sources:
-        raise UsageError(f"{source} 的一级子目录中没有找到含 SKILL.md 的技能")
+    found, resources = scan_collection(source)
+    if not found:
+        raise UsageError(f"{source} 中没有找到含 SKILL.md 的技能（只查一级子目录和其下的分组）")
+    seen = {}
+    for skill, _, prefix in found:
+        if skill in seen:
+            raise UsageError(f"技能 {skill} 在集合中出现了两次（{seen[skill]}、{prefix}），build 无法确定用哪一个")
+        seen[skill] = prefix
 
+    owned = owned_paths(tree)
     bound = bound_skills(tree)
-    overlay, issues, notes = {}, [], []
-    for skill_source in sources:
-        skill = skill_source.name
-        imported, skill_issues, skill_notes = import_skill(tree, skill, skill_source, bound=skill in bound)
+    overlay, issues, notes, names, skipped = {}, [], [], [], []
+    for skill, skill_source, prefix in found:
+        if any(path.startswith(prefix + "/") for path in owned):
+            skipped.append(skill)
+            continue
+        imported, skill_issues, skill_notes = import_skill(tree, skill, skill_source, bound=skill in bound,
+                                                           prefix=prefix)
         overlay.update(imported)
         issues.extend(skill_issues)
         notes.extend(f"{skill}：{note}" for note in skill_notes)
+        names.append(skill)
+    shared = 0
+    for rel, data in resources:
+        if rel in owned or any(rel.startswith(f"skills/{skill}/") for skill in skipped):
+            continue
+        if rel.endswith("/SKILL.md"):
+            # 分组和集合根目录自己的 SKILL.md 也按技能文件检查，同样迁移 frontmatter
+            text, moved = skillmd.migrate_frontmatter(skillmd.read_text(data))
+            data = text.encode("utf-8")
+            notes.extend(f"{rel}：{note}" for note in moved)
+        existing = tree.read_bytes(rel)
+        if existing is None:
+            overlay[rel] = data
+            shared += 1
+        elif not fsio.same_content(existing, data):
+            raise UsageError(f"{rel} 已存在且内容不同，不能覆盖")
+    agent_files = import_agents(tree, agents) if agents is not None else {}
+    overlay.update(agent_files)
 
     result = doctor(root, overlay=overlay, extra_issues=issues)
     if not result.report.failed():
-        names = [skill_source.name for skill_source in sources]
         result.extra["importedSkills"] = names
-        summary = f"已导入 {len(names)} 个技能：{'、'.join(names)}"
-        result.text = "\n".join([summary, *notes, *([result.text] if result.text else [])])
+        summary = [f"已导入 {len(names)} 个技能：{'、'.join(seen[name][len('skills/'):] for name in names)}"]
+        if skipped:
+            summary.append(f"跳过由脚手架生成的技能：{'、'.join(skipped)}")
+        if shared:
+            summary.append(f"已导入 {shared} 个共享资源文件（技能集合根目录和分组目录下的非技能内容）")
+        if agents is not None:
+            summary.append(f"已导入 {len(agent_files)} 个 agents 文件" if agent_files else "agents/ 中的文件已是最新")
+        result.text = "\n".join([*summary, *notes, *([result.text] if result.text else [])])
     return result
 
 

@@ -440,7 +440,8 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | 目录 | 内容 | 初始化向导 | 交付方式 |
 |---|---|---|---|
 | `skills/<skill>/` 或 `skills/<分组>/<skill>/` | `SKILL.md` 正文、`scripts/` 执行脚本与业务校验器、`references/`，以及技能自己维护的模板等资源 | 导入已有技能目录；开发者没有提供时不创建，由 build 生成空白 `SKILL.md` | `SKILL.md` 开头由 build 写入状态维护片段，其余原样交付（output-spec.md §6.1） |
-| `agents/`（可选） | 自定义子代理等外挂资源，由会话策略引用 | 不创建，需要时由开发者创建 | 存在时原样交付 |
+| `skills/` 下的共享资源 | 技能集合根目录和分组目录自己的 `SKILL.md`、`references/`、`hooks/` 等，供多个技能引用 | 不创建；`add skills` 导入技能集合时按原路径拷入 | 原样交付 |
+| `agents/`（可选） | 自定义子代理等外挂资源，由会话策略引用 | 不创建，需要时由开发者创建，或用 `add skills --agents`、`new --answers` 的 `agents` 拷入 | 存在时原样交付 |
 | `hooks/` | 开发者自定义扩展，例如宿主工具钩子 `hooks.json`、节点校验脚本及其配置 | 创建目录 | 原样交付，脚手架不读写 |
 
 技能目录的查找规则：build 按节点的 `skill` 在 `skills/<skill>/` 和 `skills/*/<skill>/` 两处查找含 `SKILL.md` 的目录，只找这两层。两处都有、或在多个分组下都有时报 `SKILL_AMBIGUOUS`；都没有时在 `skills/<skill>/` 生成空白 `SKILL.md`。找到的目录就是该节点的技能目录，`${skillPath}` 指向它。分组目录自己的 `SKILL.md`（例如 `skills/autodev/SKILL.md`）和分组下不被节点绑定的技能（例如回滚、评审等辅助技能）都按开发者资源原样交付，不写状态维护片段。

@@ -106,3 +106,15 @@ def atomic_write(path: Path, data: bytes) -> None:
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def remove_file(path: Path, *, stop: Path) -> bool:
+    """删除文件并逐级删掉因此变空的父目录，到 stop 为止；文件不存在时返回 False。"""
+    if not path.is_file():
+        return False
+    path.unlink()
+    parent = path.parent
+    while parent != stop and stop in parent.parents and not any(parent.iterdir()):
+        parent.rmdir()
+        parent = parent.parent
+    return True

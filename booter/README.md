@@ -21,7 +21,7 @@
 ```bash
 python3 tools/make_pyz.py                                  # 打出 dist/autobiz-plugin.pyz 和 dist/autobiz-plugin-creator-<版本>.zip
 python3 dist/autobiz-plugin.pyz new ../../my-plugin        # 初始化向导；--from lite --yes 以样例为起点、不提问
-python3 dist/autobiz-plugin.pyz -C ../../my-plugin add skills --from ../../autobizdevops_lite/skills  # 一次导入技能集合
+python3 dist/autobiz-plugin.pyz -C ../../my-plugin add skills --from ../../autobizdevops_lite/skills --agents ../../autobizdevops_lite/agents  # 一次导入技能集合和 agents
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin add skill doc-review --from ../../other-skills/doc-review  # 单独导入一个技能
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin add node review --name 评审 --skill doc-review --stage dev --seq 5 --output REVIEW.md
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin module enable artifactSync --set allowedFrom=plan:done
@@ -33,6 +33,6 @@ python3 -m unittest discover -s tests -t .                 # 脚手架自身的�
 python3 tests/check_schema_defaults.py                     # docs/input-config.md 的默认值与 Schema 是否一致
 ```
 
-不打 `.pyz` 时，在 `booter/` 下用 `python3 -m scaffold <命令>` 效果相同。各命令的参数和输出见 [docs/interfaces.md §1](../docs/interfaces.md)。
+不打 `.pyz` 时，在 `booter/` 下用 `python3 -m scaffold <命令>` 效果相同。各命令的参数和输出见 [docs/interfaces.md §1](../docs/interfaces.md)；上手步骤见 [docs/usage-quickstart.md](../docs/usage-quickstart.md)，完整定制见 [docs/usage-advanced.md](../docs/usage-advanced.md)。
 
-`add skills` 只导入来源目录下一级、含 `SKILL.md` 的技能目录；整批原子写入并只运行一次 doctor。`agents/` 是独立资源，需要单独放进插件目录。
+`add skills` 按插件 `skills/` 的布局导入技能集合，支持一层分组（`<集合>/<分组>/<技能>/SKILL.md`），集合根目录和分组目录下的共享资源（`references/`、`hooks/`、分组自己的 `SKILL.md`）按原路径拷入，例如 `add skills --from ../../autobiz_kanban/skills` 一次导入全栈版的全部技能；整批原子写入并只运行一次 doctor。`agents/` 是独立资源，不会自动创建：技能集合旁边有 agents 目录时加 `--agents <目录>` 一并拷入，或在 `new --answers` 中写 `"agents": "<目录>"`。

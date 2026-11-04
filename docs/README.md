@@ -39,6 +39,8 @@ v1 范围：
 
 | 文档 | 内容 |
 |---|---|
+| [usage-quickstart.md](usage-quickstart.md) | 快速上手：四步出一个插件 |
+| [usage-advanced.md](usage-advanced.md) | 进阶用法：全部命令与配置的定制方式 |
 | [input-config.md](input-config.md) | 用户输入：输入分类、`workflow.json`、入口文件与模块配置文件的字段、默认值、推导规则、校验规则 |
 | [output-spec.md](output-spec.md) | 插件标准化输出：目录、清单、宿主接口 board_core、内部配置、运行期数据、技能格式 |
 | [interfaces.md](interfaces.md) | 接口：CLI 与初始化向导、模块契约、宿主命令协议、看板事件推送、运行框架入口与内部库 |

@@ -12,7 +12,7 @@ from scaffold import resources
 from scaffold.build.load import MODULE_KEYS
 from scaffold.commands import CommandResult
 from scaffold.commands.doctor import doctor
-from scaffold.commands.edit import import_skill
+from scaffold.commands.edit import import_agents, import_skill
 from scaffold.lib import derive, fsio, jsonedit
 from scaffold.lib.issues import UsageError
 from scaffold.lib.tree import Tree
@@ -169,6 +169,11 @@ def new(target: Path, *, template: str = "blank", answers: dict | None = None, y
             files.update(overlay)
             tree = Tree(target, files)
         issues += found
+    agents = (answers or {}).get("agents")
+    if agents is not None:
+        if not isinstance(agents, str):
+            raise UsageError("--answers 的 agents 必须是 agents 目录的路径")
+        files.update(import_agents(tree, Path(agents)))
     result = doctor(target, overlay=files, extra_issues=issues)
     if not result.report.failed():
         (target / "hooks").mkdir(parents=True, exist_ok=True)
