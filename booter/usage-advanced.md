@@ -1,6 +1,6 @@
 # 进阶用法：完整定制
 
-按命令和配置文件逐项说明脚手架能定制什么。只想尽快出一个插件看 [usage-quickstart.md](usage-quickstart.md)；字段的默认值、推导和校验规则以 [input-config.md](input-config.md) 为准，命令的完整契约以 [interfaces.md §1](interfaces.md) 为准。
+按命令和配置文件逐项说明脚手架能定制什么。只想尽快出一个插件看 [usage-quickstart.md](usage-quickstart.md)；字段的默认值、推导和校验规则以 [docs/input-config.md](../docs/input-config.md) 为准，命令的完整契约以 [docs/interfaces.md §1](../docs/interfaces.md) 为准。
 
 ## 1. 运行方式
 
@@ -28,7 +28,7 @@ P/
 │   └── artifactSync.json     # 产物同步（可选）
 ├── skills/<skill>/           # 也支持分组 skills/<group>/<skill>/
 ├── agents/                   # 子代理文件，由 session.json 引用（可选）
-├── hooks/                    # 自定义扩展，原样交付
+├── hooks/                    # hooks.json（脚手架的条目 + 你的条目）、artifact_guard.py、全局钩子脚本，以及你自己的钩子脚本
 ├── .mcp.json                 # 可选，透传进 plugin.json
 ├── .scaffold/                # Schema，IDE 补全用，脚手架维护
 ├── plugin.json、board_core/、runtime/   # 生成，不要手改
@@ -46,7 +46,8 @@ P/
 | `plugin.id` | 小写字母、数字、连字符；发布后修改要 `doctor --allow-id-change` |
 | `plugin.name`、`version`、`description` | 必填（连同 `id`），写进 `plugin.json` |
 | `plugin.author{name,email,url}`、`homepage`、`repository`、`license`、`keywords` | 可选，写进 `plugin.json` |
-| `plugin.mcpServers`、`plugin.hooks` | 指向 `.mcp.json`、`hooks/hooks.json`，原样透传 |
+| `plugin.mcpServers` | 指向 `.mcp.json`，原样透传 |
+| `plugin.hooks` | 可以不写；写了只能是 `./hooks/hooks.json`（见 §3.7） |
 | `runtime.metaRoot` | 元数据根目录，默认 `.autobizdevops`；同一项目装多个插件时各自不同；修改要 `doctor --allow-layout-change` |
 | `workflow`、`modules.*` | 对其他核心配置的引用 |
 
@@ -115,6 +116,58 @@ P/
 | `excludeCheckpoints` | 排除的 checkpoint |
 | `extraPaths` | 产物之外要同步的路径 glob → 简述 |
 
+### 3.7 钩子与产物检查
+
+生成的插件默认注册一个宿主钩子：脚本是 `hooks/artifact_guard.py`，注册在 `hooks/hooks.json` 的 `PreToolUse`（`execute`）第一条，`plugin.json` 的 `hooks` 固定指向 `./hooks/hooks.json`。
+
+| 检查点 | 时机 | 必需产物缺失或为空时 |
+|---|---|---|
+| 钩子 `artifact_guard.py` | 模型执行 `update_state.py --checkpoint <节点>_done` 之前 | 拦截这条命令，告诉模型缺哪些、哪些为空，补齐后重试 |
+| `update_state.py` | 推进状态时 | 冗余检查，只在 `warnings` 中报告并写 `artifact-check` 变更日志，照常推进 |
+
+- **你自己的钩子直接写在 `hooks/hooks.json` 里**，照着脚手架生成的条目打样，脚本也放在 `hooks/` 下。写法 `{"PreToolUse": [{"matcher": …, "hooks": […]}]}` 或包在 `{"hooks": {…}}` 下都可以；
+- 命令指向 `hooks/artifact_guard.py` 或 `hooks/<全局钩子 id>/` 的条目归脚手架：每次重新生成都排在最前面并按当前配置重写，手改会被覆盖；其他条目都是你的，原样保留；
+- 改自己的条目直接生效，不需要 doctor；结构不对报 `PLUGIN_HOOKS_INVALID`；
+- 钩子命令写的是 `python -X utf8 hooks/artifact_guard.py`，路径相对插件根目录，与全栈版 `hooks.json` 的写法一致。
+
+**插件全局钩子模块**：脚手架还自带一组可以按需启用的公共钩子，由模块 `globalHooks` 管理（见 §3.8），合并顺序是：产物检查钩子 → 全局钩子（按 `modules/globalHooks.json` 中列出的顺序）→ 你自己在 `hooks/hooks.json` 里写的条目。
+
+### 3.8 `modules/globalHooks.json`（可选，插件全局钩子）
+
+```json
+{ "hooks": ["secrets-check", "performance-check"] }
+```
+
+入口文件的 `modules.globalHooks` 引用这个文件即启用，和 knowledge、artifactSync 一样。
+
+| id | 做什么 |
+|---|---|
+| `secrets-check` | 写入 `.yaml`、`.yml`、`.properties` 时发现明文的密码、密钥、token 就拦截，提示先加密再写入 |
+| `performance-check` | 编码节点完成（`code_done`）前，对工作区 `git diff` 中变动的前端文件执行 7 条性能规则，发现问题就拦截 |
+
+```bash
+python3 -m scaffold -C P hook list                                      # 查看全部全局钩子及启用状态
+python3 -m scaffold -C P hook enable secrets-check performance-check    # 启用（写 modules/globalHooks.json，必要时启用模块）
+python3 -m scaffold -C P hook disable performance-check                 # 关闭；全部关掉后模块也关闭
+```
+
+也可以像其他模块一样 `module enable globalHooks --set 'hooks=["secrets-check"]'`，或直接编辑文件后执行 doctor。id 写错报 `GLOBAL_HOOK_UNKNOWN`，重复报 `GLOBAL_HOOK_DUP`。
+
+**给脚手架新增一个公共钩子**：在 `booter/scaffold/modules/global_hooks/hooks/` 下建一个目录，放 `hook.json` 和 `files/<脚本>`，不用改代码：
+
+```json
+{
+  "id": "my-check",
+  "title": "我的检查",
+  "description": "一句话说明在什么时候检查什么",
+  "files": ["my_check.py"],
+  "entries": { "PreToolUse": [ { "matcher": "execute",
+    "hooks": [ { "type": "command", "command": "python -X utf8 ${hookDir}/my_check.py", "timeout": 30 } ] } ] }
+}
+```
+
+`${hookDir}` 在 build 时替换成 `hooks/my-check`。之后 `hook list`、向导和 `--answers` 都会自动出现这个钩子；运行 `python3 -m unittest tests.test_global_hooks` 检查目录是否完整。
+
 ## 4. 新建插件：`new`
 
 ```bash
@@ -127,6 +180,7 @@ python3 -m scaffold new <目录> [--from blank|lite|fullstack] [--yes] [--answer
 | `new P --from lite --yes` | 直接用样例（`booter/examples/lite/`、`fullstack/`）的核心配置 |
 | `new P --from lite --yes --answers a.json` | 样例 + 回答覆盖 |
 | `new P --from blank --yes --answers a.json` | 完全由回答生成，此时必须给出 `plugin` 和 `nodes` |
+| `new P --skeleton [--module <id> …]` | 只写出带 `[TODO: …]` 占位的核心配置骨架，不生成插件；填完后 `lint` 查看还缺什么，再 `doctor`、`package`（见下文） |
 
 回答文件（`-` 表示从 stdin 读取）：
 
@@ -140,13 +194,15 @@ python3 -m scaffold new <目录> [--from blank|lite|fullstack] [--yes] [--answer
   "board": { "display": { "workflowLabel": "需求开发" } },
   "artifactSync": { "allowedFrom": "prd:done", "artifacts": { "PRD.md": "需求" } },
   "skills": { "my-prd": "/path/to/my-prd", "my-code": null },
-  "agents": "/path/to/agents"
+  "agents": "/path/to/agents",
+  "globalHooks": { "hooks": ["secrets-check"] }
 }
 ```
 
 - `plugin` 按字段覆盖样例；`nodes`、`board`、`session`、`knowledge`、`artifactSync` 写了就整体替换样例中的对应内容；写了 `knowledge`、`artifactSync` 即启用；
 - `skills` 是技能名 → 技能目录，`null` 表示先不提供（生成空白 `SKILL.md`）；要逐个写，导入到 `skills/<skill>/`，不保留分组。整个技能集合（尤其是分组的 fullstack）建议 `new` 之后用 `add skills --from` 导入；
-- `agents` 是 agents 目录，原样拷到 `P/agents/`；不写就不创建 `agents/`。
+- `agents` 是 agents 目录，原样拷到 `P/agents/`；不写就不创建 `agents/`；
+- `globalHooks` 写了就启用插件全局钩子模块（见 §3.8），不写就只有产物检查钩子。
 
 生成 fullstack 并带上分组的技能和 agents（技能会引用 `skills/references/`、`skills/autobiz/hooks/` 等共享路径，所以用 `add skills` 整体导入，而不是在 `--answers` 里逐个列出）：
 
@@ -156,6 +212,22 @@ G=~/Documents/GitHub; OUT=$G/plugin-fullstack
 
 python3 -m scaffold new $OUT --from fullstack --yes
 python3 -m scaffold -C $OUT add skills --from $G/autobiz_kanban/skills --agents $G/autobiz_kanban/agents
+```
+
+**只写骨架**：想自己手写配置时，先让脚手架按 Schema 写出结构，再照着占位填：
+
+```bash
+python3 -m scaffold new P --skeleton --module board --module artifactSync --module globalHooks
+```
+
+- 写出 `plugin.scaffold.json`、`workflow.json`（biz、dev 各一个节点）、`--module` 选中的模块配置，以及 IDE 补全用的 `.scaffold/` Schema；可选模块：`board`、`session`、`knowledge`、`artifactSync`、`globalHooks`；
+- 要填的地方都写成 `[TODO: 说明]`；`lint` 每个占位报一条 `TODO_FIELD`，带文件和 JSON Pointer。还有占位时 `doctor` 不生成（`artifactSync` 的简述除外：可以先生成，打包前填完）；
+- 填完后：
+
+```bash
+python3 -m scaffold -C P lint       # 确认没有 TODO_FIELD
+python3 -m scaffold -C P doctor     # 生成插件，技能不存在时生成空白 SKILL.md
+python3 -m scaffold -C P package    # 技能和简述也要填完
 ```
 
 ## 5. 增量修改
@@ -244,10 +316,10 @@ python3 -m scaffold -C P check --strict --json > check.json && python3 -m scaffo
 ## 8. 脚手架自身
 
 ```bash
-cd booter
+cd booter     # 仓库根目录下；已在 booter/ 中可省略
 python3 -m unittest discover -s tests -t .   # 金样、参考插件基线、契约、CLI 端到端和单元测试
 python3 tests/check_schema_defaults.py       # input-config.md 的默认值与 Schema 是否一致
 python3 tools/make_pyz.py                    # 发布 dist/autobiz-plugin.pyz 和插件开发技能包
 ```
 
-改了 `booter/examples/` 的输入后，要重新生成对应的 `output/` 金样（见 [examples/README.md](../booter/examples/README.md)）。
+改了 `booter/examples/` 的输入后，要重新生成对应的 `output/` 金样（见 [examples/README.md](examples/README.md)）。

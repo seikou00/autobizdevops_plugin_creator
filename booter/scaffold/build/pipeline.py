@@ -82,6 +82,9 @@ def build(tree: Tree, *, dry_run: bool = False, force: bool = False, allow: froz
     skill_files, result.skills, descriptions = skills.plan_skills(ir, tree, result.skill_dirs, result.previous)
     board_core = framework.render_board_core(normalized.modules["board"], merged, result.modules)
     result.plan = emit.plan_files(merged, skill_files, board_core)
+    hooks_path, hooks_data, hooks_region = framework.render_hooks(merged, normalized.inputs.hooks)
+    result.plan.add(emit.PlannedFile(hooks_path, "seeded", hooks_data, "framework", region=hooks_region,
+                                     region_key="hooks"))
     result.report.extend(emit.check_drift(result.plan, tree, result.previous, force=force))
     if result.report.failed():
         return result

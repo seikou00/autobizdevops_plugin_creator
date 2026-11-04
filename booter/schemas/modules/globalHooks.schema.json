@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "autobiz.scaffold.module.globalHooks.v1",
+  "title": "AutoBiz 插件全局钩子模块配置 v1（modules/globalHooks.json）",
+  "description": "启用脚手架自带的公共宿主钩子。入口文件 modules.globalHooks 引用即启用模块；可用的钩子见 autobiz-plugin hook list。产物检查钩子由框架始终注册，不在此列。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["hooks"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "hooks": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+      "description": "要启用的全局钩子 id，按顺序合并进 hooks/hooks.json（排在产物检查钩子之后、开发者在 hooks/hooks.json 中自己写的条目之前），例如 secrets-check、performance-check。"
+    }
+  }
+}

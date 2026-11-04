@@ -10,7 +10,7 @@ AutoBiz 看板插件脚手架。三方分工如下：
 
 当前状态：**v1 的 P0、P1 功能已实现**（分期与实现状态见 [docs/priorities.md](docs/priorities.md)），v2 预留和 mods、RPC 草案未实现。只依赖 Python 3.9+ 标准库。
 
-脚手架的代码、Schema、示例和测试都在 [booter/](booter/) 下，用法见 [booter/README.md](booter/README.md)：
+脚手架的代码、Schema、示例、测试和使用说明都在 [booter/](booter/) 下，用法见 [booter/README.md](booter/README.md)、[快速上手](booter/usage-quickstart.md) 和 [进阶用法](booter/usage-advanced.md)：
 
 ```bash
 cd booter
@@ -23,8 +23,6 @@ python3 -m unittest discover -s tests -t .              # 脚手架自身的测�
 
 | 文档 | 内容 |
 |---|---|
-| [docs/usage-quickstart.md](docs/usage-quickstart.md) | 快速上手：四步出一个插件 |
-| [docs/usage-advanced.md](docs/usage-advanced.md) | 进阶用法：全部命令与配置的定制方式 |
 | [docs/README.md](docs/README.md) | 整体设计、三方职责、已确认决策、遗留问题、本次调整 |
 | [docs/input-config.md](docs/input-config.md) | 用户输入：输入分类、`workflow.json`、入口文件与模块配置文件的字段、默认值、推导规则、校验规则 |
 | [docs/output-spec.md](docs/output-spec.md) | 插件标准化输出：目录、清单、宿主接口 board_core、内部配置、运行期数据、技能格式 |

@@ -28,6 +28,7 @@ python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz"
 | 加节点 | `add node <id> --name <名称> --skill <技能> --stage biz\|dev\|ops --seq <n> [--output <路径> …] [--optional-output <路径> …] [--terminal]` |
 | 导入技能 | `add skills --from "<已有技能集合目录>"` 一次导入集合中的全部技能，支持 `<集合>/<分组>/<技能>/` 一层分组，共享资源按原路径拷入；单个技能用 `add skill <技能名> --from "<已有技能目录>"`，不带 `--from` 时生成空白 `SKILL.md` |
 | 模块 | `module list`；`module enable knowledge [--set assembly.assembler=devclaw]`；`module enable artifactSync --set allowedFrom=plan:done`；`module disable <id>` |
+| 全局钩子 | 插件全局钩子模块 `globalHooks`：`hook list` 查看脚手架自带的公共钩子（如 `secrets-check` 明文密码检查、`performance-check` 前端性能检查）；问用户要不要启用，要就 `hook enable <id> …`（写 `modules/globalHooks.json`），或在 `new` 的回答中写 `"globalHooks": {"hooks": [...]}`；`hook disable <id>` 关闭 |
 | 重新生成 | `doctor`（先看影响时加 `--dry-run`） |
 | 检查 | `lint`（只查核心配置）、`check`（再加技能内容、漂移和契约测试） |
 | 演示 | `simulate [--to <checkpoint>]` |

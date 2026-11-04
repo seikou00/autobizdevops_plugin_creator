@@ -50,7 +50,7 @@ def plan_skills(ir, tree, skill_dirs: dict, previous: dict | None):
         descriptions[path] = skillmd.description_of(text)
         files.append(SkillFile(path, text.encode("utf-8"), True, skillmd.state_digest(text)))
     for path, record in sorted((previous or {}).get("files", {}).items()):
-        if record.get("ownership") != "seeded" or path in bound:
+        if record.get("ownership") != "seeded" or path in bound or not path.startswith("skills/"):
             continue
         data = tree.read_bytes(path)
         if data is None:

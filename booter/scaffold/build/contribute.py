@@ -7,7 +7,7 @@ from typing import Optional, Union
 
 from scaffold.lib.issues import Issue, error
 
-MERGE_ORDER = ("framework", "board", "session", "knowledge", "artifactSync")
+MERGE_ORDER = ("framework", "board", "session", "knowledge", "artifactSync", "globalHooks")
 CORE_ENTRY_KEYS = ("apiVersion", "modules", "boardEvents")
 
 
@@ -36,6 +36,7 @@ class Contribution:
     inspect_commands: dict = field(default_factory=dict)
     knowledge_assembly: Optional[dict] = None
     skills: list = field(default_factory=list)
+    hooks: dict = field(default_factory=dict)             # 宿主钩子：事件名 → 条目数组，合并进 hooks/hooks.json
 
 
 @dataclass
@@ -47,6 +48,7 @@ class Merged:
     inspect_commands: dict = field(default_factory=dict)  # 键 → (来源 id, CommandSpec)
     knowledge_assembly: Optional[dict] = None
     skills: dict = field(default_factory=dict)            # 技能名 → 模块 id
+    hooks: dict = field(default_factory=dict)             # 事件名 → 条目数组，按 MERGE_ORDER 依次追加
 
 
 def _conflict(what: str, key: str, first: str, second: str) -> Issue:
@@ -95,4 +97,6 @@ def merge(contributions: dict) -> tuple[Merged, list[Issue]]:
                 issues.append(_conflict("技能", skill, merged.skills[skill], source))
                 continue
             merged.skills[skill] = source
+        for event, items in contribution.hooks.items():
+            merged.hooks.setdefault(event, []).extend(items)
     return merged, issues

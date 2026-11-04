@@ -227,12 +227,27 @@ def ask_modules(prompter: Prompter, nodes: list) -> tuple:
     return knowledge, artifact_sync
 
 
+def ask_hooks(prompter: Prompter) -> list:
+    """逐个询问插件全局钩子（globalHooks 模块 hooks/ 下的目录），默认都不启用。"""
+    from scaffold.modules.global_hooks.catalog import catalog
+
+    available = catalog()
+    if not available:
+        return []
+    prompter.say("── 插件全局钩子 ──\n  产物检查钩子始终启用；以下公共钩子按需选择")
+    return [hook_id for hook_id, spec in available.items()
+            if yes(prompter, f"启用 {spec.title}（{hook_id}）：{spec.description}？", False)]
+
+
 def ask(prompter: Prompter, *, seed_plugin: dict | None = None, seeded: bool = False,
         existing_skills: list | None = None) -> dict:
     """返回 --answers 结构的回答。seeded 为 True（--from lite/fullstack）时可以保留样例的流程和模块配置。"""
     existing_skills = existing_skills or []
     answers = {"plugin": ask_plugin(prompter, seed_plugin or {})}
     if seeded and yes(prompter, "保留样例的流程、模块配置？", True):
+        hooks = ask_hooks(prompter)
+        if hooks:
+            answers["globalHooks"] = {"hooks": hooks}
         prompter.say("── 7 自定义扩展 ──\n  将创建 hooks/（agents/ 可选，需要外挂子代理时再创建）")
         return answers
     answers["nodes"] = ask_nodes(prompter, existing_skills)
@@ -245,5 +260,8 @@ def ask(prompter: Prompter, *, seed_plugin: dict | None = None, seeded: bool = F
         answers["knowledge"] = knowledge
     if artifact_sync is not None:
         answers["artifactSync"] = artifact_sync
+    hooks = ask_hooks(prompter)
+    if hooks:
+        answers["globalHooks"] = {"hooks": hooks}
     prompter.say("── 7 自定义扩展 ──\n  将创建 hooks/（agents/ 可选，需要外挂子代理时再创建）")
     return answers

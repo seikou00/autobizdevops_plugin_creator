@@ -11,7 +11,7 @@
 ├── plugin.scaffold.json                  # developer  入口文件：基础信息与引用（不随包发布）
 ├── workflow.json                         # developer  核心流程（不随包发布）
 ├── modules/                              # developer  模块配置，按需存在（不随包发布）
-│   └── board.json  session.json  knowledge.json
+│   └── board.json  session.json  knowledge.json  artifactSync.json  globalHooks.json
 ├── plugin.json                           # generated  插件清单（DevClaw 只读这一份）
 ├── board_core/                           #            DevClaw 读取的全部静态内容（§3）
 │   ├── board_config.json                 # generated  宿主命令 inspectCommands
@@ -22,7 +22,11 @@
 │   ├── <node-skill>/scripts/…            # developer  执行脚本、业务校验器
 │   ├── <node-skill>/references/…         # developer
 │   └── <sync-skill>/…                    # module     产物同步模块（§7.2）
-├── hooks/                                # developer  自定义扩展，原样交付
+├── hooks/                                #            宿主钩子与自定义扩展（D61）
+│   ├── hooks.json                        # seeded     宿主钩子配置：开头是脚手架维护的条目（产物检查钩子、启用的全局钩子），其余是开发者的条目（interfaces.md §4.7）
+│   ├── artifact_guard.py                 # managed    默认钩子：执行完成命令前检查必需产物存在且非空
+│   ├── <hook-id>/…                       # module     插件全局钩子模块启用的钩子脚本，启用时生成（interfaces.md §4.8）
+│   └── …                                 # developer  开发者自己的钩子脚本、校验脚本及其配置
 ├── agents/*.md                           # developer  可选 Agent 资源（会话策略引用）
 ├── runtime/
 │   ├── workflow/
@@ -61,7 +65,7 @@
 |---|---|
 | `plugin.json`、`board_core/`、`runtime/` | 只收 build-manifest 记录的文件（标了 `inactive` 的除外，§8）和 `runtime/build-manifest.json` 本身。`node_modules/`、`__pycache__/` 等没有记录的文件不打包，列在 `--json` 输出的 `package.skipped` 中 |
 | `skills/`、`hooks/`、`agents/`（存在时） | 整个目录打包，跳过 `__pycache__/`、`*.pyc`、`.DS_Store`、`Thumbs.db` |
-| 清单引用的文件 | `plugin.mcpServers`、`plugin.hooks` 引用的文件按实际路径打包；文件不存在时 lint 报 `PLUGIN_REF_MISSING` |
+| 清单引用的文件 | `plugin.mcpServers` 引用的文件按实际路径打包；文件不存在时 lint 报 `PLUGIN_REF_MISSING`。`hooks/hooks.json` 随 `hooks/` 目录打包 |
 | 知识目录 `sys/` | 只在启用知识模块、并且没有声明 `knowledge.source` 时打包（此时视为开发者提供的资源）；声明了 `source` 时它是运行期缓存，不打包 |
 | 不打包 | `plugin.scaffold.json`、`workflow.json`、`modules/`、`.scaffold/`、`dist/`，以及以上规则没有列出的文件 |
 
@@ -87,7 +91,7 @@ DevClaw 只读取根目录的 `plugin.json`（D5），脚手架只生成这一�
 }
 ```
 
-`mcpServers`、`hooks` 只在输入中声明了才输出；`author`、`homepage`、`repository`、`license`、`keywords` 未声明时省略。所有路径都是相对插件根目录的路径，以 `./` 开头。
+`hooks` 固定指向 `./hooks/hooks.json`（脚手架维护的条目加开发者的条目，interfaces.md §4.7，D61），输入中没有声明 `plugin.hooks` 时也输出；`mcpServers` 只在输入中声明了才输出；`author`、`homepage`、`repository`、`license`、`keywords` 未声明时省略。所有路径都是相对插件根目录的路径，以 `./` 开头。
 
 ## 3. 宿主接口 board_core/
 
@@ -157,7 +161,7 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
 | 键 | 必有 | 说明 |
 |---|---|---|
 | `apiVersion` | 是 | 同 `board_config.json` |
-| `modules` | 是 | 四个模块逐个列出，未开启的写 `{"enabled": false}`，不靠缺省表达。开启的模块带 `version`；知识模块另带 `assembler`（`plugin`/`devclaw`，DevClaw 据此决定是否自己组装知识）和 `source`（是否由插件拉取知识仓库，即是否有 `pull_knowledge`）；产物同步模块另带 `skill`（同步技能名） |
+| `modules` | 是 | 五个模块（board、session、knowledge、artifactSync、globalHooks，D62）逐个列出，未开启的写 `{"enabled": false}`，不靠缺省表达。开启的模块带 `version`；知识模块另带 `assembler`（`plugin`/`devclaw`，DevClaw 据此决定是否自己组装知识）和 `source`（是否由插件拉取知识仓库，即是否有 `pull_knowledge`）；产物同步模块另带 `skill`（同步技能名） |
 | `boardEvents` | 是 | 插件会推送看板事件（interfaces.md §3.5），值固定为 `{"protocol": "autobiz.board-events.v1"}`。这是本脚手架新增的协议，现有插件没有，DevClaw 实现推送服务前忽略即可 |
 | `knowledge_config` | 总是生成（看板能力固定开启） | 知识沉淀入口，§7.3 |
 | `artifact_sync` | 产物同步模块且 `artifactSync.entry.enabled` | 产物同步入口，§7.2 |
@@ -257,13 +261,13 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
 
 | 层次 | 负责方 | 内容 |
 |---|---|---|
-| 存在且非空（最小校验） | 运行框架 `engine.py` | 产物路径的每一项至少匹配一个普通文件，并且匹配到的每个文件去掉首尾空白后都不为空。glob 不匹配目录 |
+| 存在且非空（最小校验） | 默认钩子 `artifact_guard.py` 拦截，运行框架 `engine.py` 提醒 | 产物路径的每一项至少匹配一个普通文件，并且匹配到的每个文件去掉首尾空白后都不为空。glob 不匹配目录。钩子在执行完成命令前检查，不满足时拦截；`update_state.py` 推进时再查一遍，只报 warning、不阻止（D61） |
 | 业务校验 | 开发者的校验命令 | 格式、内容是否合格，由节点 `validate` 命令判断（D13、D14）；v1 的 build 固定写 `null`，不执行 |
 
 推进规则：
 
 - 推进到 `<prefix>_in_progress`：检查本节点的必需输入是否存在（v1 的 `inputs` 固定为 `[]`）；
-- 推进到 `<prefix>_done`：检查必需输入和必需输出都存在且非空，`validate` 不为 `null` 时再执行校验命令，退出码为 0 才写入。没有声明 `outputs` 的节点不做产物检查；
+- 推进到 `<prefix>_done`：检查必需输入和必需输出都存在且非空，不满足时报 warning、照常推进（拦截在钩子中完成）；`validate` 不为 `null` 时再执行校验命令，退出码为 0 才写入。没有声明 `outputs` 的节点不做产物检查；
 - 推进到 `archived`（终态节点）：检查终态节点的必需输入是否存在，不执行校验命令。
 
 输入和输出默认是必需的；标了 `optional` 的不检查。生产者被跳过、或生产者是未执行的动态阶段节点时，依赖它的必需输入也不检查（input-config.md §2.3）。代码提交不是产物，engine 不查仓库状态（D37）。
@@ -499,7 +503,7 @@ description: [TODO: 做什么；在什么情况下使用]
 - `description` 是技能的触发依据，“什么时候用”要写在这里，而不是正文：正文只有在技能被触发后才会加载。空白 SKILL.md 的 description 预置为 `[TODO: 做什么；在什么情况下使用]`；
 - 技能的详细要求写在正文中。正文建议不超过 500 行，细节放到 `references/`，并在正文中写明什么时候读哪个文件（渐进式加载）；
 - 正文不再另写状态命令：开始、完成时执行什么只看状态维护片段。正文中自己写的 `update_state.py` 调用和旧入口路径由 `check` 报 `LEGACY_ENTRY_REF`；
-- 完成命令要在本节点的工作做完、必需产物都写好之后执行：框架检查必需产物都存在且非空（§4.4），不满足时拒绝推进并列出缺少或为空的产物，模型补齐后重试。更严格的完成条件（例如代码已提交、测试通过）写在正文中，作为执行完成命令的前提；
+- 完成命令要在本节点的工作做完、必需产物都写好之后执行：默认钩子检查必需产物都存在且非空（§4.4），不满足时拦截这条命令并列出缺少或为空的产物，模型补齐后重试；没有钩子的宿主上 `update_state.py` 只报 warning。更严格的完成条件（例如代码已提交、测试通过）写在正文中，作为执行完成命令的前提；
 - 技能私有的脚本放在技能目录的 `scripts/` 下（技能目录可能在分组下，见 input-config.md §5），校验命令中用 `${skillPath}/scripts/…` 引用。技能不需要、也不应该导入 `runtime/` 下的模块（interfaces.md §4.6）。
 
 

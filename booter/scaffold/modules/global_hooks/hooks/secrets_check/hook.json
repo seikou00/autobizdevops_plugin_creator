@@ -1,0 +1,21 @@
+{
+  "id": "secrets-check",
+  "title": "明文密码检查",
+  "description": "写入 .yaml/.yml/.properties 时发现明文的密码、密钥、token 就拦截，提示先加密再写入",
+  "files": ["check_secrets.py"],
+  "entries": {
+    "PreToolUse": [
+      {
+        "matcher": "write_file|edit_file|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 ${hookDir}/check_secrets.py",
+            "timeout": 1000,
+            "persistAfterInterrupt": true
+          }
+        ]
+      }
+    ]
+  }
+}

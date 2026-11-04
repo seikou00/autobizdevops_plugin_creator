@@ -19,6 +19,7 @@ class PlannedFile:
     replaceable: bool = False
     region: str | None = None
     recorded: bool = True        # 记入 build-manifest
+    region_key: str = "state"    # seeded 文件中脚手架维护的片段：技能是 state，hooks/hooks.json 是 hooks
 
 
 @dataclass

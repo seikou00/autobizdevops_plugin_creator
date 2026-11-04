@@ -11,7 +11,8 @@ from pathlib import Path
 from scaffold import CORE_VERSION, resources
 from scaffold.build.load import MODULE_KEYS
 
-PACKAGE_DIRS = {"board": "board", "session": "session", "knowledge": "knowledge", "artifactSync": "artifact_sync"}
+PACKAGE_DIRS = {"board": "board", "session": "session", "knowledge": "knowledge", "artifactSync": "artifact_sync",
+                "globalHooks": "global_hooks"}
 
 
 @dataclass(frozen=True)

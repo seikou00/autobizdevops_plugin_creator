@@ -14,6 +14,9 @@
     },
     "artifactSync": {
       "enabled": false
+    },
+    "globalHooks": {
+      "enabled": false
     }
   },
   "boardEvents": {

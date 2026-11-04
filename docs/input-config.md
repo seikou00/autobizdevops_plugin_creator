@@ -236,7 +236,8 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
     "board":     "./modules/board.json",
     "session":   "./modules/session.json",
     "knowledge": "./modules/knowledge.json",
-    "artifactSync": "./modules/artifactSync.json"
+    "artifactSync": "./modules/artifactSync.json",
+    "globalHooks": "./modules/globalHooks.json"
   }
 }
 ```
@@ -249,6 +250,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `session` | 全部取默认值 | 会话与 Agent：运行策略（§4.2） |
 | `knowledge` | 不启用知识模块 | 清单解析、知识组装、可选的知识仓库同步（§4.3）。引用即启用 |
 | `artifactSync` | 不启用产物同步 | 上传产物到外部服务、看板上的同步入口（§4.5）。引用即启用 |
+| `globalHooks` | 只有产物检查钩子 | 插件全局钩子：启用脚手架自带的公共宿主钩子（§4.6）。引用即启用 |
 
 引用规则：
 
@@ -267,7 +269,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `description` | 是 | — | 根 `plugin.json.description` |
 | `author` / `homepage` / `repository` / `license` / `keywords` | 否 | — | 根 `plugin.json` |
 | `mcpServers` | 否 | 透传路径，以 `./` 开头，文件由开发者维护 | 根 `plugin.json.mcpServers` |
-| `hooks` | 否 | 透传路径（宿主工具钩子，属于自定义扩展），以 `./` 开头，文件由开发者维护 | 根 `plugin.json.hooks`（D7） |
+| `hooks` | 否 | 宿主钩子配置，固定为 `./hooks/hooks.json`，可以不写；写了其他路径报 `PLUGIN_HOOKS_PATH`。`hooks/hooks.json` 由脚手架和开发者共用：脚手架只维护自己的条目——命令指向 `hooks/artifact_guard.py` 或 `hooks/<全局钩子 id>/` 下脚本的条目，每次重新生成都排在各事件的最前面并按当前配置重写；其他条目是开发者的，按原顺序原样保留。生成的条目也是给开发者打样的写法 | 根 `plugin.json.hooks` 固定为 `./hooks/hooks.json`（D7、D61，interfaces.md §4.7） |
 
 
 初始化向导会像 Codex plugin-creator 那样规范化用户输入的名称：转小写，非字母数字字符改为 `-`，合并连续的 `-`，去掉首尾的 `-`（`My Plugin` → `my-plugin`），并提示规范化后的结果。
@@ -435,6 +437,27 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `maxFileSizeMiB` | `5` | 超过上限的文件跳过并报告 |
 | `extraPaths` | `{}` | 不属于任何节点输出、但需要同步的路径：`{路径模式: 简述}`，路径相对 `FEATURE_DIR`，不记录阶段和节点 |
 
+### 4.6 modules/globalHooks.json（插件全局钩子模块）
+
+启用脚手架自带的公共宿主钩子（D62）。入口文件的 `modules.globalHooks` 引用了这个文件即表示启用，不引用即不启用。
+
+```json
+{
+  "$schema": "../.scaffold/modules/globalHooks.schema.json",
+  "hooks": ["secrets-check", "performance-check"]
+}
+```
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `hooks` | 是 | 要启用的钩子 id，按顺序写进 `hooks/hooks.json`。可用的钩子用 `autobiz-plugin hook list` 查看，目前有 `secrets-check`（明文密码检查）和 `performance-check`（前端性能检查），说明见 interfaces.md §4.8 |
+
+- 生成：每个钩子的脚本拷到插件根目录的 `hooks/<id>/`（module），条目写进 `hooks/hooks.json`：产物检查钩子在最前，其次是这里列出的钩子，开发者在同一文件中自己写的条目在最后（interfaces.md §4.7）；
+- 产物检查钩子由框架始终注册，不需要、也不能在这里列出；
+- id 不存在报 `GLOBAL_HOOK_UNKNOWN`，重复报 `GLOBAL_HOOK_DUP`；
+- 从 `hooks` 中去掉某个钩子，或关闭模块（去掉入口文件的引用）后，以前生成的脚本在 build-manifest 中标为 `inactive`，不再打包；
+- 便捷命令：`hook enable <id> …` / `hook disable <id> …` 编辑这个文件，模块未启用时先启用，`hooks` 去光后关闭模块；也可以用 `module enable globalHooks --set 'hooks=["secrets-check"]'`。
+
 ## 5. 资源目录
 
 | 目录 | 内容 | 初始化向导 | 交付方式 |
@@ -442,7 +465,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `skills/<skill>/` 或 `skills/<分组>/<skill>/` | `SKILL.md` 正文、`scripts/` 执行脚本与业务校验器、`references/`，以及技能自己维护的模板等资源 | 导入已有技能目录；开发者没有提供时不创建，由 build 生成空白 `SKILL.md` | `SKILL.md` 开头由 build 写入状态维护片段，其余原样交付（output-spec.md §6.1） |
 | `skills/` 下的共享资源 | 技能集合根目录和分组目录自己的 `SKILL.md`、`references/`、`hooks/` 等，供多个技能引用 | 不创建；`add skills` 导入技能集合时按原路径拷入 | 原样交付 |
 | `agents/`（可选） | 自定义子代理等外挂资源，由会话策略引用 | 不创建，需要时由开发者创建，或用 `add skills --agents`、`new --answers` 的 `agents` 拷入 | 存在时原样交付 |
-| `hooks/` | 开发者自定义扩展，例如宿主工具钩子 `hooks.json`、节点校验脚本及其配置 | 创建目录 | 原样交付，脚手架不读写 |
+| `hooks/` | 宿主钩子与开发者自定义扩展，例如节点校验脚本及其配置 | 创建目录，生成 `hooks.json`、`artifact_guard.py` | `hooks.json` 中脚手架维护的条目、`artifact_guard.py` 和全局钩子脚本由 build 维护，其余原样交付（D61、D62） |
 
 技能目录的查找规则：build 按节点的 `skill` 在 `skills/<skill>/` 和 `skills/*/<skill>/` 两处查找含 `SKILL.md` 的目录，只找这两层。两处都有、或在多个分组下都有时报 `SKILL_AMBIGUOUS`；都没有时在 `skills/<skill>/` 生成空白 `SKILL.md`。找到的目录就是该节点的技能目录，`${skillPath}` 指向它。分组目录自己的 `SKILL.md`（例如 `skills/autodev/SKILL.md`）和分组下不被节点绑定的技能（例如回滚、评审等辅助技能）都按开发者资源原样交付，不写状态维护片段。
 
@@ -578,7 +601,11 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `MODULE_INACTIVE_FILES` | warning | 有模块已关闭，它以前生成的文件还在插件目录中（build-manifest 中标为 `inactive`）。这些文件不再生效、不会打包，可以删除（D52） |
 | `PLUGIN_ID_CHANGED` | error | `plugin.id` 与 `runtime/build-manifest.json` 中记录的不一致。确认要改时执行 `doctor --allow-id-change`（D47） |
 | `LAYOUT_CHANGED` | error | `runtime.metaRoot` 与 build-manifest 中记录的不一致：已有项目的状态会找不到。确认要改时执行 `doctor --allow-layout-change`（D47） |
-| `PLUGIN_REF_MISSING` | error | `plugin.mcpServers` 或 `plugin.hooks` 引用的文件不存在；`package` 按实际路径打包这些文件（D57） |
+| `GLOBAL_HOOK_UNKNOWN` | error | `modules/globalHooks.json` 的 `hooks` 中的 id 不是脚手架自带的全局钩子（`autobiz-plugin hook list`，D62） |
+| `GLOBAL_HOOK_DUP` | error | `modules/globalHooks.json` 的 `hooks` 中同一个 id 出现了多次 |
+| `PLUGIN_HOOKS_INVALID` | error | `hooks/hooks.json` 的结构不对：要求“事件名 → 条目对象数组”，可以包在 `{"hooks": {…}}` 下（D61） |
+| `PLUGIN_HOOKS_PATH` | error | 入口文件的 `plugin.hooks` 不是 `./hooks/hooks.json`：钩子配置固定在这个文件（D61） |
+| `PLUGIN_REF_MISSING` | error | `plugin.mcpServers` 引用的文件不存在；`package` 按实际路径打包这个文件（D57） |
 | `SCAFFOLD_OUTDATED` | error | 当前脚手架、运行框架或某个模块的版本低于 build-manifest 中的记录，或入口文件的 `scaffoldVersion` 比脚手架支持的高：继续生成会把插件降级，doctor 拒绝执行，应先更新脚手架（D57） |
 | `CORE_MAJOR_CHANGED` | error | 当前运行框架的主版本与 build-manifest 记录的 `coreVersion` 不同。确认要跨主版本升级时执行 `doctor --allow-major-upgrade`（D57） |
 | `SCAFFOLD_VERSION_CHANGED` | warning | 当前脚手架、运行框架或某个模块的版本高于 build-manifest 中的记录（主版本不变）。执行 doctor 即可替换 managed、module 文件（D57） |
@@ -593,6 +620,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `SKILL_TOO_LONG` | warning | SKILL.md 超过 500 行，应把细节拆到 `references/` |
 | `SKILL_STATE_BLOCK` | error | 节点技能的 `SKILL.md` 缺少状态维护片段，片段内容与推导结果不一致（例如被手改，或改了节点却没有重新生成），或不再绑定节点的技能还留着片段。执行 `doctor` 即可修复（output-spec.md §6.1） |
 | `LEGACY_ENTRY_REF` | error | 技能正文（跳过 frontmatter 和状态维护片段）逐行检查，命中一行报一条，`message` 写明行号和所在小节（D51）：节点技能中出现 `update_state.py`、`update_checkpoint.py`、`route_checkpoint.py`（节点状态只由状态维护片段维护）；所有技能中出现旧入口路径 `hooks/update_state.py`、`hooks/update_checkpoint.py`、`hooks/route_checkpoint.py`、`hooks/skip_node.py`、`hooks/init_workspace.py`、`${pluginPath}/inspect_state.py`（新目录结构中已不存在）。提示：删掉这一行；整节只剩状态命令时连同小节标题一起删；这一行前面有校验等步骤时，改写成“执行完成命令之前先……”。`add skill --from` 导入时同样检查，但只报 warning、照样导入（D56）。旧版的 `scaffold:begin state` 片段由 build 直接替换成新片段，不报 |
+| `TODO_FIELD` | error / warning | 核心配置中还有没填写的 `[TODO: …]` 占位（`new --skeleton` 的骨架、手写的占位），每个占位报一条，`pointer` 指出位置，对象的键也检查。默认是 error，doctor 不生成；`artifactSync` 的 `artifacts`、`extraPaths` 中的简述是 warning，打包前由 `TODO_PLACEHOLDER` 拦下。占位所在位置不再另报 `INPUT_SCHEMA`（D63） |
 | `TODO_PLACEHOLDER` | warning（check）/ error（package） | 空白 `SKILL.md`、骨架文件或清单中还有未填写的 `[TODO: …]`，包括 `module enable artifactSync` 预填在 `modules/artifactSync.json` 的 `artifacts` 中的简述（D56） |
 | `DRIFT_GENERATED` / `DRIFT_MANAGED` | error | 生成或托管的文件被手改过（内置知识组装脚本除外，插件可以替换它，§4.4）。按磁盘内容与 build-manifest 的记录是否一致判断：与记录一致、只是与当前脚手架重放的结果不同时，报 `SCAFFOLD_VERSION_CHANGED`（§7.2），不算漂移（D57） |
 | `CONTRACT_TEST` | error | 在临时目录中模拟宿主调用失败，每个失败的步骤报一条；`simulate` 报同一个 code（interfaces.md §1.5）。lint 或漂移检查有 error 时不跑契约测试（D55） |

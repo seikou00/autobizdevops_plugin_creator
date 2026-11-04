@@ -67,7 +67,7 @@ def make_manifest(ir, normalized, plan, modules: dict, descriptions: dict, previ
         if not planned.recorded:
             continue
         if planned.ownership == "seeded":
-            files[path] = {"ownership": "seeded", "regions": {"state": planned.region}}
+            files[path] = {"ownership": "seeded", "regions": {planned.region_key: planned.region}}
         else:
             files[path] = {"ownership": planned.ownership, "sha256": fsio.digest(planned.data)}
     tree = normalized.inputs.tree

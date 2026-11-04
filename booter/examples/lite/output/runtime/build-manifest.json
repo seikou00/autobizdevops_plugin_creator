@@ -31,6 +31,10 @@
       "ownership": "managed",
       "sha256": "…"
     },
+    ".scaffold/modules/globalHooks.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
     ".scaffold/modules/knowledge.schema.json": {
       "ownership": "managed",
       "sha256": "…"
@@ -53,11 +57,21 @@
     },
     "board_core/modules.json": {
       "ownership": "generated",
-      "sha256": "sha256:4102e3773343b8e339409d3949a03b51b0b846f8a579c497d844b8d58b3c2fe4"
+      "sha256": "sha256:4069af6c55fa6479f4dd090b76773c38f80c97a4335b0201ea53c31954b12549"
+    },
+    "hooks/artifact_guard.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "hooks/hooks.json": {
+      "ownership": "seeded",
+      "regions": {
+        "hooks": "sha256:c3fc901214919889eeb66881dd0058281ca92952bca2215f60d53f8dc6ea03aa"
+      }
     },
     "plugin.json": {
       "ownership": "generated",
-      "sha256": "sha256:b8118fa9408aeba2f9fc7e61c14dc567bf89c043aa16a2143e0dbdde035de318"
+      "sha256": "sha256:f039c5f27960e4adca37ad654f65a4b98f946caf911d2af5b79b2c6cfdc4fcc1"
     },
     "runtime/__init__.py": {
       "ownership": "managed",

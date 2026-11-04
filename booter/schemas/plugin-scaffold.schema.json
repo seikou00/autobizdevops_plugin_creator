@@ -19,12 +19,13 @@
     "modules": {
       "type": "object",
       "additionalProperties": false,
-      "description": "模块配置文件引用。board、session 不引用时全部取默认值；knowledge、artifactSync 引用即启用，不引用即不启用。",
+      "description": "模块配置文件引用。board、session 不引用时全部取默认值；knowledge、artifactSync、globalHooks 引用即启用，不引用即不启用。",
       "properties": {
         "board": { "$ref": "#/definitions/fileRef", "description": "看板模块配置，建议 ./modules/board.json。" },
         "session": { "$ref": "#/definitions/fileRef", "description": "会话与 Agent 配置，建议 ./modules/session.json。" },
         "knowledge": { "$ref": "#/definitions/fileRef", "description": "知识模块配置，建议 ./modules/knowledge.json。" },
-        "artifactSync": { "$ref": "#/definitions/fileRef", "description": "产物同步模块配置，建议 ./modules/artifactSync.json。" }
+        "artifactSync": { "$ref": "#/definitions/fileRef", "description": "产物同步模块配置，建议 ./modules/artifactSync.json。" },
+        "globalHooks": { "$ref": "#/definitions/fileRef", "description": "插件全局钩子模块配置，建议 ./modules/globalHooks.json。" }
       }
     }
   },

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from scaffold.build.contribute import Contribution, FileSpec
-from scaffold.build.load import MODULE_KEYS
+from scaffold.build.load import HOOKS_FILE, MODULE_KEYS, hook_events
 from scaffold.lib import fsio
 
 FRAMEWORK_FILES = (
@@ -12,8 +12,22 @@ FRAMEWORK_FILES = (
     "runtime/workflow/__init__.py", "runtime/workflow/update_state.py",
     "runtime/adapters/__init__.py", "runtime/adapters/board_view.py", "runtime/adapters/board_events.py",
 )
+GUARD_SCRIPT = "hooks/artifact_guard.py"   # 模板在 runtime/hooks/，拷到插件根目录的 hooks/
+# 默认钩子：执行完成命令前检查必需产物存在且非空，不满足时拦截（与 update_state.py 的检查冗余，D61）
+ARTIFACT_GUARD = {
+    "matcher": "execute",
+    "hooks": [{
+        "type": "command",
+        "command": f"python -X utf8 {GUARD_SCRIPT}",
+        "timeout": 30,
+        "onBlock": {"reason": "产物检查不通过", "systemMessage": "必需产物缺失或为空",
+                    "additionalContext": "补全必需产物后再执行技能完成命令"},
+        "persistAfterInterrupt": True,
+    }],
+}
 SCHEMA_FILES = ("plugin-scaffold.schema.json", "workflow.schema.json", "modules/board.schema.json",
-                "modules/session.schema.json", "modules/knowledge.schema.json", "modules/artifactSync.schema.json")
+                "modules/session.schema.json", "modules/knowledge.schema.json", "modules/artifactSync.schema.json",
+                "modules/globalHooks.schema.json")
 PLUGIN_FIELDS = ("name", "version", "description", "author", "homepage", "repository", "license", "keywords")
 API_VERSION = 1
 BOARD_EVENTS = {"protocol": "autobiz.board-events.v1"}
@@ -27,10 +41,45 @@ def skill_dir(skill_dirs: dict, skill: str) -> str:
 def plugin_manifest(plugin: dict) -> dict:
     result = {key: plugin[key] for key in PLUGIN_FIELDS if key in plugin}
     result["skills"] = "./skills/"
-    for key in ("mcpServers", "hooks"):
-        if key in plugin:
-            result[key] = plugin[key]
+    if "mcpServers" in plugin:
+        result["mcpServers"] = plugin["mcpServers"]
+    result["hooks"] = f"./{HOOKS_FILE}"   # 固定指向 hooks/hooks.json（D61）
     return result
+
+
+def managed_scripts() -> tuple:
+    """命令中出现这些路径的条目归脚手架维护：产物检查钩子、所有全局钩子的目录，以及旧版生成在 runtime/hooks/ 下的脚本。"""
+    from scaffold.modules.global_hooks.catalog import catalog
+
+    return (GUARD_SCRIPT, "runtime/hooks/") + tuple(f"{spec.target}/" for spec in catalog().values())
+
+
+def _is_managed(item: dict, scripts: tuple) -> bool:
+    return any(isinstance(hook, dict) and any(script in str(hook.get("command", "")) for script in scripts)
+               for hook in item.get("hooks") or [])
+
+
+def merged_hooks(contributed: dict, existing) -> tuple:
+    """返回 (hooks/hooks.json 的内容, 脚手架维护的条目)。
+
+    脚手架的条目（产物检查钩子、globalHooks 启用的钩子）排在每个事件的最前面；文件中现有的其他条目是开发者的，
+    按原顺序保留在后面。现有文件中命令指向托管脚本的条目视为脚手架的旧条目，丢弃后重新生成。
+    沿用现有文件的写法（是否包在 hooks 下）。"""
+    events, wrapped = hook_events(existing) if existing is not None else ({}, False)
+    scripts = managed_scripts()
+    managed = {event: list(items) for event, items in contributed.items()}
+    result = {event: list(items) for event, items in managed.items()}
+    for event, items in events.items():
+        kept = [item for item in items if not _is_managed(item, scripts)]
+        if kept or not items:
+            result[event] = result.get(event, []) + kept
+    return ({"hooks": result} if wrapped else result), managed
+
+
+def render_hooks(merged, existing) -> tuple:
+    """返回 (路径, 内容, 脚手架条目的摘要)。"""
+    content, managed = merged_hooks(merged.hooks, existing)
+    return HOOKS_FILE, fsio.dump_json(content), fsio.digest(fsio.dump_json(managed))
 
 
 def runtime_config(ir) -> dict:
@@ -70,9 +119,11 @@ def flow_config(ir, normalized, skill_dirs: dict) -> dict:
 def framework_contribution(ir, normalized, skill_dirs: dict) -> Contribution:
     files = [FileSpec(path, "managed", src=path) for path in FRAMEWORK_FILES]
     files += [FileSpec(f".scaffold/{name}", "managed", src=f"schemas/{name}") for name in SCHEMA_FILES]
+    files.append(FileSpec(GUARD_SCRIPT, "managed", src="runtime/hooks/artifact_guard.py"))
     files.append(FileSpec("plugin.json", "generated", content=fsio.dump_json(plugin_manifest(ir.plugin))))
     return Contribution(files=files, runtime_config={"runtime": runtime_config(ir),
-                                                     "flow": flow_config(ir, normalized, skill_dirs)})
+                                                     "flow": flow_config(ir, normalized, skill_dirs)},
+                        hooks={"PreToolUse": [ARTIFACT_GUARD]})
 
 
 def render_command(spec, interpreter: str, platform: str) -> str:

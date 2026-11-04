@@ -21,7 +21,7 @@ v1 范围：
 
 - 工作流：节点按手动填写的 `seq` 编排，即主干执行顺序，每个节点有 `<prefix>_in_progress`、`<prefix>_done` 两个 checkpoint；可以有一个终态节点；动态阶段、跳过节点不由用户配置，`flow.json` 中保留字段、取默认值（D22、D32）；
 - 节点输入和输出都可以标可选；
-- 节点完成判定：框架检查产物是否存在，再执行开发者提供的单行校验命令（§6.6）；
+- 节点完成判定：默认钩子在完成命令执行前检查产物存在且非空并拦截，状态变更入口再查一遍只提醒；之后执行开发者提供的单行校验命令（§6.6，D61）；
 - 看板能力：**知识沉淀入口**，固定开启，用户不配置（D33）；
 - 可选的**产物同步模块**（`modules/artifactSync.json`，D30）：把产物上传到外部服务，并在看板上生成同步入口；
 - 可选的**知识模块**：清单解析、发布单元查询、知识组装（默认由插件用内置的 collector 组装脚本完成，插件可以直接替换这个脚本，也可以交给 DevClaw）；
@@ -39,8 +39,8 @@ v1 范围：
 
 | 文档 | 内容 |
 |---|---|
-| [usage-quickstart.md](usage-quickstart.md) | 快速上手：四步出一个插件 |
-| [usage-advanced.md](usage-advanced.md) | 进阶用法：全部命令与配置的定制方式 |
+| [booter/usage-quickstart.md](../booter/usage-quickstart.md) | 快速上手：四步出一个插件（随脚手架维护） |
+| [booter/usage-advanced.md](../booter/usage-advanced.md) | 进阶用法：全部命令与配置的定制方式（随脚手架维护） |
 | [input-config.md](input-config.md) | 用户输入：输入分类、`workflow.json`、入口文件与模块配置文件的字段、默认值、推导规则、校验规则 |
 | [output-spec.md](output-spec.md) | 插件标准化输出：目录、清单、宿主接口 board_core、内部配置、运行期数据、技能格式 |
 | [interfaces.md](interfaces.md) | 接口：CLI 与初始化向导、模块契约、宿主命令协议、看板事件推送、运行框架入口与内部库 |
@@ -316,7 +316,7 @@ DevClaw 通过 `session_collector_context_inject` 拿到会话内容。默认会
 
 | 层次 | 负责方 | 做什么 |
 |---|---|---|
-| 存在且非空（最小校验） | 运行框架 `engine.py` | 必需产物的 `path` 每一项至少匹配一个文件，匹配到的每个文件去掉首尾空白后都不为空 |
+| 存在且非空（最小校验） | 默认钩子 `hooks/artifact_guard.py` 拦截；运行框架 `engine.py` 冗余检查，只提醒 | 必需产物的 `path` 每一项至少匹配一个文件，匹配到的每个文件去掉首尾空白后都不为空 |
 | 业务校验 | 开发者的校验命令 | 空文件、格式、内容是否合格 |
 
 - 校验命令是 `flow.json` 节点 `validate` 中的完整单行命令，只在推进到 `_done` 时、存在性检查通过之后执行（D14）；v1 用户不能配置，build 固定写 `null`（D32）；
@@ -439,6 +439,9 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 | D58 | 插件开发技能的评审结论（2026-11-03，scaffold.md 单元 14）：① 技能不带 `input-config.md` 副本，SKILL.md 只写建模和配置的要点，细节以 CLI 的 Issue 和插件目录 `.scaffold/` 下的 Schema 为准，`references/` 只有 `modeling-guide.md`；② 去掉技能自己的 `agents/openai.yaml`；③ 以只含这个技能的 DevClaw 插件发布（同 demo）：`tools/make_pyz.py` 打出 `.pyz` 后组装 `plugin.json` 和技能目录，`.pyz` 放在技能的 `scripts/` 下、不提交进仓库；SKILL.md 中的命令用 `${pluginPath}` 定位 `.pyz`，没有被替换时按 SKILL.md 所在目录定位；④ 对话流程与已定决策对齐：不问知识沉淀入口（D33），触发场景不写“给节点加校验”（D32），填写空白 SKILL.md 的 `description` 后再执行一次 doctor（D49），每次修改后 lint、一组修改完成后 doctor 再 check，`--force` 和 `--allow-*` 只在开发者明确同意后使用 | §3.1；interfaces.md §1.1、§1.6、§1.7；scaffold.md 总览、§14 |
 | D59 | 运行框架模板的评审结论（2026-11-03，scaffold.md 单元 15）：① `runtime/common/cli.py`（入口共用的参数、输出与退出码）和 `runtime/adapters/board_view.py`（看板数据拼装，`inspect_state.py`、`inspect_workflow_templates.py`、`render_session_context.py`、`board_events.py` 共用，节点文案读 `runtime/config/board.json`）加入输出目录，归属 managed；`BoardError` 定义在 `query.py`；② `sync_knowledge.py` 只更新知识目录，不回写配置文件；③ v1 运行框架不实现动态阶段和跳过节点：`flow.json` 保留 `dynamicStages`、`skip`，出现非默认值时 `query.load_flow` 拒绝加载，`update_state.py` 不提供 `--skip-node`，`query.pending_choice`、`engine.skip_nodes` 留到 v2；`inputs`、`validate` 照常实现；v1 的写入口只有 `init_workspace.py`、`init_feature.py`、`update_state.py` 三个；④ 改掉“框架只查存在性”的旧说法，完成判定是存在且非空（D37） | §2.2、§6.4；input-config.md §2.5、§2.7、§2.8；output-spec.md §1、§5.2；interfaces.md §3.1、§3.5.2、§3.5.3、§4.1、§4.2、§4.6、§5；scaffold.md §15 |
 | D60 | 全栈版已有项目的状态接续（2026-11-04，README §9 第 3 条）：① 运行框架读取 `autobizdevops.state.v3`（不带 `pluginId`），当作本插件的旧格式，记录可以是对象或 checkpoint 字符串；第一次写入时把原文件备份为 `state.v3.bak.json`，再升级为 `schemaVersion: 1` 并补上 `pluginId`、`boardSeq`；② 已下架的 `lean`、`custom` 模板按 `standard` 继续，原值记在 `legacyWorkflowTemplate`；③ checkpoint 不在当前流程中的 Feature（v3 的 `needs_fix`、`detail_design_*`，或节点删除、改名之后的 Feature）原样保留、只读：看板上 `currentNodeStatus` 为 `unknown` 并带 `readOnly`、`readOnlyReason`，推进、重开和更新发布单元都拒绝，不影响同项目的其他 Feature（取代 output-spec.md §4.2 中“checkpoint 不在当前配置中时拒绝写入”） | §9；output-spec.md §4.2；interfaces.md §3.3.3、§3.3.4、§5 |
+| D61 | 产物存在且非空改由冗余的宿主钩子拦截（2026-11-04）：build 把 `hooks/artifact_guard.py`（managed）放在插件根目录的 `hooks/` 下，在 `hooks/hooks.json`（seeded）中注册，`plugin.json` 的 `hooks` 固定为 `./hooks/hooks.json`；默认钩子是 PreToolUse（`execute`），命令为 `update_state.py --checkpoint <节点>_done` 且必需产物缺失或为空时返回 block；`hooks/hooks.json` 由脚手架和开发者共用：命令指向托管脚本的条目归脚手架，每次生成排在最前并重写，其余条目归开发者、原样保留，生成的条目同时给开发者打样；`plugin.hooks` 只能是 `./hooks/hooks.json`（`PLUGIN_HOOKS_PATH`），结构不对报 `PLUGIN_HOOKS_INVALID`；`update_state.py` 仍然检查，但只在 `warnings` 中报告并写 `artifact-check` 变更日志，不再阻止推进（修订 D37 中“推进到 `_done` 要求必需产物都存在且非空”的执行方式，标准不变） | §6.6；interfaces.md §4.1、§4.2、§4.7；output-spec.md §2.1、§4.4；input-config.md §7.1 |
+| D62 | 插件全局钩子模块（2026-11-04）：新增非核心模块 `globalHooks`（`modules/globalHooks.json`，入口文件 `modules.globalHooks` 引用即启用），配置只有 `hooks`（要启用的钩子 id 数组）；模块包 `booter/scaffold/modules/global_hooks/` 的 `hooks/<包>/` 下每个目录一个公共钩子（`hook.json` 加 `files/` 中的脚本），`catalog()` 自动发现，新增钩子不改代码；`contribute` 把脚本拷到 `hooks/<id>/`（module），条目经新增的 `Contribution.hooks` 写进 `hooks/hooks.json`，排在框架的产物检查钩子之后、开发者条目之前；`new` 的向导逐个询问，`--answers` 写 `globalHooks`，`hook list/enable/disable` 是编辑模块文件的便捷命令；validate 报 `GLOBAL_HOOK_UNKNOWN`、`GLOBAL_HOOK_DUP`。首批为全栈版的 `secrets-check`（明文密码检查）和 `performance-check`（前端性能检查，适配新入口 `update_state.py`） | interfaces.md §1.1、§1.4、§4.7、§4.8；input-config.md §3.2、§4.6、§7.1；output-spec.md §1 |
+| D63 | 核心配置骨架（2026-11-04）：`new <dir> --skeleton [--module <id> …]` 只写出带 `[TODO: …]` 占位的入口文件、`workflow.json`（biz、dev 各一个节点）、所选模块配置和 `.scaffold/` Schema，不执行 doctor；load 在 Schema 校验时逐项报出占位 `TODO_FIELD`（默认 error，doctor 不生成；`artifactSync` 的简述为 warning，沿用 D56，打包前由 `TODO_PLACEHOLDER` 拦下），占位处的 Schema 问题不再另报 `INPUT_SCHEMA`；开发者填完后 `lint` → `doctor` → `package` | interfaces.md §1.1、§1.4.1；input-config.md §7.1 |
 
 ## 9. 遗留问题
 

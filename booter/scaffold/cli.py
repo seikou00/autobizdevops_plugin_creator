@@ -38,6 +38,10 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument("--from", dest="template", default="blank", choices=("blank", "lite", "fullstack"))
     new.add_argument("--answers", help="回答的 JSON 文件，- 表示从 stdin 读取")
     new.add_argument("--yes", action="store_true", help="不提问，回答取自 --from 的样例和 --answers")
+    new.add_argument("--skeleton", action="store_true",
+                     help="只写出带 [TODO: …] 占位的核心配置骨架，不生成插件；填完后执行 doctor")
+    new.add_argument("--module", dest="modules", action="append", default=[], metavar="MODULE",
+                     help="--skeleton 时一并写出这个模块的配置骨架，可以重复：board、session、knowledge、artifactSync、globalHooks")
 
     add = commands.add_parser("add", parents=[common], help="添加节点或技能")
     targets = add.add_subparsers(dest="target", parser_class=Parser)
@@ -68,6 +72,13 @@ def build_parser() -> argparse.ArgumentParser:
     disable = actions.add_parser("disable", parents=[common], help="关闭 knowledge 或 artifactSync（只去掉引用）")
     disable.add_argument("module_id")
 
+    hook = commands.add_parser("hook", parents=[common], help="列出、启用或关闭插件全局钩子（globalHooks 模块）")
+    hook_actions = hook.add_subparsers(dest="action", parser_class=Parser)
+    hook_actions.add_parser("list", parents=[common], help="列出全局钩子及启用状态")
+    for name, text in (("enable", "启用全局钩子（写 modules/globalHooks.json）"), ("disable", "关闭全局钩子")):
+        action = hook_actions.add_parser(name, parents=[common], help=text)
+        action.add_argument("hook_ids", nargs="+", metavar="hook_id")
+
     doctor = commands.add_parser("doctor", parents=[common], help="修改核心配置或更新脚手架后重新生成插件")
     doctor.add_argument("--dry-run", action="store_true", help="只列出将要发生的变化，不写文件")
     doctor.add_argument("--force", action="store_true", help="覆盖被手改过的托管文件")
@@ -93,7 +104,14 @@ def build_parser() -> argparse.ArgumentParser:
 def run(args) -> object:
     root = Path(getattr(args, "directory", "."))
     if args.command == "new":
-        from scaffold.commands.new import load_answers, new
+        from scaffold.commands.new import load_answers, new, skeleton
+
+        if args.skeleton:
+            if args.template != "blank" or args.answers or args.yes:
+                raise UsageError("--skeleton 不能与 --from、--answers、--yes 一起使用")
+            return skeleton(Path(args.target), args.modules)
+        if args.modules:
+            raise UsageError("--module 只能与 --skeleton 一起使用")
 
         return new(Path(args.target), template=args.template, answers=load_answers(args.answers), yes=args.yes)
     if args.command == "add":
@@ -118,6 +136,14 @@ def run(args) -> object:
         if args.action == "disable":
             return edit.module_disable(root, args.module_id)
         raise UsageError("用法：autobiz-plugin module list|enable|disable …")
+    if args.command == "hook":
+        from scaffold.commands import edit
+
+        if args.action == "list":
+            return edit.hook_list(root)
+        if args.action in ("enable", "disable"):
+            return edit.hook_toggle(root, args.hook_ids, enable=args.action == "enable")
+        raise UsageError("用法：autobiz-plugin hook list|enable|disable …")
     if args.command == "doctor":
         from scaffold.commands.doctor import doctor
 
@@ -141,7 +167,7 @@ def run(args) -> object:
         from scaffold.commands.package import package
 
         return package(root, output=Path(args.output) if args.output else None)
-    raise UsageError("缺少子命令：new、add、module、doctor、lint、check、simulate、package")
+    raise UsageError("缺少子命令：new、add、module、hook、doctor、lint、check、simulate、package")
 
 
 def _configure_stdio() -> None:

@@ -5,6 +5,9 @@
 
 import http.server
 import json
+import os
+import subprocess
+import sys
 import threading
 import unittest
 from pathlib import Path
@@ -13,6 +16,7 @@ from tests.helpers import built_example, run_script, temp_dir
 
 INSPECT = "runtime/adapters/inspect_state.py"
 UPDATE = "runtime/workflow/update_state.py"
+GUARD = "hooks/artifact_guard.py"
 
 
 class Workspace:
@@ -36,6 +40,16 @@ class Workspace:
         environment = {"PLUGIN_WORKSPACE": str(self.root), "PROJECT_DIR": "p1", "FEATURE_ID": feature, **(env or {})}
         return self.host(UPDATE, "--feature", feature, "--checkpoint", checkpoint, *extra, env=environment)
 
+    def guard(self, command, feature="f1"):
+        """按宿主 PreToolUse 钩子的方式调用产物检查钩子，返回 (退出码, stdout 的 JSON 或 None)。"""
+        payload = json.dumps({"tool_name": "execute", "tool_input": {"command": command}})
+        environment = {**os.environ, "PLUGIN_WORKSPACE": str(self.root), "PROJECT_DIR": "p1", "FEATURE_ID": feature,
+                       "PYTHONDONTWRITEBYTECODE": "1"}
+        completed = subprocess.run([sys.executable, "-X", "utf8", str(self.plugin / GUARD)], input=payload.encode(),
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment)
+        out = completed.stdout.decode("utf-8").strip()
+        return completed.returncode, json.loads(out) if out else None
+
     def write(self, rel, text="内容\n", feature="f1"):
         path = self.meta / "features" / feature / rel
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -55,17 +69,45 @@ class Workspace:
 
 
 class StateTest(unittest.TestCase):
-    def test_linear_flow_requires_non_empty_outputs(self):
+    def test_missing_outputs_warn_but_do_not_block(self):
+        ws = Workspace(self)
+        ws.create()
+        code, payload, _ = ws.update("draft_done", "--dry-run")
+        self.assertEqual(code, 0, payload)
+        self.assertIn("推进到 draft_done 时必需产物缺失: DRAFT.md", payload["warnings"])
+        ws.write("DRAFT.md", "  \n")
+        code, payload, _ = ws.update("draft_done")
+        self.assertEqual(code, 0, payload)
+        self.assertEqual(payload["checkpoint"], "draft_done")
+        self.assertTrue(any("为空" in warning for warning in payload["warnings"]))
+        events = [json.loads(line) for line in (ws.meta / "hooks.ndjson").read_text("utf-8").splitlines()]
+        self.assertEqual([event["eventId"] for event in events], ["artifact-check", "update-state"])
+        self.assertEqual(events[0]["eventStatus"], "warning")
+
+    def test_guard_hook_blocks_done_command_until_outputs_exist(self):
+        ws = Workspace(self)
+        ws.create()
+        done = f'python -X utf8 "{ws.plugin / UPDATE}" --feature "f1" --checkpoint draft_done'
+        code, payload = ws.guard(done)
+        self.assertEqual(code, 2)
+        self.assertEqual(payload["decision"], "block")
+        self.assertIn("必需产物缺失: DRAFT.md", payload["reason"])
+        ws.write("DRAFT.md", "  \n")
+        code, payload = ws.guard(f"bash -lc 'cd /tmp && {done}'")
+        self.assertEqual(code, 2)
+        self.assertIn("必需产物为空: DRAFT.md", payload["reason"])
+        for command in ("ls -la", done.replace("draft_done", "draft_in_progress"), done + " --dry-run"):
+            self.assertEqual(ws.guard(command), (0, None), command)
+        ws.write("DRAFT.md")
+        self.assertEqual(ws.guard(done), (0, None))
+        ws.update("draft_done")
+        self.assertEqual(ws.guard(done), (0, None))
+
+    def test_linear_flow_advances_and_rejects_skipping(self):
         ws = Workspace(self)
         created = ws.create()
         self.assertEqual(created["checkpoint"], "draft_in_progress")
         self.assertFalse(ws.create()["created"])
-        code, payload, _ = ws.update("draft_done")
-        self.assertEqual(code, 1)
-        self.assertIn("必需产物缺失: DRAFT.md", payload["errors"][0])
-        ws.write("DRAFT.md", "  \n")
-        code, payload, _ = ws.update("draft_done")
-        self.assertIn("为空", payload["errors"][0])
         ws.write("DRAFT.md")
         self.assertEqual(ws.update("draft_done")[0], 0)
         code, payload, _ = ws.update("review_done")

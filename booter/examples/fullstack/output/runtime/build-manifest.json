@@ -34,6 +34,10 @@
       "ownership": "managed",
       "sha256": "…"
     },
+    ".scaffold/modules/globalHooks.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
     ".scaffold/modules/knowledge.schema.json": {
       "ownership": "managed",
       "sha256": "…"
@@ -56,7 +60,17 @@
     },
     "board_core/modules.json": {
       "ownership": "generated",
-      "sha256": "sha256:4102e3773343b8e339409d3949a03b51b0b846f8a579c497d844b8d58b3c2fe4"
+      "sha256": "sha256:4069af6c55fa6479f4dd090b76773c38f80c97a4335b0201ea53c31954b12549"
+    },
+    "hooks/artifact_guard.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "hooks/hooks.json": {
+      "ownership": "seeded",
+      "regions": {
+        "hooks": "sha256:c3fc901214919889eeb66881dd0058281ca92952bca2215f60d53f8dc6ea03aa"
+      }
     },
     "plugin.json": {
       "ownership": "generated",

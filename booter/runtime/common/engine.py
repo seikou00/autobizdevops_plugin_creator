@@ -179,7 +179,7 @@ def init_feature(project_path: Path, feature: str, *, owner: str | None = None, 
 
 # —— 状态变更 ——
 
-def _check_artifacts(project_path: Path, feature: str, refs: list) -> list:
+def check_artifacts(project_path: Path, feature: str, refs: list) -> list:
     problems = []
     for ref in refs:
         if not ref.get("required", True):
@@ -241,30 +241,31 @@ def _prepare(project_path: Path, payload: dict, feature: str, checkpoint: str, *
     elif checkpoint != old and checkpoint not in query.allowed_next(old):
         allowed = "、".join(query.allowed_next(old)) or "无（流程已结束）"
         raise BoardError(f"不允许状态跳转: {old} → {checkpoint}；当前允许: {old} 或 {allowed}")
-    problems = _check_artifacts(project_path, feature, node.get("inputs", []))
+    # 产物存在且非空只提醒、不阻止推进；拦截由宿主钩子 hooks/artifact_guard.py 在执行完成命令前完成
+    problems = check_artifacts(project_path, feature, node.get("inputs", []))
     if status == "done" and checkpoint != old:
-        problems += _check_artifacts(project_path, feature, node.get("outputs", []))
-    if problems:
-        raise BoardError(f"不能推进到 {checkpoint}：\n" + "\n".join(problems))
-    return node, status, old
+        problems += check_artifacts(project_path, feature, node.get("outputs", []))
+    return node, status, old, problems
 
 
 def transition(project_path: Path, feature: str, checkpoint: str, *, reopen: bool = False, reason: str = "",
                dry_run: bool = False, owner: str | None = None, iteration: str | None = None) -> dict:
-    """状态转移检查（含 archived）→ 产物存在且非空 → （_done 且 validate 不为 null 时）校验命令 → 加锁提交 → 变更日志。"""
+    """状态转移检查（含 archived）→ 产物存在且非空（只提醒）→ （_done 且 validate 不为 null 时）校验命令 → 加锁提交
+    → 变更日志。"""
     query.safe_component(feature, "Feature ")
 
     def evaluate(payload):
-        node, status, old = _prepare(project_path, payload, feature, checkpoint, reopen=reopen, reason=reason)
+        node, status, old, problems = _prepare(project_path, payload, feature, checkpoint, reopen=reopen, reason=reason)
+        result["warnings"] += [f"推进到 {checkpoint} 时{problem}" for problem in problems]
         validation = None
         if status == "done" and checkpoint != old and not reopen and node.get("validate"):
             validation = run_validate(project_path, feature, node)
-        return node, old, validation
+        return node, old, validation, problems
 
     result = {"ok": True, "changed": False, "feature": feature, "statePath": str(query.state_path(project_path)),
               "dryRun": dry_run, "warnings": []}
     if dry_run:
-        node, old, validation = evaluate(query.load_state(project_path))
+        node, old, validation, _ = evaluate(query.load_state(project_path))
         if validation is not None and not validation["passed"]:
             why = "超时" if validation["timedOut"] else f"退出码 {validation['exitCode']}"
             raise BoardError(f"{node['id']} 的校验命令未通过（{why}）:\n{validation['output']}")
@@ -272,7 +273,7 @@ def transition(project_path: Path, feature: str, checkpoint: str, *, reopen: boo
         return _with_validation(result, node, validation)
     with state_lock(project_path):
         payload = query.load_state(project_path)
-        node, old, validation = evaluate(payload)
+        node, old, validation, problems = evaluate(payload)
         if validation is not None:
             _log(project_path, result["warnings"], feature, "node-validate", "success" if validation["passed"] else "failed",
                  f"{node['id']} 的校验命令" + ("通过" if validation["passed"] else "未通过"), nodeId=node["id"],
@@ -292,6 +293,9 @@ def transition(project_path: Path, feature: str, checkpoint: str, *, reopen: boo
                 if value is not None:
                     target[key] = value
             result["boardSeq"] = _commit(project_path, updated)
+            if problems:
+                _log(project_path, result["warnings"], feature, "artifact-check", "warning",
+                     f"{node['id']} 的必需产物缺失或为空，仍然推进", nodeId=node["id"], problems=problems)
             if checkpoint != old or reopen:
                 _log(project_path, result["warnings"], feature, "update-state", "success",
                      reason or f"{old} → {checkpoint}", **{"from": old, "to": checkpoint, "nodeId": node["id"],

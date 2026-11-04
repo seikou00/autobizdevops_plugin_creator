@@ -14,7 +14,8 @@ from scaffold.wizard import ScriptedPrompter
 WIZARD = ["Doc Review", "Doc-Review-Kanban", None, "文档起草与评审",
           "draft", "起草", "biz", None, "doc-draft", "DRAFT.md", "Y",
           "review", "评审", "biz", None, "doc-review", "REVIEW.md", "N",
-          None, None, None, "multi", "N", "N", "N"]
+          None, None, None, "multi", "N", "N", "N",
+          "N", "Y"]                                    # 全局钩子：performance-check 不启用，secrets-check 启用
 
 
 def codes(payload, level=None):
@@ -39,6 +40,8 @@ class WizardTest(unittest.TestCase):
         self.assertEqual([node["id"] for node in workflow["nodes"]["biz"]], ["draft", "review"])
         self.assertIn('"outputs": ["DRAFT.md"]', (root / "workflow.json").read_text("utf-8"))
         self.assertTrue((root / "skills/doc-draft/SKILL.md").is_file())
+        self.assertEqual(json.loads((root / "modules/globalHooks.json").read_text("utf-8"))["hooks"], ["secrets-check"])
+        self.assertTrue((root / "hooks/secrets-check/check_secrets.py").is_file())
 
     def test_conflicting_answers_are_asked_again(self):
         answers = list(WIZARD)
@@ -74,7 +77,7 @@ class EditCommandsTest(unittest.TestCase):
     def test_module_disable_enable_and_set(self):
         root = self.lite()
         code, payload = cli("-C", str(root), "module", "list")
-        self.assertEqual([item["enabled"] for item in payload["modules"]], [True, True, True, True])
+        self.assertEqual([item["enabled"] for item in payload["modules"]], [True, True, True, True, False])  # globalHooks 默认不启用
         self.assertEqual(cli("-C", str(root), "module", "disable", "artifactSync")[0], 0)
         manifest = json.loads((root / "runtime/build-manifest.json").read_text("utf-8"))
         self.assertTrue(manifest["files"]["skills/autobizdevops-artifact-sync/SKILL.md"]["inactive"])
@@ -204,6 +207,7 @@ class CreatorPackageTest(unittest.TestCase):
             manifest = json.loads(archive.read("autobiz-plugin-creator/plugin.json"))
         self.assertEqual(names, sorted(names))
         self.assertIn("autobiz-plugin-creator/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz", names)
+        self.assertIn("autobiz-plugin-creator/skills/autobiz-plugin-skeleton/SKILL.md", names)
         self.assertEqual(manifest["skills"], "./skills/")
 
 

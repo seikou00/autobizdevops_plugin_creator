@@ -20,10 +20,12 @@
 | 命令 | 作用 |
 |---|---|
 | `autobiz-plugin new <dir> [--from blank\|lite\|fullstack] [--answers <file\|->] [--yes]` | 初始化向导：按 §1.4 的七类输入问答，生成入口文件 `plugin.scaffold.json`、`workflow.json`、需要的 `modules/*.json` 和工程目录，随后执行 doctor。`<dir>` 必须不存在或为空；`--answers` 给出回答（§1.4），`--yes` 不提问 |
+| `autobiz-plugin new <dir> --skeleton [--module <id> …]` | 只写出带 `[TODO: …]` 占位的核心配置骨架（入口文件、`workflow.json`、`--module` 选中的模块配置）和 `.scaffold/` Schema，不执行 doctor；开发者填完后执行 `lint` 查看还缺什么，再 `doctor`、`package`（§1.4.1，D63）。不能与 `--from`、`--answers`、`--yes` 一起使用 |
 | `autobiz-plugin add node <id> --name <name> --skill <skill> --stage biz\|dev\|ops --seq <n> [--output <path> …] [--optional-output <path> …] [--terminal]` | 在 `workflow.json` 的 `nodes.<stage>` 中添加节点，按 `seq` 插到组内对应位置，不改其他节点的 `seq`。`--output` 是必需输出，`--optional-output` 是可选输出（写成 `{path, optional: true}`），两者按命令行上的顺序追加到 `outputs`；含 glob 的路径要加引号，避免被 shell 展开。`--terminal` 表示终态节点，不能带输出。写完后执行 doctor（技能不存在时生成空白 `SKILL.md`） |
 | `autobiz-plugin add skill <skill> [--from <dir>]` | 导入已有技能资源（正文、模板、脚本、校验器）到 `skills/<skill>/`；不带 `--from` 时创建空白 `SKILL.md`（只有 frontmatter 和状态维护片段，技能已绑定节点时才有片段）。导入时 frontmatter 的 `name` 改为 `<skill>`，顶层 `version`、`author` 迁到 `metadata`；正文中的旧状态命令（`LEGACY_ENTRY_REF`）等技能内容问题报 warning，照样导入，check 和 package 时报 error（input-config.md §7.3）。目标目录已存在，或其他分组下有同名技能时拒绝导入（D56） |
 | `autobiz-plugin add skills --from <skills-dir> [--agents <agents-dir>]` | 把 `<skills-dir>` 当作插件的 `skills/` 导入，保留一层分组：一级子目录含 `SKILL.md`、且它的子目录都不含 `SKILL.md` 时是技能，导入到 `skills/<skill>/`；一级子目录下有含 `SKILL.md` 的子目录时是分组，这些子目录是分组下的技能，导入到 `skills/<分组>/<skill>/`（与 build 查找技能的两层一致，input-config.md §7.3）。`<skills-dir>` 自己含 `SKILL.md`、有技能子目录且没有带 `SKILL.md` 的分组子目录时，它本身就是一个分组（例如 `skills/autodev`），按 `skills/<目录名>/<skill>/` 导入。技能以目录名作为技能名，技能目录内部更深层的 `SKILL.md` 是技能自己的资源。其余内容（集合根目录和分组目录自己的 `SKILL.md`、`references/`、`hooks/` 等）是共享资源，按原路径拷到 `skills/` 下：不存在时写入，内容相同时跳过，内容不同时拒绝导入；其中的 `SKILL.md` 同样迁移 frontmatter。上次构建登记为脚手架生成的技能（例如产物同步模块的 `autobizdevops-artifact-sync`）跳过不导入。同名技能在集合中出现两次时拒绝导入。build 生成的空白 `skills/<skill>/SKILL.md` 会被分组下的同名技能替换（删除空白文件）。每个技能沿用 `add skill --from` 的迁移、冲突检查和 warning 规则。整批先在内存中完成导入与一次 doctor，任一 error 均不写文件；成功时 JSON 输出增加 `importedSkills` 技能名数组。`agents/` 不属于技能集合，不会自动查找或创建：给了 `--agents` 时把该目录原样拷到插件的 `agents/`，与技能同批写入；已有同名文件内容相同时跳过，内容不同时拒绝导入 |
 | `autobiz-plugin module list` | 列出可用模块与可选能力、版本及启用状态 |
+| `autobiz-plugin hook list` / `hook enable <id> …` / `hook disable <id> …` | 插件全局钩子模块 `globalHooks` 的便捷入口：列出全部全局钩子及启用状态（JSON 输出加 `hooks`）；启用、关闭即在 `modules/globalHooks.json` 的 `hooks` 中加入或去掉 id，再执行 doctor——模块未启用时先启用（创建文件并在入口文件中引用），`hooks` 去光后关闭模块（只去掉引用）。id 不存在时报用法错误（D62） |
 | `autobiz-plugin module enable <id> [--set key=value …]` / `disable <id>` | 启用或关闭 `knowledge`、`artifactSync`（看板能力固定开启，不能用这个命令关闭）。`enable knowledge` / `enable artifactSync` 在 `modules/knowledge.json` / `modules/artifactSync.json` 不存在时创建骨架，并在入口文件中引用；`disable` 只去掉引用，`modules/*.json` 和模块以前生成的文件都保留；这些文件不再生效：宿主命令和看板入口不再生成，build-manifest 中标为 `inactive`，`package` 不打包，lint 报 `MODULE_INACTIVE_FILES`（D52）。已存在时不重建，只加回引用。`--set` 的 key 沿模块 Schema 的属性用 `.` 逐级指定（例如 `assembly.assembler=devclaw`、`source.url=…`），value 按 Schema 的类型转换：字符串原样保留，其余按 JSON 解析；`artifacts`、`extraPaths` 这类以路径为键的映射不能用 `--set` 指定。`enable artifactSync` 必须用 `--set` 给出 `allowedFrom` 或 `allowedCheckpoints`；它会把扩展名不是 `.json` 的输出路径预填进 `artifacts`，简述写成 `[TODO: 简述]`，开发者删掉不需要上传的、补上简述即可（D56） |
 | `autobiz-plugin doctor [--dry-run] [--force] [--allow-id-change] [--allow-layout-change] [--allow-major-upgrade]` | 修改核心配置（`workflow.json`、`modules/*.json`、入口文件）或更新脚手架后重新生成插件：lint → 与上次构建比较并列出影响 → build → 复查（§1.7） |
 | `autobiz-plugin lint [--strict]` | 只检查核心配置（`workflow.json`、入口文件、`modules/*.json`）的结构和语义规则，以及编译配置是否过期（input-config.md §7.2）。只读、不联网，通常在 1 秒内完成 |
@@ -133,17 +135,43 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
     { "id": "draft", "name": "起草", "stage": "biz", "seq": 1, "skill": "doc-draft", "outputs": ["DRAFT.md"] },
     { "id": "review", "name": "评审", "stage": "biz", "seq": 2, "skill": "doc-review", "outputs": ["REVIEW.md"] } ],
   "skills": { "doc-draft": null, "doc-review": "/path/to/doc-review" },
-  "agents": "/path/to/agents"
+  "agents": "/path/to/agents",
+  "globalHooks": { "hooks": ["secrets-check"] }
 }
 ```
 
 - `nodes` 每项的字段同 `workflow.json` 的节点，另加 `stage`；终态节点写 `"terminal": true`；
 - `skills` 为技能名 → 导入目录，`null` 表示不提供；导入规则同 `add skill --from`；
 - `agents` 可选，为 agents 目录的路径，规则同 `add skills --agents`；不写时不创建 `agents/`；
-- `board`、`session`、`knowledge`、`artifactSync` 可选，内容与对应的模块配置文件相同；写了 `knowledge`、`artifactSync` 即表示启用；
+- `globalHooks` 可选，内容与 `modules/globalHooks.json` 相同，写了即启用插件全局钩子模块（input-config.md §4.6）；向导中对每个钩子逐个询问，默认不启用，选了任何一个才启用模块；
+- `board`、`session`、`knowledge`、`artifactSync`、`globalHooks` 可选，内容与对应的模块配置文件相同；写了 `knowledge`、`artifactSync`、`globalHooks` 即表示启用；
 - 与 `--from` 一起使用时，`plugin` 按字段覆盖样例，其余写了的类别整体替换样例中的对应内容。
 
 `--from lite` / `--from fullstack` 以 [examples/lite/](../booter/examples/lite/) 或 [examples/fullstack/](../booter/examples/fullstack/) 的核心配置为起点（入口文件、`workflow.json` 和入口文件引用的 `modules/*.json`，不含 `output/`），拷贝时把 `$schema` 改写为 `.scaffold/` 下的路径，向导中的回答覆盖样例中的对应项。脚手架不提供从已有插件的 `board_config.json` 反推核心配置的命令：迁移已有插件时，以对应样例为起点修改核心配置，再用 `add skills --from` 导入技能集合目录；只有单个技能时可用 `add skill --from`。
+
+#### 1.4.1 只写骨架（new --skeleton，D63）
+
+不问答、不生成插件，只写出核心配置的结构，由开发者（或 agent）照着 `[TODO: …]` 的说明填写：
+
+```bash
+autobiz-plugin new my-plugin --skeleton --module board --module artifactSync --module globalHooks
+```
+
+| 文件 | 骨架内容 |
+|---|---|
+| `plugin.scaffold.json` | `plugin` 的 `id`、`name`、`description` 是占位，`version` 为 `0.1.0`；`modules` 引用 `--module` 选中的模块 |
+| `workflow.json` | `biz`、`dev` 各一个节点，`id`、`name`、`skill`、`outputs` 是占位，`seq` 为 1、2；需要 `ops` 组或更多节点时自己加 |
+| `modules/board.json` | `display.workflowLabel` 占位 |
+| `modules/session.json` | `policies.default.agentMode` 为 `multi`，没有占位 |
+| `modules/knowledge.json` | `assembly.assembler` 为 `plugin`，`source.url` 占位 |
+| `modules/artifactSync.json` | `allowedFrom`、`artifacts` 的产物路径和简述都是占位 |
+| `modules/globalHooks.json` | `hooks` 中一个占位 |
+| `.scaffold/` | 6 个输入 Schema（拷贝，IDE 补全用），首次 doctor 时登记为 managed |
+
+- 不加 `--module` 时只写入口文件和 `workflow.json`；`board`、`session` 不写就全部取默认值，`knowledge`、`artifactSync`、`globalHooks` 不写就不启用，之后可以用 `module enable` 加上；
+- 填写前后都可以运行 `lint`：每个还没填的占位报一条 `TODO_FIELD`，`pointer` 指出位置，`message` 带占位中的说明（input-config.md §7.1）。占位报 error，`doctor` 不生成、不写任何文件；只有 `artifactSync` 的 `artifacts`、`extraPaths` 中的简述报 warning，可以先生成，`package` 时由 `TODO_PLACEHOLDER` 拦下（与 `module enable artifactSync` 预填的简述一致，D56）；
+- 占位所在位置的 Schema 问题由 `TODO_FIELD` 代替，不再另报 `INPUT_SCHEMA`；
+- 填完后 `doctor` 照常生成插件（技能不存在时生成空白 `SKILL.md`），之后 `check`、`package`。
 
 ### 1.5 simulate
 
@@ -875,6 +903,7 @@ P0 不做鉴权，本机任何进程都可以向 DevClaw 发送伪造的看板�
 | `runtime/adapters/inspect_state.py` | DevClaw 的项目和 Feature 查询 | 调用查询库，将结果转换为看板接口数据 |
 | `runtime/adapters/inspect_workflow_templates.py` | DevClaw 的动态工作流能力 | 查询流程定义，返回宿主需要的模板结构 |
 | `runtime/adapters/skip_node.py` | DevClaw 的 `skip_node`（`flow.json` 的 `skip` 不为 `null`（v1 不会出现） 时） | 处理宿主参数，通过引擎跳过节点。v1 不生成这个文件（D52） |
+| `hooks/artifact_guard.py` | DevClaw 的 PreToolUse 钩子（`hooks/hooks.json` 注册，matcher 为 `execute`） | 执行完成命令前检查必需产物存在且非空，不满足时拦截（§4.7，D61） |
 | `runtime/session/render_session_context.py` | DevClaw 的会话机制 | 获取流程上下文，结合会话策略及知识组装结果生成会话内容 |
 | `runtime/knowledge/inspect_deploy_units.py` | 知识模块接入方 | 解析知识清单，提供支持的系统和发布单元信息 |
 | `runtime/knowledge/sync_knowledge.py` | DevClaw 的 `pull_knowledge` | 拉取知识仓库，只更新知识目录，不回写任何配置文件（仅声明 `knowledge.source` 时，§3.3.9，D59） |
@@ -894,8 +923,8 @@ python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp
 | 场景 | 规则 |
 |---|---|
 | 正常推进 | `<cp>` 必须等于当前 checkpoint，或是状态规则允许的下一个 |
-| 推进到 `_in_progress` | 检查本节点的必需输入是否存在（optional、生产者被跳过或未执行的输入除外；v1 的 `inputs` 固定为 `[]`） |
-| 推进到 `_done` | 检查本节点的必需输入和必需输出都存在且非空（output-spec.md §4.4），`validate` 不为 `null` 时再执行节点校验命令（§4.4），全部通过才写入。不满足时 `errors` 中逐条列出缺少或为空的产物 |
+| 推进到 `_in_progress` | 检查本节点的必需输入是否存在（optional、生产者被跳过或未执行的输入除外；v1 的 `inputs` 固定为 `[]`）；缺少时同样只报 warning |
+| 推进到 `_done` | 检查本节点的必需输入和必需输出都存在且非空（output-spec.md §4.4）；缺少或为空时只在 `warnings` 中逐条列出（`推进到 <cp> 时必需产物缺失: …`），照常推进，并写一条 `eventId = artifact-check`、`eventStatus = warning` 的变更日志。拦截由钩子 `artifact_guard.py` 在执行这条命令之前完成（§4.7，D61）。`validate` 不为 `null` 时再执行节点校验命令（§4.4），通过才写入 |
 | 推进到 `archived` | 只能从终态节点前一个节点的 `_done` 推进；检查终态节点的必需输入，不执行校验命令。之后不能再推进或重开 |
 | 动态阶段选择（v2） | v1 运行框架不实现，`flow.json` 的 `dynamicStages` 不为 `[]` 时拒绝加载（D59）。v2 的规则：当前 checkpoint 是选择点时，推进到阶段第一个节点的 `_in_progress` 记为执行，推进到下一个主干节点的 `_in_progress` 记为跳过，写入 `workflowDecisions`。阶段执行时，最后一个节点 `_done` 的下一个是下一个主干节点的 `_in_progress` |
 | 重开 | 必须加 `--reopen` 和非空的 `--reason`；只能回到当前或之前节点的 `_in_progress`。下游节点在看板上显示为未开始，旧产物保留。重开不执行校验命令。v2 有动态阶段和跳过节点后，还可以回到已执行的动态阶段节点，回到选择点之前时清除该阶段的决定，回到被跳过节点之前时恢复这些节点 |
@@ -1022,7 +1051,7 @@ engine.init_feature(project_path: Path, feature: str, *, owner: str | None = Non
                     iteration: str | None = None, template: str = "standard") -> dict
 engine.transition(project_path: Path, feature: str, checkpoint: str, *, reopen: bool = False,
                   reason: str = "", dry_run: bool = False) -> dict
-    # 状态转移检查（含 archived）→ 产物存在且非空检查 → （_done 且 validate 不为 null 时）校验命令
+    # 状态转移检查（含 archived）→ 产物存在且非空检查（只提醒，写入 warnings）→ （_done 且 validate 不为 null 时）校验命令
     # → 加锁提交 state.json → 写变更日志
 # v2 再加 query.pending_choice（停在选择点时的待选项）和 engine.skip_nodes（跳过节点），v1 不提供（D59）
 # 以上函数提交时都在锁内把 state.json 的 boardSeq 加 1，返回值中带 "boardSeq"，供入口推送看板事件（§3.5）
@@ -1037,6 +1066,72 @@ class query.BoardError(ValueError): ...                           # 所有业务
 - 两个模块不承诺对开发者代码的接口稳定性，随运行框架版本一起变化。
 
 ---
+
+
+### 4.7 默认钩子 artifact_guard.py（D61）
+
+build 把产物检查脚本拷到插件根目录的 `hooks/artifact_guard.py`（managed，模板在脚手架的 `runtime/hooks/`），并在 `hooks/hooks.json` 中注册；`plugin.json` 的 `hooks` 固定指向 `./hooks/hooks.json`。`hooks/hooks.json` 由脚手架和开发者共用：脚手架只维护自己的条目——命令指向 `hooks/artifact_guard.py` 或 `hooks/<全局钩子 id>/` 下脚本的条目，每次重新生成都排在各事件的最前面并按当前配置重写；其他条目是开发者的，按原顺序原样保留。生成的条目也是给开发者打样的写法：
+
+```json
+{
+  "PreToolUse": [
+    { "matcher": "execute",
+      "hooks": [ { "type": "command", "command": "python -X utf8 hooks/artifact_guard.py", "timeout": 30,
+                   "onBlock": { "reason": "产物检查不通过", "systemMessage": "必需产物缺失或为空",
+                                "additionalContext": "补全必需产物后再执行技能完成命令" },
+                   "persistAfterInterrupt": true } ] },
+    "…开发者 PreToolUse 条目按原顺序接在后面"
+  ],
+  "…开发者的其他事件原样保留": []
+}
+```
+
+- 合并规则：默认钩子放在 `PreToolUse` 最前面；其次是插件全局钩子模块 `globalHooks` 启用的钩子，按 `modules/globalHooks.json` 中列出的顺序（§4.8）；框架和模块通过 `Contribution.hooks` 贡献条目，按合并顺序 framework → … → globalHooks 追加；开发者的条目按原顺序接在最后。文件包在 `{"hooks": {…}}` 下时保持这种写法，否则写成顶层事件（与全栈版 `autobiz_kanban` 的写法一致）；没有这个文件时 build 创建它。开发者改了自己的条目不需要重新生成，lint 也不报 `BUILD_STALE`；改了脚手架的条目会在下次生成时被重写。build-manifest 把它记为 `seeded`，`regions.hooks` 是脚手架条目的摘要。结构不是“事件名 → 条目对象数组”时报 `PLUGIN_HOOKS_INVALID`；入口文件的 `plugin.hooks` 可以不写，写了只能是 `./hooks/hooks.json`，否则报 `PLUGIN_HOOKS_PATH`（input-config.md §7.1）；
+- 输入：宿主从 stdin 传入的 JSON，命令取自 `tool_input.command`（或 `cmd`、`script`、顶层 `command`）。命令按 POSIX 规则拆分，展开 `sh -c`、`bash -lc`、`cmd /c` 包装，按 `&&`、`||`、`;`、`|` 拆成多条；
+- 只处理 `update_state.py --checkpoint <节点>_done`（也接受 `--checkpoint=<cp>`）：按命令中的 `--workspace`、`--project`、`--feature`，缺省时按 `PLUGIN_WORKSPACE`、`PROJECT_DIR`、`FEATURE_ID` 定位，用 `engine.check_artifacts` 检查该节点的必需输出；
+- 有缺失或为空的产物时：stdout 输出 `{"decision": "block", "reason": "不能推进到 <cp>：必需产物缺失: …", "systemMessage": …}`，原因同时写 stderr，以退出码 2 退出；
+- 其余情况都以 0 退出、不输出：其他命令、`_in_progress`、`archived`、`--reopen`、`--dry-run`、Feature 已在该 checkpoint、无法定位项目或 Feature、Feature 不存在。这些情况交给 `update_state.py` 自己报告，钩子出错不影响流程；
+- 命令中的解释器写 `python`，脚本路径相对插件根目录，与全栈版 `hooks.json` 的写法一致。
+
+
+### 4.8 插件全局钩子模块 globalHooks（D62）
+
+`globalHooks` 是一个非核心模块（`modules/globalHooks.json`，input-config.md §4.6），启用脚手架自带的公共宿主钩子。模块包在 `booter/scaffold/modules/global_hooks/`，每个钩子是 `hooks/` 下的一个目录：
+
+```text
+scaffold/modules/global_hooks/
+├── module.json  module.py          # 模块契约：validate 检查 id，contribute 贡献脚本和钩子条目
+├── catalog.py                      # catalog()：扫描 hooks/*/hook.json
+└── hooks/
+    ├── secrets_check/
+    │   ├── hook.json               # id、title、description、files、entries
+    │   └── files/check_secrets.py
+    └── performance_check/
+        ├── hook.json
+        └── files/performance_checker.py
+```
+
+```json
+{
+  "id": "secrets-check",
+  "title": "明文密码检查",
+  "description": "写入 .yaml/.yml/.properties 时发现明文的密码、密钥、token 就拦截，提示先加密再写入",
+  "files": ["check_secrets.py"],
+  "entries": { "PreToolUse": [ { "matcher": "write_file|edit_file|apply_patch",
+    "hooks": [ { "type": "command", "command": "python -X utf8 ${hookDir}/check_secrets.py", "timeout": 1000,
+                 "persistAfterInterrupt": true } ] } ] }
+}
+```
+
+- `catalog()` 扫描 `hooks/*/hook.json` 得到全部钩子，源码运行和 `.pyz` 中都通过 `importlib.resources` 读取。**新增钩子只需在 `hooks/` 下加一个目录**：写 `hook.json`，把脚本放进 `files/`，不用改代码；`hook list`、向导和 `--answers` 自动包含它。`tests/test_global_hooks.py` 检查每个钩子的文件齐全、`entries` 只引用自己的文件；
+- `id` 为 kebab-case，全局唯一；`entries` 的写法与 `hooks.json` 相同，`command` 中的 `${hookDir}` 在 build 时替换为 `hooks/<id>`；
+- `contribute` 把 `files` 拷到插件根目录的 `hooks/<id>/`（module），条目放进 `Contribution.hooks`，由 build 写进 `hooks/hooks.json` 中脚手架维护的部分（§4.7）；
+- 脚本自带的协议由脚本决定：拦截时以退出码 2 退出或输出 `{"decision": "block", …}`，放行时以 0 退出。
+
+| id | 来源 | 事件 / matcher | 做什么 |
+|---|---|---|---|
+| `secrets-check` | 全栈版 `hooks/check-secrets-new.py`，原样 | PreToolUse / `write_file\|edit_file\|apply_patch` | 写入 `.yaml`、`.yml`、`.properties` 时，键以 password、secret、pwd、key、token 结尾（以及 Redis、Kafka、Zookeeper 的密码项）且值不是加密、掩码或变量引用时，以退出码 2 拦截 |
+| `performance-check` | 全栈版 `hooks/performance_checker.py`，适配新入口 | PreToolUse / `execute` | 命令是 `update_state.py`（或旧的 `update_checkpoint.py`）推进到 `code_done` 时，对工作区 `git diff` 中变动的前端文件执行 7 条性能规则，发现问题输出 block。工作区取 `WORKSPACE_PATH`，缺省时取 `PLUGIN_WORKSPACE/PROJECT_DIR`；触发的 checkpoint 写在命令参数中，固定为 `code_done` |
 
 ## 5. 版本与兼容
 
@@ -1062,7 +1157,7 @@ class query.BoardError(ValueError): ...                           # 所有业务
 由 lite 迁移时的行为差异：
 
 - 入口从 `hooks/`、根目录迁到 `runtime/`，board_config 中的命令随之重新生成；board_config 只剩 `inspectCommands`，流程定义改由命令输出，看板入口移到 `modules.json`；技能中旧的 `scaffold` 状态片段原地替换成 `plugin workflow` 状态维护片段，`artifacts` 托管片段删除；
-- 完成判定不变：必需产物存在且去掉首尾空白后非空（D37）；v1 也不能配置校验命令；
+- 完成判定的标准不变：必需产物存在且去掉首尾空白后非空（D37）；不满足时由钩子 `artifact_guard.py` 拦截完成命令，`update_state.py` 本身只报 warning（D61）；v1 也不能配置校验命令；
 - 会话内容新增流程上下文段；会话入口的键由 `session_context_inject` 改为 `session_collector_context_inject`；宿主命令统一加 `-X utf8`（lite 原来没有）；
 - 产物显示名不再配置，取路径本身（lite 的“结构化需求”“实施计划”等名称不再保留）；节点描述改为取技能的 `description`、`nextAction` 改用默认文案，lite 的节点文案覆写不再保留；产物 id 改由路径推导（`requirements` → `prd`、`specs` → `spec`）；
 - `plan.md` 对旧文件名 `PLAN.md` 的回退不再支持。macOS、Windows 默认文件系统不区分大小写，不受影响；Linux 上的旧 Feature 需要把文件改名。

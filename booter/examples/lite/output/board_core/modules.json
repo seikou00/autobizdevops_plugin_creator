@@ -19,6 +19,9 @@
       "enabled": true,
       "version": "1.0.0",
       "skill": "autobizdevops-artifact-sync"
+    },
+    "globalHooks": {
+      "enabled": false
     }
   },
   "boardEvents": {

@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "execute",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 hooks/artifact_guard.py",
+            "timeout": 30,
+            "onBlock": {
+              "reason": "产物检查不通过",
+              "systemMessage": "必需产物缺失或为空",
+              "additionalContext": "补全必需产物后再执行技能完成命令"
+            },
+            "persistAfterInterrupt": true
+          }
+        ]
+      }
+    ]
+  }
+}

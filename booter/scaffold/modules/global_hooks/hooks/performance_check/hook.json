@@ -1,0 +1,21 @@
+{
+  "id": "performance-check",
+  "title": "前端性能检查",
+  "description": "编码节点完成（code_done）前，对工作区 git diff 中变动的前端文件执行 7 条性能规则，发现问题就拦截",
+  "files": ["performance_checker.py"],
+  "entries": {
+    "PreToolUse": [
+      {
+        "matcher": "execute",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 ${hookDir}/performance_checker.py code_done",
+            "timeout": 7200,
+            "persistAfterInterrupt": true
+          }
+        ]
+      }
+    ]
+  }
+}

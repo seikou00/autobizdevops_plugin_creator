@@ -5,7 +5,8 @@
 （examples/lite、examples/fullstack 的核心配置，显式列出，Q12.1）。执行方式：python3 autobiz-plugin.pyz <命令>。
 
 插件包 autobiz-plugin-creator-<版本>.zip 只有一个顶层目录 autobiz-plugin-creator/：生成的 plugin.json，
-skills/autobiz-plugin-creator/ 下的 SKILL.md、references/，以及放进 scripts/ 的同一个 .pyz（不提交进仓库）。
+skills/autobiz-plugin-creator/ 下的 SKILL.md、references/ 和放进 scripts/ 的同一个 .pyz（不提交进仓库），
+以及共用这个 .pyz 的骨架引导技能 skills/autobiz-plugin-skeleton/。
 
 用法（在 booter/ 下）：python3 tools/make_pyz.py [-o dist/autobiz-plugin.pyz] [--no-creator]
 """
@@ -31,7 +32,9 @@ SEED_FILES = {
 }
 MAIN = "import sys\n\nfrom scaffold.cli import main\n\nsys.exit(main())\n"
 CREATOR = "autobiz-plugin-creator"
-CREATOR_FILES = ("SKILL.md", "references/modeling-guide.md")
+# 插件包中的技能 → 要打包的文件；.pyz 只放在 autobiz-plugin-creator/scripts/ 下，其他技能引用它
+CREATOR_SKILLS = {CREATOR: ("SKILL.md", "references/modeling-guide.md"),
+                  "autobiz-plugin-skeleton": ("SKILL.md",)}
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 
 
@@ -79,11 +82,12 @@ def make_creator_plugin(pyz: Path, output: Path) -> Path:
     """插件开发技能的 DevClaw 插件包，与 demo 的 autobiz-plugin-creator-demo 相同（Q14.4）。"""
     version = scaffold_version()
     manifest = {"name": CREATOR, "version": version,
-                "description": "AutoBiz 看板插件开发助手：对话梳理流程，用 autobiz-plugin 生成、检查并打包插件。",
+                "description": "AutoBiz 看板插件开发助手：对话梳理流程，或按配置骨架引导自行填写，用 autobiz-plugin 生成、检查并打包插件。",
                 "skills": "./skills/"}
     entries = {"plugin.json": (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode("utf-8")}
-    for rel in CREATOR_FILES:
-        entries[f"skills/{CREATOR}/{rel}"] = (REPO / "skills" / CREATOR / rel).read_bytes()
+    for skill, files in CREATOR_SKILLS.items():
+        for rel in files:
+            entries[f"skills/{skill}/{rel}"] = (REPO / "skills" / skill / rel).read_bytes()
     entries[f"skills/{CREATOR}/scripts/autobiz-plugin.pyz"] = Path(pyz).read_bytes()
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)

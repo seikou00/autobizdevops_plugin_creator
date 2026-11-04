@@ -9,6 +9,7 @@
 | `board_core/modules.json` | generated | DevClaw 读取的模块开启情况与看板入口，output-spec.md §3.3 |
 | `runtime/config/runtime.json`、`flow.json`、`board.json`、`session.json`、`knowledge.json` | generated | 只给插件脚本读，output-spec.md §5；看板上的流程数据由 adapter 用它们拼出、通过命令输出 |
 | `runtime/build-manifest.json` | generated | output-spec.md §8 |
+| `hooks/hooks.json` | seeded | 产物检查钩子（和启用的全局钩子）的条目，开发者的条目写在同一文件，interfaces.md §4.7 |
 | `skills/<skill>/SKILL.md` | seeded | 示例中没有技能目录，所以是 build 生成的空白 `SKILL.md`：只有 frontmatter 和状态维护片段，checkpoint 与 `workflow.json` 的节点一一对应（output-spec.md §6.1） |
 | `skills/autobizdevops-artifact-sync/config/artifact-sync.json` | generated | 产物同步模块，output-spec.md §7.2 |
 

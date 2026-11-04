@@ -395,6 +395,8 @@ def module_enable(root: Path, module_id: str, sets: list) -> CommandResult:
         skeleton = {"$schema": f"../.scaffold/modules/{module_id}.schema.json"}
         if module_id == "artifactSync":
             skeleton["artifacts"] = _artifact_skeleton(tree, entry)
+        if module_id == "globalHooks":
+            skeleton["hooks"] = []
         text = jsonedit.render(skeleton, "", "  ", "\n") + "\n"
     else:
         text = fsio.decode(data)
@@ -424,3 +426,55 @@ def module_disable(root: Path, module_id: str) -> CommandResult:
         return CommandResult(Report(), text=f"{module_id} 本来就没有启用")
     entry_text = jsonedit.remove_member(entry_text, "/modules", module_id)
     return doctor(root, overlay={ENTRY: entry_text.encode("utf-8")})
+
+
+# —— hook list / enable / disable（globalHooks 模块的便捷入口）——
+
+def _global_hooks(tree: Tree, entry: dict) -> list:
+    if "globalHooks" not in (entry.get("modules") or {}):
+        return []
+    data = tree.read_bytes(_module_rel(entry, "globalHooks"))
+    try:
+        value = fsio.parse_json(data) if data is not None else {}
+    except fsio.JsonError:
+        return []
+    return list(value.get("hooks") or []) if isinstance(value, dict) else []
+
+
+def hook_list(root: Path) -> CommandResult:
+    from scaffold.lib.issues import Report
+    from scaffold.modules.global_hooks.catalog import catalog
+
+    tree = Tree(root)
+    _, entry = entry_of(tree)
+    enabled = _global_hooks(tree, entry)
+    hooks, lines = [], []
+    for hook_id, spec in catalog().items():
+        hooks.append({"id": hook_id, "title": spec.title, "description": spec.description,
+                      "enabled": hook_id in enabled})
+        lines.append(f"{hook_id:<18} {'已启用' if hook_id in enabled else '未启用':<6} {spec.title}：{spec.description}")
+    lines.append("产物检查钩子 artifact_guard 始终启用，不在此列；启用的钩子记在 modules/globalHooks.json")
+    return CommandResult(Report(), extra={"hooks": hooks}, text="\n".join(lines))
+
+
+def hook_toggle(root: Path, hook_ids: list, *, enable: bool) -> CommandResult:
+    """在 modules/globalHooks.json 的 hooks 中加入或去掉钩子：模块未启用时先启用，去光了就关闭模块。"""
+    from scaffold.lib.issues import Report
+    from scaffold.modules.global_hooks.catalog import catalog
+
+    available = catalog()
+    unknown = [hook_id for hook_id in hook_ids if hook_id not in available]
+    if unknown:
+        raise UsageError(f"没有全局钩子 {'、'.join(unknown)}，可用：{'、'.join(available)}")
+    tree = Tree(root)
+    _, entry = entry_of(tree)
+    current = _global_hooks(tree, entry)
+    if enable:
+        updated = current + [hook_id for hook_id in dict.fromkeys(hook_ids) if hook_id not in current]
+    else:
+        updated = [hook_id for hook_id in current if hook_id not in hook_ids]
+    if updated == current:
+        return CommandResult(Report(), text="全局钩子没有变化")
+    if not updated:
+        return module_disable(root, "globalHooks")
+    return module_enable(root, "globalHooks", ["hooks=" + json.dumps(updated)])
