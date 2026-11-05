@@ -10,7 +10,8 @@
 4. 始终读取 <sessionWorkspacePath>/AGENTS.md（会话工作区指令）和 CONTEXT.md（领域词汇表）。
 
 插件可以整个替换这个文件，只要在同一路径实现上面的协议；doctor 不会覆盖被替换的文件。
-依赖 gray-matter 缺失时不在会话中执行 npm install（会话入口不得写文件），直接按清单映射加载（README §9 第 7 条）。
+gray-matter 由 doctor 在本目录执行 npm install 安装并随包带上；缺失时不在会话中安装（会话入口不得写文件），
+直接按清单映射加载（README §9 第 7 条）。
 """
 
 import sys

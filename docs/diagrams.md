@@ -68,7 +68,7 @@ flowchart LR
     C2["create_feature"]
     C3["project_status<br/>feature_status"]
     C4["dynamic_workflow"]
-    C5["session_collector_context_inject"]
+    C5["session_context_inject"]
     C6["deploy_units"]
     EV["看板事件服务<br/>127.0.0.1"]
   end
@@ -280,7 +280,7 @@ sequenceDiagram
   participant P as 会话策略
   participant K as 知识组装脚本（内置，插件可替换）
 
-  D->>R: session_collector_context_inject（项目、Feature、发布单元、会话工作区）
+  D->>R: session_context_inject（项目、Feature、发布单元、会话工作区）
   R->>Q: 查询当前节点、目标节点、输入输出及存在情况
   Q-->>R: 流程上下文 flow
   R->>P: 目标节点 → 当前节点 → 默认，三级降级

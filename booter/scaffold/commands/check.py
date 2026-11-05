@@ -170,6 +170,8 @@ def check(root: Path, *, strict: bool = False, package_mode: bool = False) -> Co
             replaceable = {path for path, planned in (replay.plan.files.items() if replay.plan else [])
                            if planned.replaceable}
             report.extend(drift_issues(tree, result.previous, replaceable))
+            for module_id, module in result.modules.items():
+                report.extend(module.prepare(tree.root, result.normalized.modules[module_id], install=False))
     if report.failed():
         extra["contract"] = {"ran": False, "reason": "lint 或漂移检查有 error，磁盘上的插件已经不对应当前配置"}
     else:

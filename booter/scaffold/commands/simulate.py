@@ -18,7 +18,7 @@ from scaffold.lib.tree import Tree
 from scaffold.shapes import check_shape
 
 PROJECT = "demo-project"
-READ_ONLY = ("project_status", "feature_status", "dynamic_workflow", "session_collector_context_inject",
+READ_ONLY = ("project_status", "feature_status", "dynamic_workflow", "session_context_inject",
              "deploy_units")
 
 
@@ -128,7 +128,7 @@ class Contract:
             raise UsageError(f"board_config.json 中没有平台 {self.platform} 的命令") from None
         self.values = {"pluginPath": str(plugin), "pluginWorkspace": str(self.workspace), "projectDir": PROJECT,
                        "projectDirs...": [PROJECT], "feature": self.feature, "selectedDeployUnits": "[]",
-                       "sessionWorkspacePath": str(base / "session"), "knowledge-path": ""}
+                       "sessionWorkspacePath": str(base / "session"), "knowledgePath": "[]"}
 
     def run(self) -> dict:
         chain = None
@@ -186,7 +186,7 @@ class Contract:
 
     def advance(self, index: int, node: dict, feature_dir: Path) -> bool:
         skill_file = f"{node['skillDir']}/SKILL.md"
-        session = self.call("session_collector_context_inject", node=node["id"], read_only=True)
+        session = self.call("session_context_inject", node=node["id"], read_only=True)
         if session is not None and session.get("flow", {}).get("targetNodeId") != node["id"]:
             self.fail(self.steps[-1], f"策略目标节点应为 {node['id']}，实际为 {session.get('flow', {}).get('targetNodeId')}")
         text = skillmd.read_text((self.plugin / skill_file).read_bytes())

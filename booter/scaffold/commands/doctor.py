@@ -1,4 +1,5 @@
-"""doctor：修改核心配置或更新脚手架后重新生成插件——lint → 与上次构建比较并列出影响 → build → 复查（interfaces.md §1.7）。
+"""doctor：修改核心配置或更新脚手架后重新生成插件——lint → 与上次构建比较并列出影响 → build → 复查 → 准备运行环境
+（interfaces.md §1.7）。
 
 脚手架更新后同一主版本内直接替换 managed、module 文件，changes.versions 列出版本变化（D57）。
 """
@@ -113,6 +114,9 @@ def doctor(root, *, dry_run: bool = False, force: bool = False, allow: frozenset
     written += [path for path in emit.apply(result.plan, disk, MANIFEST, fsio.dump_json(result.manifest))
                 if path not in written]
     report.extend(recheck(disk, result))
+    # 写盘之后准备运行环境：例如知识模块安装 collector 的 Node 依赖，失败只报 warning
+    for module_id, module in result.modules.items():
+        report.extend(module.prepare(disk.root, result.normalized.modules[module_id], install=True))
     return CommandResult(report, extra=extra, written=written, text=_summary(changes, written))
 
 

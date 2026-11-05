@@ -53,7 +53,7 @@
     },
     "board_core/board_config.json": {
       "ownership": "generated",
-      "sha256": "sha256:909badec09fab0b477f32b6e83e91bdce85d20a4ac753568430804c5807eb55a"
+      "sha256": "sha256:26850a42ae93956a4078926b35fad6c33e3b1bba742d0605ce8f2a34e500115e"
     },
     "board_core/modules.json": {
       "ownership": "generated",
@@ -150,6 +150,10 @@
       "sha256": "…"
     },
     "runtime/knowledge/inspect_deploy_units.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "runtime/knowledge/package.json": {
       "ownership": "module",
       "sha256": "…"
     },

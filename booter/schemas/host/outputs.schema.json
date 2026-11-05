@@ -232,7 +232,7 @@
         "transitions": { "type": "array" }
       }
     },
-    "session_collector_context_inject": {
+    "session_context_inject": {
       "type": "object",
       "required": ["ok", "message", "sessionContext", "agentmdLoadStatus", "flow", "agentConfig"],
       "properties": {

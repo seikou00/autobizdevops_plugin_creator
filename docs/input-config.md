@@ -665,7 +665,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 - 没有提供技能，生成两个空白 `SKILL.md`：只有 frontmatter 和状态维护片段（`draft_in_progress`/`draft_done`、`review_in_progress`/`review_done`），正文由开发者填写；
 - 推进到 `review_done` 时，框架检查 `REVIEW.md` 存在即放行；两个节点的 `inputs` 为 `[]`、`validate` 为 `null`；
 - `inspectCommands` 中不含 `knowledge_path`、`deploy_units`、`pull_knowledge`；`modules.json` 中 `knowledge`、`artifactSync` 为 `{"enabled": false}`，只有固定的 `knowledge_config`，没有 `artifact_sync`；
-- `session_collector_context_inject` 返回流程上下文和默认策略的 `agentConfig`，不含知识段；
+- `session_context_inject` 返回流程上下文和默认策略的 `agentConfig`，不含知识段；
 
 全部生成内容见 [examples/minimal/output/](../booter/examples/minimal/output/)。
 

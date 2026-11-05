@@ -547,7 +547,7 @@ def merge(contribs: dict[str, Contribution]) -> tuple[Merged, list[Issue]]
 
 - **Q6.1（已定）** 删除 `Module.defaults()`：它与 D27（常量默认值只写在 Schema 的 `default` 中）冲突。模块配置统一由 normalize 按 Schema 补全后传入。
 - **Q6.2（已定）** `module.json` 去掉 `config.pointer`（目前都是 `""`，配置总是整个文件）；`config.file` 与 `id` 相同，也去掉；新增 `schema`、`core` 两个字段。
-- **Q6.3（已定）** `CommandSpec` 删除 `runtime_owned`：D31 去掉运行期回写之后，这个字段已经没有用处。新增 `args` 中的 `{platform}`，供 `session_collector_context_inject` 的 `--platform <platform>` 使用。
+- **Q6.3（已定）** `CommandSpec` 删除 `runtime_owned`：D31 去掉运行期回写之后，这个字段已经没有用处。新增 `args` 中的 `{platform}`，供 `session_context_inject` 的 `--platform <platform>` 使用。
 - **Q6.4 board、session 算不算模块，现在两处说法矛盾（已定）。** README §3.1 把它们放在 `scaffold/modules/board|session/`，interfaces.md §2.3 又规定 `runtime_config` 中的 `board`、`session`“由核心生成，模块不得占用”。两者实现同一个 Module 协议并标 `core: true`；§2.3 中的保留名只约束非核心模块。各自的贡献见 §9。
 - **Q6.5 运行期代码只放一处（已定）。** README §3.1 同时把 adapters 模板写在 `scaffold/modules/board/` 和根目录的 `runtime/` 下。运行期代码统一放在根目录 `runtime/`：adapters、session 都要 import `runtime/common/`，放在一起才能整体测试；board、session 的 `FileSpec.src` 写成 `runtime/…`。knowledge 是可选模块，版本独立，仍放在自己的 `files/` 下。
 - **Q6.6 模块配置的 Schema 只保留一份（已定）。** interfaces.md §2.1 让模块包带 `options.schema.json`，再“发布为” `schemas/modules/<file>.schema.json`，这样就有两份。只保留 `schemas/modules/*.schema.json`，`module.json` 的 `schema` 字段指向它，模块包中不再有 `options.schema.json`。
@@ -713,7 +713,7 @@ def build(root: Path, *, dry_run: bool = False, force: bool = False,
 | 模块 | validate | runtime_config | files | inspect_commands | entries / manifest |
 |---|---|---|---|---|---|
 | board（core） | `PLACEHOLDER_UNKNOWN`、`FEATURE_DIR_MISSING` | `board.json` | `runtime/adapters/` 下的 `init_workspace.py`、`init_feature.py`、`inspect_state.py`、`inspect_workflow_templates.py`（v1 不生成 `skip_node.py`，D52） | `project_status`、`feature_status`、`create_project`、`create_feature`、`dynamic_workflow`、`plugin_dir_hook`、`dialog_tips`、`system_prompt_inject`（`skip_node` v1 不生成） | `knowledge_config` |
-| session（core） | `POLICY_NODE_UNKNOWN`、`SUBAGENT_FILE_MISSING` | `session.json` | `runtime/session/render_session_context.py` | `session_collector_context_inject`；启用知识模块时末尾加 `--knowledge-path`、`--knowledge-path-platform`（Q9.3） | — |
+| session（core） | `POLICY_NODE_UNKNOWN`、`SUBAGENT_FILE_MISSING` | `session.json` | `runtime/session/render_session_context.py` | `session_context_inject`；启用知识模块时末尾加 `--knowledge-path`、`--knowledge-path-platform`（Q9.3） | — |
 | knowledge | `MODULE_OPTION` | `knowledge.json` | `runtime/knowledge/` 下的 `inspect_deploy_units.py`、`render_collected_session_context.py`（replaceable）、`collect-knowledge.js`；`sync_knowledge.py` 只在声明 `source` 时生成 | `knowledge_path`、`deploy_units`（带两个知识目录参数，Q9.4）；`pull_knowledge` 只在声明 `source` 时生成 | `manifest`：`{assembler, source}`；`knowledge_assembly` |
 | artifactSync | `ARTIFACT_REF_UNKNOWN`、`MODULE_OPTION`、`MODULE_SKILL_CONFLICT` | — | `skills/autobizdevops-artifact-sync/**`，其中 `config/artifact-sync.json` 由输入生成 | — | `entries.artifact_sync`（`entry.enabled` 时）；`manifest`：`{skill}`；`skills` |
 
@@ -728,15 +728,15 @@ def build(root: Path, *, dry_run: bool = False, force: bool = False,
 
 评审结论（2026-11-03，D53）：
 
-- **Q9.1 知识组装继续调用 JS 脚本（已定）。** 内置组装脚本保持现状，调用 `collect-knowledge.js`。这个脚本由知识库开发同事提供，脚手架原样拷贝、不改写，也不用 Python 重写。它对 `gray-matter` 的依赖怎么安装（随包带 `node_modules`，还是 build 或 package 时安装）仍是 README §9 第 7 条的遗留问题。
+- **Q9.1 知识组装继续调用 JS 脚本（已定）。** 内置组装脚本保持现状，调用 `collect-knowledge.js`。这个脚本由知识库开发同事提供，脚手架原样拷贝、不改写，也不用 Python 重写。它对 `gray-matter` 的依赖由 doctor 写盘后执行 `npm install` 安装、package 随包带上（README §9 第 7 条，2026-11-05）。
 - **Q9.2 模块的版本号（已定）。** `board_core/modules.json` 和 build-manifest 中每个启用的模块都带 `version`（三个示例都是 `1.0.0`）。board、session 的运行期代码在仓库根目录的 `runtime/` 中，和框架一起发布（D50），不可能单独升级。board、session 的版本号直接取 `coreVersion`，`module.json` 中不再单独维护；knowledge、artifactSync 的文件在各自的模块包中，保留自己的版本号，供 doctor 判断哪些模块文件变了（单元 13 去掉了 upgrade，Q13.2）。
-- **Q9.3 知识目录固定为 `sys`，DevClaw 维护的目录通过参数传入（已定）。** Schema 中去掉 `knowledge.root`，插件自己的知识目录固定为 `sys/`；编译后的 `knowledge.json` 仍写 `"root": "sys"`，宿主命令 `knowledge_path` 固定为 `${pluginPath}/sys`。为兼容两种知识目录，启用知识模块时，会话入口 `session_collector_context_inject` 的命令末尾带两个参数：
+- **Q9.3 知识目录固定为 `sys`，DevClaw 维护的目录通过参数传入（已定）。** Schema 中去掉 `knowledge.root`，插件自己的知识目录固定为 `sys/`；编译后的 `knowledge.json` 仍写 `"root": "sys"`，宿主命令 `knowledge_path` 固定为 `${pluginPath}/sys`。为兼容两种知识目录，启用知识模块时，会话入口 `session_context_inject` 的命令末尾带两个参数：
 
   ```text
-  --knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledge-path}"
+  --knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledgePath}"
   ```
 
-  `${knowledge-path}` 是新增的宿主占位符，由 DevClaw 替换为它自己维护的知识目录，不维护时替换为空字符串。`--knowledge-path-platform` 不为空时，知识目录取它；为空时走旧模式，取 `--knowledge-path`，即 `${pluginPath}/sys`。会话入口把选出的目录作为 `knowledgePath` 传给组装脚本。未启用知识模块时命令不带这两个参数，所以 minimal 示例不变；lite、fullstack 示例的会话入口命令已补上。session 模块要知道知识模块是否启用，所以 `ModuleContext` 增加 `enabled`。路径分隔符和其他宿主命令一样统一写 `/`，Windows 上同样可用。
+  `${knowledgePath}` 是 DevClaw 的宿主占位符（D68 前写作 `${knowledge-path}`），DevClaw 替换为项目绑定知识库的 JSON 数组，没有时为 `[]`。`--knowledge-path-platform` 不为空时，知识目录取它；为空时走旧模式，取 `--knowledge-path`，即 `${pluginPath}/sys`。会话入口把选出的目录作为 `knowledgePath` 传给组装脚本。未启用知识模块时命令不带这两个参数，所以 minimal 示例不变；lite、fullstack 示例的会话入口命令已补上。session 模块要知道知识模块是否启用，所以 `ModuleContext` 增加 `enabled`。路径分隔符和其他宿主命令一样统一写 `/`，Windows 上同样可用。
 - **Q9.4 `deploy_units` 也带这两个参数（已定）。** `deploy_units`（`inspect_deploy_units.py`）解析知识目录中的清单、列出支持的发布单元，现在只接受 `--knowledge-path`，生成的命令不带参数，始终读 `${pluginPath}/sys`。DevClaw 自己维护知识时，清单在 DevClaw 的目录里，这条命令读到的就不是同一份。`deploy_units` 与会话入口一样带上这两个参数，按同样的规则选目录；output-spec.md §3.2、interfaces.md §3.3.8 和 lite、fullstack 示例的命令已补上。
 
 
@@ -835,7 +835,7 @@ def simulate(root: Path, *, feature: str = "demo", to: str | None = None, platfo
 
 核对结果（2026-11-03）：
 
-- 占位符：三个示例、三个平台的可执行命令中共 234 处占位符，全部符合 D2。按“先拆分、再逐个参数替换”和“先文本替换、再交给 shell 拆分”两种做法比较得到的参数：路径含空格、中文时两者相同；值以 `\` 结尾（例如 `C:\ws\`）时有 3 条命令不同，值中含 `"` 时有 4 条不同。`${knowledge-path}` 为空时两种做法都得到一个空参数（D53）；
+- 占位符：三个示例、三个平台的可执行命令中共 234 处占位符，全部符合 D2。按“先拆分、再逐个参数替换”和“先文本替换、再交给 shell 拆分”两种做法比较得到的参数：路径含空格、中文时两者相同；值以 `\` 结尾（例如 `C:\ws\`）时有 3 条命令不同，值中含 `"` 时有 4 条不同。`${knowledgePath}` 为空时两种做法都得到一个空参数（D53）；
 - demo_simulate.py 有 5 处按旧设计实现：从 `board_config.json` 的 `workflow.nodes` 取节点（D31 之后没有这一项）；用 `runtime.layout` 推导产物目录（D48 之后没有这个字段）；会话入口键名为 `session_context_inject`（D40 已改）；终态节点只有 `archived` 一个 checkpoint，`start, finish = node["checkpoints"]` 会抛异常；`--skip-validate` 调用 engine 的私有参数 `_skip_validate`，interfaces.md §4.6 的 `engine.transition` 没有这个参数。`demo/rehearse.py` 现在在第 4 步因读取 `runtime.layout` 中止；
 - v1 中 `flow.json` 的 `validate` 固定为 `null`，`workflow.json` 也不能写（input-config.md §2.5），simulate 不会执行任何校验命令；
 - lite、fullstack 启用了知识模块（`assembler = plugin`，声明了 `source`），示例中都没有 `sys/`，执行 `deploy_units` 会因清单不存在返回 `ok:false`；
@@ -852,7 +852,7 @@ def simulate(root: Path, *, feature: str = "demo", to: str | None = None, platfo
   - `.scaffold/` 原来拷贝 `schemas/` 下的全部文件（Q7.4），改为显式列出 6 个输入配置的 Schema，`schemas/host/` 不拷进插件。output-spec.md §1、本文 §7 已同步。
 - **Q11.4 生成结果过期时只报 warning（已定）。** simulate 不执行 load、lint：按 build-manifest 中 `inputs` 记录的键（包括 `<SKILL.md 路径>#description`）重算摘要，与记录不一致时报 warning `BUILD_STALE`，照常执行，`simulation.stale` 为 `true`。check 中 `BUILD_STALE` 仍是 error；lint 或漂移检查有 error 时，check 不跑契约测试，`contract.ran` 为 `false`：磁盘上的插件已经不对应当前配置，跑出来的失败多半是噪声。input-config.md §7.2 已注明 simulate 中的级别。
 - **Q11.5 v1 去掉 `--skip-validate`（已定）。** v1 不执行校验命令，这个参数没有作用；demo 为了实现它绕过命令行入口调用 engine 的私有参数，也不符合“按宿主的方式调用”。等 `validate` 开放（v2）时再加。check 的契约测试与 simulate 走完全相同的流程。interfaces.md §1.1、§1.5，README §5，本文 §10 已同步。
-- **Q11.6 在插件的拷贝上执行（已定）。** simulate 先按打包清单（output-spec.md §1）把插件拷到 `<tmp>/plugin`，`${pluginPath}` 指向这份拷贝；`sys/` 存在时一并拷贝（声明了 `source` 时相当于已经执行过 `pull_knowledge`）。DevClaw 运行的是打包后的插件，其中没有核心配置和 `inactive` 文件，在拷贝上执行才能发现脚本误读了这些文件；运行中生成的 `__pycache__/`、collector 首次运行时的 `npm install` 也都落在临时目录，插件目录不被修改。interfaces.md §1.5 的“不访问网络”不包括内置知识组装脚本调用的 collector（`collect-knowledge.js`），已注明。
+- **Q11.6 在插件的拷贝上执行（已定）。** simulate 先按打包清单（output-spec.md §1）把插件拷到 `<tmp>/plugin`，`${pluginPath}` 指向这份拷贝；`sys/` 存在时一并拷贝（声明了 `source` 时相当于已经执行过 `pull_knowledge`）。DevClaw 运行的是打包后的插件，其中没有核心配置和 `inactive` 文件，在拷贝上执行才能发现脚本误读了这些文件；运行中生成的 `__pycache__/`、simulate 中产生的其他运行期文件也都落在临时目录，插件目录不被修改。interfaces.md §1.5 的“不访问网络”不包括内置知识组装脚本调用的 collector（`collect-knowledge.js`），已注明。
 - **Q11.7 按调用方注入环境变量（已定）。** 脚手架作为独立脚本运行，不在项目会话中，环境里没有 `FEATURE_ID`、`AUTOBIZ_BOARD_ENDPOINT` 这些变量，不需要清理。注入按 interfaces.md §3.4 区分调用方：宿主命令只带参数，不注入会话变量；状态维护片段的命令注入 `PLUGIN_WORKSPACE`、`PROJECT_DIR`、`FEATURE_ID`、`SESSION_ID=simulate`。demo 给所有调用都注入，会掩盖宿主命令依赖环境变量而不是参数的错误。
 - **Q11.8 补全执行步骤（已定）。** interfaces.md §1.5 已改写：`create_project`、`create_feature` 各执行两次检查幂等；节点列表取 `project_status` 输出的 `workflow.nodes`，产物目录取 `create_feature` 输出的 `featureDir`；知识目录中没有清单时 `deploy_units` 只报 warning；节点的推进执行技能 SKILL.md 中状态维护片段的命令，只为必需输出写桩内容，终态节点只推进到 `archived`；只读命令执行前后比较临时工作区；`--to` 在执行前对照 `flow.json` 的 checkpoint 链检查。
 - **Q11.9 解释器按平台配置（已定）。** 宿主命令照 `board_config.json` 中所选平台的命令执行。状态维护片段固定写 `python`（D40），simulate 执行时把它换成所选平台在 `board.target.python` 中配置的解释器：darwin、linux 取 `posix`（默认 `python3`），win32 取 `win32`（默认 `python`）。这个值从 `board_config.json` 中该平台的命令取得，不读核心配置。解释器在 PATH 上找不到时改用脚手架自己的解释器，报 warning `INTERPRETER_MISSING`：DevClaw 在这台机器上执行同样会失败。
@@ -992,13 +992,13 @@ CLI 不提供 `upgrade`：脚手架更新后，由 doctor 替换 managed、modul
 - **Q13.3 脚手架发布成一个 zipapp 文件（已定）。** 脚手架只用标准库，用 `tools/make_pyz.py` 打成一个文件 `autobiz-plugin.pyz`，执行方式为 `python3 autobiz-plugin.pyz <命令>`（Windows 上为 `python …` 或 `py -3 …`），文档中的 `autobiz-plugin` 指的就是它。插件开发技能在 `scripts/` 下带同一个 `.pyz`（Q14.2 随之确定）。理由：Windows 上 pip 安装的入口在 `Scripts\` 下，常常不在 PATH 中；内网环境拷贝一个文件即可使用；技能和 CLI 始终是同一个版本。包内的 `runtime/`、模块文件、Schema 和种子用 `importlib.resources` 读取，已在 3.9.6 上验证。缺点是没有直接可用的 `autobiz-plugin` 命令，以后需要时再加包装脚本。
 - **Q13.4 zip 的顶层目录（已定，待 DevClaw 确认）。** zip 中只有一个顶层目录 `<plugin.id>/`，插件文件都在它下面，DevClaw 由它得到安装目录名。已记入 README §9，README §2.3 中过时的“元数据目录名”已改掉。
 - **Q13.5 打包规则（已定）。** 写入 output-spec.md §1：
-  - `plugin.json`、`board_core/`、`runtime/` 只收 build-manifest 记录的文件（标了 `inactive` 的除外）和 build-manifest 本身。这些区域本来就由记录显式列出，`node_modules/`、`__pycache__/` 等其他文件不会进包，没收进的文件列在 `package.skipped` 中；
+  - `plugin.json`、`board_core/`、`runtime/` 只收 build-manifest 记录的文件（标了 `inactive` 的除外）和 build-manifest 本身。这些区域本来就由记录显式列出，`__pycache__/` 等其他文件不会进包（doctor 安装的 `runtime/knowledge/node_modules/` 例外，见 Q13.6），没收进的文件列在 `package.skipped` 中；
   - `skills/`、`hooks/`、`agents/` 整个打包，跳过 `__pycache__/`、`*.pyc`、`.DS_Store`、`Thumbs.db`；
   - `plugin.mcpServers`、`plugin.hooks` 引用的文件按实际路径打包，文件不存在时报 error `PLUGIN_REF_MISSING`（lint 规则，check、package 同样报出）；
   - `sys/` 只在启用知识模块、并且没有声明 `source` 时打包；
   - zip 条目按路径排序、时间戳固定、路径用 `/`，同一个插件每次打出的 zip 相同；
   - `--json` 的 `package` 字段为 `{"path", "skipped"}`。
-- **Q13.6 Node 依赖仍待定（已定）。** README §9 第 7 条不在本单元决定。在它定下之前，按 Q13.5，package 不执行 `npm install`，也不会带上 `node_modules/`；以后决定随包带上时，由知识模块把它登记进 build-manifest。
+- **Q13.6 Node 依赖（已定，2026-11-05 修订）。** 本单元评审时 README §9 第 7 条待定，package 不执行 `npm install`、不带 `node_modules/`。现已定为 doctor 写盘后由知识模块安装（`Module.prepare`），package 本身仍不执行 `npm install`；`node_modules/` 不登记进 build-manifest（逐个记录第三方文件的摘要会让漂移检查失去意义），打包时按目录整个带上。
 
 ## 14. 插件开发技能
 

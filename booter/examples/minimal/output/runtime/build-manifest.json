@@ -45,7 +45,7 @@
     },
     "board_core/board_config.json": {
       "ownership": "generated",
-      "sha256": "sha256:67be9f8c6c666741e2720a48c5ec0065c2f8112840e9d1fbc0d776487dc06590"
+      "sha256": "sha256:140d8118dcf3a0849d6c45a020a668a65894cd6a5b3fe7af386e66e2e5af1ba9"
     },
     "board_core/modules.json": {
       "ownership": "generated",

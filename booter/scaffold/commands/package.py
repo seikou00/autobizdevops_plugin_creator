@@ -12,6 +12,7 @@ from scaffold.lib.tree import Tree
 
 RECORDED_ROOTS = ("plugin.json", "board_core/", "runtime/")
 WHOLE_DIRS = ("skills", "hooks", "agents")
+NODE_MODULES = "runtime/knowledge/node_modules"
 SKIPPED_NAMES = ("__pycache__", ".DS_Store", "Thumbs.db")
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 
@@ -49,6 +50,11 @@ def collect(root: Path, entry: dict, manifest: dict | None, *, knowledge_enabled
             rel = ref[2:] if ref.startswith("./") else ref
             if (root / rel).is_file():
                 files.add(rel)
+    if knowledge_enabled:
+        # collector 的 Node 依赖由 doctor 安装，不归 build-manifest 记录，整个目录随包带上（README §9 第 7 条）
+        for path in tree.walk(NODE_MODULES):
+            if not _skipped(path):
+                files.add(path)
     if knowledge_enabled and not knowledge_source:
         files.update(path for path in tree.walk("sys") if not _skipped(path))
     return sorted(files), sorted(set(skipped) - files)

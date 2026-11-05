@@ -61,6 +61,14 @@ class Module:
     def contribute(self, ir, options: dict, ctx: ModuleContext):
         raise NotImplementedError
 
+    def prepare(self, root: Path, options: dict, *, install: bool) -> list:
+        """生成之后准备插件的运行环境（例如安装 Node 依赖），返回 warning 列表。
+
+        doctor 写盘后以 install=True 调用，可以访问网络、写插件目录下不归 build-manifest 记录的文件；
+        check 以 install=False 调用，只检查不安装。
+        """
+        return []
+
 
 @lru_cache(maxsize=None)
 def discover() -> dict:

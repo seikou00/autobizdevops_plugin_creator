@@ -53,8 +53,8 @@ mods.md 中的 P0/P1/P2 是 mod 能力自己的分档，与本文无关。
 | 功能点 | 依据 |
 |---|---|
 | board：三平台 `inspectCommands`（一律 `-X utf8`）、`modules.json`（含 `boardEvents` 和固定开启的知识沉淀入口 `knowledge_config`）、`runtime/config/board.json` | D31、D33、D40 |
-| session：默认会话入口 `render_session_context.py`（流程上下文、`agentConfig`、知识段），`session.policies`，宿主命令键 `session_collector_context_inject` | D35、D40、D44 |
-| knowledge：`inspect_deploy_units.py`（`deploy_units`）、内置组装脚本和 `collect-knowledge.js`、声明 `source` 时的 `sync_knowledge.py`（`pull_knowledge`）、`${knowledge-path}`；没有 Node 时退回清单映射和 `AGENTS.md` | D26、D53 |
+| session：默认会话入口 `render_session_context.py`（流程上下文、`agentConfig`、知识段），`session.policies`，宿主命令键 `session_context_inject` | D35、D40、D44 |
+| knowledge：`inspect_deploy_units.py`（`deploy_units`）、内置组装脚本和 `collect-knowledge.js`、声明 `source` 时的 `sync_knowledge.py`（`pull_knowledge`）、`${knowledgePath}`；没有 Node 时退回清单映射和 `AGENTS.md` | D26、D53 |
 | artifactSync：按节点生成 `stages`、同步配置 `artifact-sync.json`（`schemaVersion: 3`，兼容读取 v1、v2）、同步技能、看板入口 `artifact_sync`、工号确认；通过 `runtime.common.query` 定位 Feature 目录，不再写死 `.autobizdevops` | D30、D35、README §6.3 |
 
 ### 2.5 测试
@@ -115,7 +115,7 @@ mods.md 中的 P0/P1/P2 是 mod 能力自己的分档，与本文无关。
 | 看板数据中的产物路径数组 `paths` | 第 9 条 | P0 |
 | 看板事件服务、`AUTOBIZ_BOARD_ENDPOINT` 注入、读取 `boardEvents` | 第 10 条 | P0；插件侧不依赖它也能工作 |
 | zip 的顶层目录作为安装目录名 | 第 11 条 | P0 |
-| 内置组装脚本的 Node 依赖 | 第 7 条 | P0（知识模块） |
+| 内置组装脚本的 Node 依赖 | 第 7 条 | 已定（2026-11-05）：doctor 安装、随包带上 |
 | 产物同步的服务端路径是否加 `pluginId` | 第 1 条 | P0（产物同步模块） |
 | 全栈版已有项目的状态接续 | 第 3 条 | P1 |
 
@@ -143,7 +143,7 @@ P1 中定下的新决策：全栈版已有项目的状态接续（D60，README �
 | `BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` | 在模块规则之后报，不挡住模块规则 | 改完配置后最常见的就是过期；按 D47 的两段式，lint 此时只报“过期”，模块配置的问题要等 doctor 才看得到。过期不影响 IR 是否可靠 |
 | `add skill --from` | 目标目录里只有 doctor 生成的空白 `SKILL.md` 时允许覆盖导入 | `new` 会为每个节点生成空白 `SKILL.md`，否则 interfaces.md §1.4 的迁移路径（先 `new`、再 `add skill --from`）走不通 |
 | 编辑命令写入的新内容 | 跟随同级元素的写法；新写的对象逐个键换行，只含标量的数组写在一行 | 与示例的手排格式一致；原有内容的字节不变 |
-| 内置知识组装脚本 | 缺 `gray-matter` 时不执行 `npm install`，直接按清单映射加载 | 会话入口不得写文件（interfaces.md §3.1）；Node 依赖仍待定（README §9 第 7 条） |
+| 内置知识组装脚本 | 缺 `gray-matter` 时不执行 `npm install`，直接按清单映射加载 | 会话入口不得写文件（interfaces.md §3.1）；依赖由 doctor 安装、随包带上，失败报 `KNOWLEDGE_NODE_DEPS`（README §9 第 7 条） |
 | 内置知识组装脚本 | 按全栈版的结构（`<SCOPE>`、`<SYSTEM>`、`<UNIT>`、`<DOMAIN_CONTEXT>`）重写，没有逐行移植 | 全栈版的脚本依赖 1100 多行的旧会话入口；已用清单映射和本地 `AGENTS.md` 验证，collector 分支还没有在装了 `gray-matter` 的环境中跑过 |
 | 产物同步技能 | 带上全栈版共享的 `references/ask-user-question.md` | 技能正文引用了它，原来在 `skills/references/` 下，单独拷出技能后链接会断 |
 | 运行框架目录 | 各级 `__init__.py`、`runtime/knowledge/__init__.py` 记入 build-manifest | 避免其他同名的 `runtime` 包遮住插件的包；三个示例的 build-manifest 已补上（摘要写作 `…`） |

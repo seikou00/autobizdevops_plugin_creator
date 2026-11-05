@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from scaffold.build.contribute import CommandSpec, Contribution, FileSpec
 from scaffold.modules import Module
+from scaffold.modules.knowledge import node_deps
 
 ROOT = "sys"
 ASSEMBLER = "runtime/knowledge/render_collected_session_context.py"
-KNOWLEDGE_ARGS = '--knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledge-path}"'
+KNOWLEDGE_ARGS = '--knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledgePath}"'
 
 
 def knowledge_config(options: dict) -> dict:
@@ -37,7 +38,7 @@ class KnowledgeModule(Module):
         files = [module_file("__init__.py"), module_file("inspect_deploy_units.py")]
         if plugin_assembles:
             files += [module_file("render_collected_session_context.py", replaceable=True),
-                      module_file("collect-knowledge.js")]
+                      module_file("collect-knowledge.js"), module_file("package.json")]
         if source:
             files.append(module_file("sync_knowledge.py"))
         commands = {
@@ -52,3 +53,9 @@ class KnowledgeModule(Module):
         return Contribution(files=files, manifest={"assembler": assembly.get("assembler"), "source": source},
                             runtime_config={"knowledge": knowledge_config(options)}, inspect_commands=commands,
                             knowledge_assembly=knowledge_assembly)
+
+    def prepare(self, root, options, *, install):
+        """内置组装脚本的 collector 依赖 Node 包：doctor 时安装缺少的，check 时只提醒（README §9 第 7 条）。"""
+        if options.get("assembly", {}).get("assembler") != "plugin":
+            return []
+        return node_deps.prepare(root, install_missing=install)

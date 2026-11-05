@@ -42,7 +42,7 @@
 │   │   ├── board_events.py               # managed    写入口提交后推送看板事件（interfaces.md §3.5）
 │   │   └── board_view.py                 # managed    看板数据拼装，读取命令、会话入口与看板事件共用（D59）
 │   ├── session/
-│   │   └── render_session_context.py     # managed    DevClaw 会话机制（session_collector_context_inject）
+│   │   └── render_session_context.py     # managed    DevClaw 会话机制（session_context_inject）
 │   ├── knowledge/                        # module     知识模块，启用时生成
 │   │   ├── inspect_deploy_units.py       #            解析知识清单，提供支持的系统和发布单元
 │   │   ├── render_collected_session_context.py  #     内置知识组装脚本（assembler = plugin 时）
@@ -66,7 +66,7 @@
 
 | 内容 | 规则 |
 |---|---|
-| `plugin.json`、`board_core/`、`runtime/` | 只收 build-manifest 记录的文件（标了 `inactive` 的除外，§8）和 `runtime/build-manifest.json` 本身。`node_modules/`、`__pycache__/` 等没有记录的文件不打包，列在 `--json` 输出的 `package.skipped` 中 |
+| `plugin.json`、`board_core/`、`runtime/` | 只收 build-manifest 记录的文件（标了 `inactive` 的除外，§8）和 `runtime/build-manifest.json` 本身。`__pycache__/` 等没有记录的文件不打包，列在 `--json` 输出的 `package.skipped` 中；例外是启用知识模块时 doctor 安装的 `runtime/knowledge/node_modules/`，整个目录随包带上（README §9 第 7 条） |
 | `skills/`、`hooks/`、`agents/`（存在时） | 整个目录打包，跳过 `__pycache__/`、`*.pyc`、`.DS_Store`、`Thumbs.db` |
 | 清单引用的文件 | `plugin.mcpServers` 引用的文件按实际路径打包；文件不存在时 lint 报 `PLUGIN_REF_MISSING`。`hooks/hooks.json` 随 `hooks/` 目录打包 |
 | 知识目录 `sys/` | 只在启用知识模块、并且没有声明 `knowledge.source` 时打包（此时视为开发者提供的资源）；声明了 `source` 时它是运行期缓存，不打包 |
@@ -130,9 +130,9 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
 | `plugin_dir_hook` | `${pluginWorkspace}/${projectDir}` | 必有 |
 | `dialog_tips` | `board.display.dialogTips` | 必有 |
 | `system_prompt_inject` | `board.display.systemPromptInject` | 必有 |
-| `session_collector_context_inject` | `{py} "${pluginPath}/runtime/session/render_session_context.py" --platform <platform> --plugin-workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path "${sessionWorkspacePath}"`；启用知识模块时末尾再加 `--knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledge-path}"`（D53） | 必有 |
+| `session_context_inject` | `{py} "${pluginPath}/runtime/session/render_session_context.py" --platform <platform> --plugin-workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" --selected-deployUnit ${selectedDeployUnits} --session-workspace-path "${sessionWorkspacePath}"`；启用知识模块时末尾再加 `--knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledgePath}"`（D53） | 必有 |
 | `knowledge_path` | `${pluginPath}/sys` | 知识模块 |
-| `deploy_units` | `{py} "${pluginPath}/runtime/knowledge/inspect_deploy_units.py" --knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledge-path}"`（D53） | 知识模块；DevClaw 由它取得支持的发布单元。键名待与 DevClaw 确认（README §9） |
+| `deploy_units` | `{py} "${pluginPath}/runtime/knowledge/inspect_deploy_units.py" --knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledgePath}"`（D53） | 知识模块；DevClaw 由它取得支持的发布单元。键名待与 DevClaw 确认（README §9） |
 | `pull_knowledge` | `{py} "${pluginPath}/runtime/knowledge/sync_knowledge.py"` | 声明 `knowledge.source` |
 | `skip_node` | `{py} "${pluginPath}/runtime/adapters/skip_node.py" --workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" --node "${nodeId}"` | `flow.json` 的 `skip` 不为 `null`（v1 不会出现） |
 
@@ -529,6 +529,7 @@ description: [TODO: 做什么；在什么情况下使用]
 | `runtime/knowledge/inspect_deploy_units.py` | lite `agents_repo.py` | 启用即生成 | 按 `manifest.format` 解析知识清单，输出支持的系统和发布单元（interfaces.md §3.3.8） |
 | `runtime/knowledge/render_collected_session_context.py` | 全栈版 `render_collected_session_context.py`，去掉流程上下文和运行策略部分 | `assembler = plugin` | 内置组装脚本（interfaces.md §4.5）：调用 `collect-knowledge.js` 按所选发布单元组装知识；collector 不可用或单元未命中时按清单映射加载，最后回退 `<localRepoPath>/AGENTS.md`；始终读取 `<sessionWorkspacePath>/AGENTS.md`。插件可以替换这个文件，被替换后 doctor 保留插件的版本，脚手架更新后替换运行框架时也一样（README §4） |
 | `runtime/knowledge/collect-knowledge.js` | 全栈版 `collect-knowledge.js` | `assembler = plugin` | collector：列出支持的发布单元、按单元恢复知识，依赖 Node 和 `gray-matter` |
+| `runtime/knowledge/package.json` | 脚手架 | `assembler = plugin` | collector 的 Node 依赖清单；doctor 写盘后在同目录执行 `npm install --omit=dev`，失败报 `KNOWLEDGE_NODE_DEPS` warning |
 | `runtime/knowledge/sync_knowledge.py` | lite `sync_agents.py` | 声明 `source` | 按 `runtime/config/knowledge.json` 的 `source` 克隆知识仓库到 `root`：先在临时目录克隆并校验清单，成功后再替换；HTTPS 失败时回退 SSH。不回写任何配置文件 |
 
 另外会在 `inspectCommands` 中加入 `knowledge_path`、`deploy_units`（声明 `source` 时再加 `pull_knowledge`），在 `modules.json` 中写入知识模块的开启信息，生成 `runtime/config/knowledge.json`，在 `session.json` 中写入 `knowledgeAssembly`（仅 `assembler = plugin`，§5.4）。

@@ -1,4 +1,4 @@
-"""默认会话入口 session_collector_context_inject（interfaces.md §3.3.7）。
+"""默认会话入口 session_context_inject（interfaces.md §3.3.7）。
 
 按顺序拼装：流程上下文（始终生成）→ 知识组装结果（知识模块启用且 assembler = plugin）。
 运行策略按“nextAction 目标节点 → 当前节点 → 全局默认”三级降级，映射为 agentConfig。
@@ -136,7 +136,10 @@ def assemble_knowledge(args, project, feature, units, flow, config, messages):
     assembly = query.load_session().get("knowledgeAssembly")
     if not assembly:
         return "", []
-    knowledge_path = args.knowledge_path_platform or args.knowledge_path or ""
+    from runtime.knowledge.inspect_deploy_units import choose_knowledge_dir
+
+    unit_ids = [unit["deployUnitId"] for unit in units if isinstance(unit.get("deployUnitId"), str)]
+    knowledge_path = str(choose_knowledge_dir(args.knowledge_path, args.knowledge_path_platform, unit_ids))
     request = {"schema": REQUEST_SCHEMA, "platform": args.platform, "pluginRoot": str(ROOT),
                "pluginWorkspace": args.plugin_workspace or "", "project": args.project or "", "feature": feature or "",
                "featureDir": flow["featureDir"], "selectedDeployUnits": units,
@@ -206,7 +209,7 @@ def render(args) -> dict:
 
 
 def main(argv=None) -> int:
-    parser = cli.ArgumentParser(description="生成会话内容（session_collector_context_inject）")
+    parser = cli.ArgumentParser(description="生成会话内容（session_context_inject）")
     parser.add_argument("--platform", default=sys.platform if sys.platform in ("darwin", "win32") else "linux")
     parser.add_argument("--plugin-workspace")
     parser.add_argument("--project")

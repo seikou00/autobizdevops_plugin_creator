@@ -86,11 +86,11 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 | R6 | 看板刷新与产物实时刷新 | 推进成功后通知 DevClaw 刷新看板；会话中的 Write 落在 `FEATURE_DIR` 下时，防抖后通知刷新产物状态 | 可以替代 D21 的本机服务，还顺带实现了 D21 推迟的“产物实时刷新”：那项功能本来就需要知道模型写了哪些文件，运行 mod 正好能看到 | P1，前提是 DevClaw 给 mod 提供看板接口；没有就按 D21 做 | 按 D21 实现本机服务 |
 | R7 | 下一步建议 | 节点完成后，把下一个节点的技能（如 `/doc-review`）放进输入框的建议里，按 Tab 采用 | — | P2 | 在看板上点下一个节点 |
 | R8 | 开发者扩展 | `entry.ts` 静态导入 `hooks/extension.ts`，开发者可以加自己的面板、命令、守卫 | 给开发者的自由度出口，不用改托管代码 | P2，按需开放：扩展是插件里的任意代码，要和 DevClaw 的权限、审核策略一起定 | 只能用命令钩子 |
-| R9 | 知识按需加载 | 会话开始只注入知识索引；模型第一次触达某个发布单元的代码时，附上该单元的知识；节点技能展开时附上节点声明的知识；会话开始时检查知识仓库是否过期，后台同步；引导知识沉淀。组装逻辑仍在 `runtime/knowledge/` 的 Python 中，规则见 §2.4 | 知识占用的上下文从“选了几个单元就全部加载”降到“用到哪个加载哪个”；不用再手动 `pull_knowledge` | P1：现有一次性注入能用，但发布单元多、知识大时挤占上下文，且大部分用不到 | 继续由 `session_collector_context_inject` 一次性注入四层知识 |
+| R9 | 知识按需加载 | 会话开始只注入知识索引；模型第一次触达某个发布单元的代码时，附上该单元的知识；节点技能展开时附上节点声明的知识；会话开始时检查知识仓库是否过期，后台同步；引导知识沉淀。组装逻辑仍在 `runtime/knowledge/` 的 Python 中，规则见 §2.4 | 知识占用的上下文从“选了几个单元就全部加载”降到“用到哪个加载哪个”；不用再手动 `pull_knowledge` | P1：现有一次性注入能用，但发布单元多、知识大时挤占上下文，且大部分用不到 | 继续由 `session_context_inject` 一次性注入四层知识 |
 
 刻意不放进运行 mod 的：
 
-- **用修改系统提示来注入流程上下文**：每次状态变化都改系统提示，会让整个提示缓存失效，成本高。会话开始时仍由 `session_collector_context_inject` 注入，之后的变化通过技能展开（R2）和 `update_state.py` 的返回结果送达；
+- **用修改系统提示来注入流程上下文**：每次状态变化都改系统提示，会让整个提示缓存失效，成本高。会话开始时仍由 `session_context_inject` 注入，之后的变化通过技能展开（R2）和 `update_state.py` 的返回结果送达；
 - **由 mod 提供看板读取**：没有会话时看板也要显示，而 mod 是随会话加载的（待确认，§6）。
 
 ### 2.3 状态推进：不放在 mod 中
@@ -109,7 +109,7 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 
 ### 2.4 知识按需加载（R9）
 
-现在的问题：启用知识模块且 `assembler = plugin` 时，`session_collector_context_inject` 在会话开始时把系统级、单元级、会话工作区、领域词汇表四层知识一次性并入 `sessionContext`（[output-spec.md §7.1](output-spec.md)）。选了多个发布单元时，大部分单元级知识在这个会话里用不到，却一直占着上下文；知识仓库要靠 `pull_knowledge` 手动同步；知识沉淀要人想起来去看板上发起。
+现在的问题：启用知识模块且 `assembler = plugin` 时，`session_context_inject` 在会话开始时把系统级、单元级、会话工作区、领域词汇表四层知识一次性并入 `sessionContext`（[output-spec.md §7.1](output-spec.md)）。选了多个发布单元时，大部分单元级知识在这个会话里用不到，却一直占着上下文；知识仓库要靠 `pull_knowledge` 手动同步；知识沉淀要人想起来去看板上发起。
 
 目标：知识在用到时才进入会话，同步和沉淀不依赖人记得操作。清单解析和组装逻辑不变，仍由知识组装脚本完成（默认为内置的 `render_collected_session_context.py`），只保留一份实现；运行 mod 只决定**什么时候、加载哪一部分**。
 
@@ -124,12 +124,12 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 
 | 时机 | 触发事件 | 加载内容 | 说明 |
 |---|---|---|---|
-| 会话开始 | `session_collector_context_inject`（仍由 DevClaw 调用） | 系统级知识、领域词汇表、会话工作区层，加上所选发布单元的索引（每个单元一行：ID、名称、描述、`localRepoPath`） | 只在会话开始注入一次，不改系统提示，不影响提示缓存（见 §2.2“刻意不放进运行 mod 的”） |
+| 会话开始 | `session_context_inject`（仍由 DevClaw 调用） | 系统级知识、领域词汇表、会话工作区层，加上所选发布单元的索引（每个单元一行：ID、名称、描述、`localRepoPath`） | 只在会话开始注入一次，不改系统提示，不影响提示缓存（见 §2.2“刻意不放进运行 mod 的”） |
 | 触达发布单元 | Read、Grep、Glob、Edit、Write 的执行后钩子：路径落在某个所选单元的 `localRepoPath` 下 | 该单元的单元级知识，附在这次工具结果的附加上下文里 | 每个单元每个会话只附一次，记录在会话内存储中。类似 Claude Code 进入子目录时加载该目录的 CLAUDE.md。Bash 命令只能按文本识别路径，尽力而为 |
 | 模型主动查询 | 注册只读工具 `knowledge_lookup(unit, topic?)`，自动放行 | 指定单元的知识；带 `topic` 时只返回匹配的段落 | 覆盖钩子识别不到的情况，例如模型还没读代码就要先了解某个单元 |
 | 节点技能展开 | 与 R2 同一个钩子 | 节点声明的知识：`knowledge.nodes.<节点 id>.include`，知识目录下的相对路径，可用 `${deployUnitId}` 对所选单元逐个展开 | 例如需求分析节点固定带上业务规则文档。未声明时不附加 |
 
-`knowledge_lookup` 和钩子都调用新增的 `runtime/knowledge/lookup.py`，它复用组装器的分层读取，只按单元或主题取一部分。`session_collector_context_inject` 在 `lazy` 下调用组装器的索引模式，`agentmdLoadStatus` 中未加载的单元标为 `"deferred": true`，DevClaw 照常显示。
+`knowledge_lookup` 和钩子都调用新增的 `runtime/knowledge/lookup.py`，它复用组装器的分层读取，只按单元或主题取一部分。`session_context_inject` 在 `lazy` 下调用组装器的索引模式，`agentmdLoadStatus` 中未加载的单元标为 `"deferred": true`，DevClaw 照常显示。
 
 **同步**（声明了 `knowledge.source` 时）：
 
@@ -148,7 +148,7 @@ DevClaw 底层是类 Claude Code 的工具，提供 mods 机制：插件可以�
 - `assembler = devclaw`：知识段由 DevClaw 组装，运行 mod 只提供 `knowledge_lookup` 和沉淀引导，不改会话开始的注入；
 - 组装逻辑本身：不用 TS 重写，理由同 §1 原则 3。
 
-**依赖**：运行 mod 要知道本会话选了哪些发布单元。现在 `create_feature` 不保存发布单元，每次会话由宿主作为参数传给 `session_collector_context_inject`（[interfaces.md §3.3.7](interfaces.md)），mod 拿不到。需要 DevClaw 提供（§6 第 11 项）。
+**依赖**：运行 mod 要知道本会话选了哪些发布单元。现在 `create_feature` 不保存发布单元，每次会话由宿主作为参数传给 `session_context_inject`（[interfaces.md §3.3.7](interfaces.md)），mod 拿不到。需要 DevClaw 提供（§6 第 11 项）。
 
 ### 2.5 做不到或只能尽力而为的
 

@@ -11,7 +11,7 @@ FILE = "modules/session.json"
 SCRIPT = "runtime/session/render_session_context.py"
 ARGS = ('--platform {platform} --plugin-workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" '
         '--selected-deployUnit ${selectedDeployUnits} --session-workspace-path "${sessionWorkspacePath}"')
-KNOWLEDGE_ARGS = ' --knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledge-path}"'
+KNOWLEDGE_ARGS = ' --knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledgePath}"'
 
 
 def policies(options: dict) -> dict:
@@ -58,4 +58,4 @@ class SessionModule(Module):
                  FileSpec(SCRIPT, "managed", src=SCRIPT)]
         config = {"schema": "autobiz.session.v1", "policies": policies(options), "knowledgeAssembly": None}
         return Contribution(files=files, runtime_config={"session": config},
-                            inspect_commands={"session_collector_context_inject": CommandSpec(SCRIPT, args)})
+                            inspect_commands={"session_context_inject": CommandSpec(SCRIPT, args)})

@@ -18,7 +18,7 @@ if str(ROOT) not in sys.path:
 
 import json  # noqa: E402
 from dataclasses import dataclass  # noqa: E402
-from typing import Dict, Optional, Tuple  # noqa: E402
+from typing import Dict, List, Optional, Sequence, Tuple  # noqa: E402
 
 SCHEMA_VERSION = "autobizdevops.deploy-units.v1"
 AGENTS_MD = "AGENTS.md"
@@ -67,10 +67,50 @@ def manifest_settings() -> Tuple[str, str]:
     return manifest.get("format", "agents-manifest-v1"), manifest.get("path", "agents.manifest.json")
 
 
-def choose_knowledge_dir(knowledge_path: Optional[str], platform_path: Optional[str]) -> Path:
-    """--knowledge-path-platform 不为空时取它（DevClaw 维护的目录），否则取 --knowledge-path（D53）。"""
-    chosen = (platform_path or "").strip() or (knowledge_path or "").strip()
-    if not chosen:
+def platform_candidates(raw: Optional[str]) -> List[str]:
+    """把 --knowledge-path-platform 展开为候选目录。
+
+    DevClaw 把 ${knowledgePath} 替换为项目绑定知识库的 JSON 数组 [{"id", "name", "path"}]，没有时为 "[]"；
+    也接受单个目录。宿主没有替换的 ${...} 视同未传。
+    """
+    value = (raw or "").strip()
+    if not value or "${" in value:
+        return []
+    if not value.startswith("["):
+        return [value]
+    try:
+        entries = json.loads(value)
+    except ValueError:
+        return []
+    if not isinstance(entries, list):
+        return []
+    paths = [entry["path"].strip() for entry in entries
+             if isinstance(entry, dict) and isinstance(entry.get("path"), str)]
+    return [path for path in paths if path and "${" not in path]
+
+
+def _lists_any(knowledge_dir: Path, unit_ids: Sequence[str]) -> bool:
+    try:
+        return any(unit_id in unit_pairs(load_manifest(knowledge_dir, strict_duplicates=False)) for unit_id in unit_ids)
+    except (AgentsManifestError, OSError):
+        return False
+
+
+def choose_knowledge_dir(knowledge_path: Optional[str], platform_path: Optional[str],
+                         unit_ids: Sequence[str] = ()) -> Path:
+    """--knowledge-path-platform 有可用目录时取它（DevClaw 维护的知识库），否则取 --knowledge-path（D53）。
+
+    DevClaw 绑定了多个知识库时，优先取清单中登记了所选发布单元的那个，否则取第一个。
+    """
+    candidates = [Path(path).expanduser() for path in platform_candidates(platform_path)]
+    if unit_ids:
+        for candidate in candidates:
+            if _lists_any(candidate, unit_ids):
+                return candidate
+    if candidates:
+        return candidates[0]
+    chosen = (knowledge_path or "").strip()
+    if not chosen or "${" in chosen:
         chosen = str(ROOT / knowledge_config().get("root", "sys"))
     return Path(chosen).expanduser()
 

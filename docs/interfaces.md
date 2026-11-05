@@ -81,7 +81,7 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 ```
 
 - `file` 标明问题所在的文件（`workflow.json`、`plugin.scaffold.json`、`modules/board.json`，或 `skills/autodev-plan/SKILL.md` 这类资源文件）；`pointer` 是该文件内的 JSON Pointer，问题出在文件层面时为空；
-- `code` 的取值见 input-config.md §7.2、§7.3，此外还有 `MODULE_CONFLICT`（§2.3）、doctor 的 `CHECKPOINT_REMOVED` 和 `DOCTOR_BASELINE_MISSING`（§1.7）、simulate 的 `INTERPRETER_MISSING` 和 `KNOWLEDGE_MANIFEST_MISSING`（§1.5）、用法错误的 `USAGE`（§1.2）；
+- `code` 的取值见 input-config.md §7.2、§7.3，此外还有 `MODULE_CONFLICT`（§2.3）、doctor 的 `CHECKPOINT_REMOVED` 和 `DOCTOR_BASELINE_MISSING`（§1.7）、知识模块 collector 的 Node 依赖没有装上时 doctor、check 报的 warning `KNOWLEDGE_NODE_DEPS`（§4.5）、simulate 的 `INTERPRETER_MISSING` 和 `KNOWLEDGE_MANIFEST_MISSING`（§1.5）、用法错误的 `USAGE`（§1.2）；
 - `issues` 按文件、位置、code 稳定排序（D43）：文件依次为入口文件、`workflow.json`、`modules/` 下的 board、session、knowledge、artifactSync，其余按路径；同一文件内按 `pointer` 逐段比较，数字段按数值比较；最后按 `code`；
 - 各命令在通用结构之外的附加字段（D54）：`doctor` 加 `changes`（§1.7），`check` 加 `contract`（契约测试的结果），`simulate` 加 `simulation`（§1.5），`module list` 加 `modules`（各模块的版本和启用状态），`package` 加 `package`（`{"path": 生成的 zip, "skipped": [没有打包的文件]}`，output-spec.md §1，D57）；`add skills` 成功时加 `importedSkills`（已导入的技能名数组）；`lint`、其他 `add`、`module enable`/`disable`、`new` 没有附加字段；
 - 不加 `--json` 时输出同样内容的可读文本，按文件和位置分组。
@@ -179,13 +179,13 @@ simulate 在临时目录中扮演 DevClaw，调用一遍已经生成的插件，
 1. 准备：按 output-spec.md §1 的打包清单把插件拷到 `<tmp>/plugin`（`sys/` 存在时一并拷贝），创建工作区 `<tmp>/ws/<project>`。`--platform` 缺省为当前平台，`board_config.json` 中没有该平台的命令时报用法错误；`--to` 不是 `flow.json` 中的 checkpoint 时同样报用法错误。核心配置或节点技能 `description` 的摘要与 build-manifest 中的记录不一致时报 warning `BUILD_STALE`，照常执行；
 2. 建项目和 Feature：`create_project`、`create_feature`（`--selected-deployUnit` 传 `[]`）各执行两次，第二次应返回 `created: false`，checkpoint 不变。`create_feature` 返回的 checkpoint 应为 `checkpoints.initial`，桩内容写到它返回的 `featureDir` 下；
 3. 读流程：`dynamic_workflow`、`project_status`。节点列表取 `project_status` 输出的 `workflow.nodes`，与 `dynamic_workflow` 的 checkpoint 链对照。启用知识模块时执行 `deploy_units`；知识目录中没有清单时（例如声明了 `knowledge.source` 但还没有执行 `pull_knowledge`）报 warning `KNOWLEDGE_MANIFEST_MISSING`，不算失败；
-4. 逐个节点：`session_collector_context_inject`（策略目标节点应为本节点）→ 执行该技能 SKILL.md 状态维护片段中的开始命令 → 为必需输出写入桩内容（glob 中的 `*`、`**` 换成 `demo`，`?` 换成 `x`；可选输出不写）→ 执行片段中的完成命令 → `feature_status`（本节点及之前的节点为 `done`，之后的为 `not_started`）。终态节点只有完成命令，推进到 `archived` 后它的状态为 `archived`；
+4. 逐个节点：`session_context_inject`（策略目标节点应为本节点）→ 执行该技能 SKILL.md 状态维护片段中的开始命令 → 为必需输出写入桩内容（glob 中的 `*`、`**` 换成 `demo`，`?` 换成 `x`；可选输出不写）→ 执行片段中的完成命令 → `feature_status`（本节点及之前的节点为 `done`，之后的为 `not_started`）。终态节点只有完成命令，推进到 `archived` 后它的状态为 `archived`；
 5. 只读命令（§3.1）执行前后比较临时工作区，有文件被创建或修改即失败；
 6. 每次输出都按 §3.3 的结构校验（Schema 在脚手架的 `schemas/host/outputs.schema.json`），最后打印节点状态表和失败原因。
 
 执行方式：
 
-- 宿主命令取 `board_config.json` 中所选平台的命令，先按 POSIX 规则拆成参数，再逐个参数替换占位符：`${projectDirs...}` 展开为多个参数，`${selectedDeployUnits}` 替换为一个参数，`${knowledge-path}` 替换为空字符串。宿主命令只带参数，不注入 §3.4 的会话变量，也不设 `AUTOBIZ_BOARD_ENDPOINT`，所以不推送看板事件；
+- 宿主命令取 `board_config.json` 中所选平台的命令，先按 POSIX 规则拆成参数，再逐个参数替换占位符：`${projectDirs...}` 展开为多个参数，`${selectedDeployUnits}` 替换为一个参数，`${knowledgePath}` 替换为空字符串。宿主命令只带参数，不注入 §3.4 的会话变量，也不设 `AUTOBIZ_BOARD_ENDPOINT`，所以不推送看板事件；
 - 状态维护片段中的命令开头固定写 `python`（output-spec.md §6.1），执行时换成所选平台在 `board.target.python` 中配置的解释器（darwin、linux 取 `posix`，win32 取 `win32`，即该平台宿主命令开头的解释器），再替换 `${pluginPath}`、`${feature}`，并注入 `PLUGIN_WORKSPACE`、`PROJECT_DIR`、`FEATURE_ID`、`SESSION_ID`（值为 `simulate`）；
 - 解释器在 PATH 上找不到时改用脚手架自己的解释器，报 warning `INTERPRETER_MISSING`：DevClaw 在这台机器上执行同样会失败。
 
@@ -481,8 +481,8 @@ DevClaw 负责展示看板、发起会话、传入运行上下文、调用插件
 
 - 宿主先替换占位符，再执行命令，不保证工作目录。脚本必须通过 `__file__` 定位插件根目录；
 - **stdout** 输出且只输出一个 UTF-8 JSON 对象，**stderr** 用于日志；
-- 退出码：`0` 表示成功；`1` 表示业务失败，此时 stdout 为 `{"ok": false, "errors": ["…"]}`。`session_collector_context_inject` 和 `pull_knowledge` 例外：始终以 `0` 退出，用 `ok` 字段表示结果（兼容现有宿主）；
-- 只读命令（`project_status`、`feature_status`、`dynamic_workflow`、`session_collector_context_inject`、`deploy_units`）不得创建或修改任何文件；
+- 退出码：`0` 表示成功；`1` 表示业务失败，此时 stdout 为 `{"ok": false, "errors": ["…"]}`。`session_context_inject` 和 `pull_knowledge` 例外：始终以 `0` 退出，用 `ok` 字段表示结果（兼容现有宿主）；
+- 只读命令（`project_status`、`feature_status`、`dynamic_workflow`、`session_context_inject`、`deploy_units`）不得创建或修改任何文件；
 - `create_project`、`create_feature` 是幂等的，重复执行不会丢失已有进度；
 - 写命令（`create_project`、`create_feature`）和模型调用的 `update_state.py` 提交成功后推送看板事件（§3.5），v2 的 `skip_node` 同样推送。推送结果不影响 stdout 和退出码。
 
@@ -496,10 +496,10 @@ DevClaw 负责展示看板、发起会话、传入运行上下文、调用插件
 | `${pluginWorkspace}` | 项目集合工作区 | 所有命令、`plugin_dir_hook`、`system_prompt_inject`、`dialog_tips` |
 | `${projectDir}` | 项目目录名 | 同上 |
 | `${projectDirs...}` | 多个项目目录名，宿主逐个转义后展开 | `project_status` |
-| `${feature}` | 当前 Feature | `feature_status`、`create_feature`、`session_collector_context_inject`、`system_prompt_inject`、技能正文 |
-| `${selectedDeployUnits}` | 所选发布单元，JSON 数组，宿主作为一个参数整体转义 | `create_feature`、`session_collector_context_inject` |
-| `${sessionWorkspacePath}` | 会话工作区目录 | `session_collector_context_inject` |
-| `${knowledge-path}` | DevClaw 自己维护的知识目录；DevClaw 不维护时替换为空字符串（D53） | `session_collector_context_inject`（启用知识模块时）、`deploy_units` |
+| `${feature}` | 当前 Feature | `feature_status`、`create_feature`、`session_context_inject`、`system_prompt_inject`、技能正文 |
+| `${selectedDeployUnits}` | 所选发布单元，JSON 数组，宿主作为一个参数整体转义 | `create_feature`、`session_context_inject` |
+| `${sessionWorkspacePath}` | 会话工作区目录 | `session_context_inject` |
+| `${knowledgePath}` | 项目绑定的 DevClaw 知识库，JSON 数组 `[{"id", "name", "path"}]`，作为一个参数整体转义；没有可用知识库时为 `[]`（D53、D68） | `session_context_inject`（启用知识模块时）、`deploy_units` |
 | `${projectCode}` | 项目编码 | `dialog_tips`、`modules.json` 的 `knowledge_config.nextAction`、`artifact_sync.nextAction` |
 | `${leanToken}` | 知识沉淀 token | `modules.json` 的 `knowledge_config.nextAction` |
 | `${nodeId}` | 用户在看板上选中的节点 | `skip_node` |
@@ -538,7 +538,7 @@ runtime/adapters/init_feature.py --workspace <dir> --project <name> --feature <n
 
 - 处理宿主参数后调用 `engine.init_feature`；项目尚未初始化时先初始化项目；
 - 新 Feature 的 checkpoint 为 `flow.json` 的 `checkpoints.initial`；
-- `--selected-deployUnit` 中每个单元的 `deployUnitId`、`localRepoPath` 记入 Feature 记录的 `deployUnits`。重复执行时用新传入的列表更新 `deployUnits`。会话中宿主仍会重新传入发布单元，`session_collector_context_inject` 发现与记录不一致时只在 `message` 中提示，不改记录；
+- `--selected-deployUnit` 中每个单元的 `deployUnitId`、`localRepoPath` 记入 Feature 记录的 `deployUnits`。重复执行时用新传入的列表更新 `deployUnits`。会话中宿主仍会重新传入发布单元，`session_context_inject` 发现与记录不一致时只在 `message` 中提示，不改记录；
 - Feature 目录已存在但 `state.json` 中没有对应记录时，返回 `ok:false`，避免覆盖未知产物。
 
 #### 3.3.3 project_status（inspect_state.py）
@@ -677,9 +677,9 @@ runtime/adapters/inspect_state.py --mode run --workspace <dir> --project <name> 
 
 这些是模板字符串，宿主替换占位符后直接使用，不执行。
 
-#### 3.3.7 session_collector_context_inject（render_session_context.py）
+#### 3.3.7 session_context_inject（render_session_context.py）
 
-会话入口在 `board_config.json` 中的键默认为 `session_collector_context_inject`，取代旧插件使用的 `session_context_inject`（D40）；脚本和下面的输入输出协议不变。
+会话入口在 `board_config.json` 中的键为 `session_context_inject`，与旧插件和 CMBDevClaw 一致（D68 撤回了 D40 的改名）。
 
 ```text
 runtime/session/render_session_context.py --platform <p> --plugin-workspace <dir> --project <name> --feature <name>
@@ -716,7 +716,7 @@ runtime/session/render_session_context.py --platform <p> --plugin-workspace <dir
 
 `flow` 是新增字段，现有宿主忽略即可。
 
-启用知识模块时，生成的命令末尾带 `--knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledge-path}"`（D53），用来兼容两种知识目录：`--knowledge-path-platform` 不为空时，知识目录取它（DevClaw 自己维护的目录）；为空时走旧模式，取 `--knowledge-path`，即插件自己的 `${pluginPath}/sys`。未启用知识模块时命令不带这两个参数。
+启用知识模块时，生成的命令末尾带 `--knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledgePath}"`（D53），用来兼容两种知识目录：`--knowledge-path-platform` 是 DevClaw 传入的知识库 JSON 数组（也接受单个目录），其中有可用目录时取它，多个时优先取清单登记了所选发布单元的那个，否则取第一个（D68）；为 `[]` 或为空时走旧模式，取 `--knowledge-path`，即插件自己的 `${pluginPath}/sys`。未启用知识模块时命令不带这两个参数。
 
 **策略目标节点**（与宿主拉起技能时依据的 nextAction 保持一致）：
 
@@ -887,7 +887,7 @@ runtime/adapters/skip_node.py --workspace <dir> --project <name> --feature <name
 | 鉴权 | DevClaw 每次运行生成一个随机 token，通过 `AUTOBIZ_BOARD_TOKEN` 注入，插件请求时带上 `Authorization: Bearer <token>`。服务端校验 token 和 `Host` 头，防止浏览器页面发起跨站请求。服务只接受 `board/*` 通知，不提供任何执行操作的方法 |
 | 产物实时刷新 | 不监听文件，改用 DevClaw 掌握的会话事件：模型写文件的工具调用落在 `run.watchRefs` 中 `purpose: artifacts` 的目录下时，防抖 1～2 秒后拉取一次 `feature_status` |
 | 静态结果预生成 | `dynamic_workflow`、`deploy_units` 在 build 和 `pull_knowledge` 时预先写成文件，DevClaw 读一次后缓存 |
-| 会话入口提速 | 根据 `session_collector_context_inject` 的实测耗时，决定是否需要单独优化 |
+| 会话入口提速 | 根据 `session_context_inject` 的实测耗时，决定是否需要单独优化 |
 
 P0 不做鉴权，本机任何进程都可以向 DevClaw 发送伪造的看板事件。因此推送只用于刷新显示，有疑问时以读取命令的结果为准；在鉴权实现之前，服务不得监听回环地址以外的地址。
 
@@ -1000,11 +1000,11 @@ python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp
   `selectedDeployUnits` 已解析并校验；`knowledgePath` 为按 §3.3.7 选出的知识目录的绝对路径（`--knowledge-path-platform` 不为空时取它，否则取 `--knowledge-path`）；`featureDir` 在 Feature 尚未创建时为空字符串；
 - **stdout**：`{"sessionContext": "…", "agentmdLoadStatus": [ … ], "message": "…"}`，三个字段都可以省略。`sessionContext` 是知识段，追加在流程上下文之后；`agentmdLoadStatus` 的条目格式见 §3.3.7；
 - 工作目录为插件根目录，超时为 `knowledge.assembly.timeoutSec`（默认 30 秒）；
-- 退出码非 0、超时或输出不是合法 JSON 时，本次会话不含知识段，`agentmdLoadStatus` 为 `[]`，在 `message` 中追加 `"知识组装失败: <原因>"`，`session_collector_context_inject` 仍然返回 `ok:true`；
+- 退出码非 0、超时或输出不是合法 JSON 时，本次会话不含知识段，`agentmdLoadStatus` 为 `[]`，在 `message` 中追加 `"知识组装失败: <原因>"`，`session_context_inject` 仍然返回 `ok:true`；
 - 只负责知识段：不能修改 `agentConfig` 和 `flow`，流程上下文和运行策略始终由默认入口给出；
 - stdout 只用于协议 JSON，日志写 stderr；不得修改项目文件和知识目录，知识仓库同步是 `pull_knowledge` 的职责。
 
-内置组装脚本的做法（来自全栈版）：调用同目录的 `collect-knowledge.js`（需要 Node）列出 collector 支持的发布单元，再逐个取所选单元的知识；collector 不可用（没有 Node、接口失败、超时）或单元不在它的列表中时，按清单映射加载，最后回退 `<localRepoPath>/AGENTS.md`。另外始终读取 `<sessionWorkspacePath>/AGENTS.md` 作为会话工作区指令。collector 依赖的 `gray-matter` 缺失时，首次运行会在 `runtime/knowledge/` 下执行 `npm install`（README §9）。
+内置组装脚本的做法（来自全栈版）：调用同目录的 `collect-knowledge.js`（需要 Node）列出 collector 支持的发布单元，再逐个取所选单元的知识；collector 不可用（没有 Node、接口失败、超时）或单元不在它的列表中时，按清单映射加载，最后回退 `<localRepoPath>/AGENTS.md`。另外始终读取 `<sessionWorkspacePath>/AGENTS.md` 作为会话工作区指令。collector 依赖的 `gray-matter` 由 doctor 在 `runtime/knowledge/` 下执行 `npm install` 安装并随包带上；缺失时会话入口不安装，直接按清单映射加载（README §9 第 7 条）。
 
 插件替换这个文件时，只需在同一路径实现上面的协议。主体逻辑可以用任何语言写，由这个 Python 文件调用（内置版本就是这样调用 Node 的）。doctor 重新生成或替换运行框架时都不覆盖被替换的文件（README §4）。
 
@@ -1160,6 +1160,6 @@ scaffold/modules/global_hooks/
 
 - 入口从 `hooks/`、根目录迁到 `runtime/`，board_config 中的命令随之重新生成；board_config 只剩 `inspectCommands`，流程定义改由命令输出，看板入口移到 `modules.json`；技能中旧的 `scaffold` 状态片段原地替换成 `plugin workflow` 状态维护片段，`artifacts` 托管片段删除；
 - 完成判定的标准不变：必需产物存在且去掉首尾空白后非空（D37）；不满足时由钩子 `artifact_guard.py` 拦截完成命令，`update_state.py` 本身只报 warning（D61）；v1 也不能配置校验命令；
-- 会话内容新增流程上下文段；会话入口的键由 `session_context_inject` 改为 `session_collector_context_inject`；宿主命令统一加 `-X utf8`（lite 原来没有）；
+- 会话内容新增流程上下文段；会话入口的键仍为 `session_context_inject`（D68）；宿主命令统一加 `-X utf8`（lite 原来没有）；
 - 产物显示名不再配置，取路径本身（lite 的“结构化需求”“实施计划”等名称不再保留）；节点描述改为取技能的 `description`、`nextAction` 改用默认文案，lite 的节点文案覆写不再保留；产物 id 改由路径推导（`requirements` → `prd`、`specs` → `spec`）；
 - `plan.md` 对旧文件名 `PLAN.md` 的回退不再支持。macOS、Windows 默认文件系统不区分大小写，不受影响；Linux 上的旧 Feature 需要把文件改名。

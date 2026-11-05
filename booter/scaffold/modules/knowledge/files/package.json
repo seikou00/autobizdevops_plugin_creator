@@ -1,0 +1,8 @@
+{
+  "name": "autobiz-knowledge-collector",
+  "private": true,
+  "description": "collect-knowledge.js 的运行依赖，由 autobiz-plugin doctor 在 runtime/knowledge/ 下执行 npm install 安装",
+  "dependencies": {
+    "gray-matter": "^4.0.3"
+  }
+}
