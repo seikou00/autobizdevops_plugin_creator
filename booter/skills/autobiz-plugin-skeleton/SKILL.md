@@ -1,13 +1,13 @@
 ---
 name: autobiz-plugin-skeleton
-description: 以配置骨架引导用户自己完成 AutoBiz 看板插件：用选择题确定起点和模块，生成带 [TODO] 占位的 workflow.json 和模块配置，讲清每个字段怎么填后停下来让用户填写，检查通过后导入已有技能或引导填写空白 SKILL.md，最后打包。当用户想自己动手写插件配置、要一份可以照着填的配置模板，或说“先给我骨架、我自己填”时使用；想完全通过对话由助手建模时改用 autobiz-plugin-creator。
+description: 以配置骨架引导用户自己完成 AutoBiz 看板插件：用选择题确定插件目录和模块，生成带 [TODO] 占位的 workflow.json 和模块配置，讲清每个字段怎么填后停下来让用户填写，检查通过后导入已有技能或引导填写空白 SKILL.md，最后打包。当用户想自己动手写插件配置、要一份可以照着填的配置模板，或说“先给我骨架、我自己填”时使用；想完全通过对话由助手建模时改用 autobiz-plugin-creator。
 metadata:
   version: 1.1.0
 ---
 
 # 看板插件骨架引导
 
-带用户走完：**选择起点和模块 → 生成骨架 → 用户填配置 → 检查 → 技能（导入或填写空白）→ 打包**。配置和技能内容由用户决定；你负责提供选项、解释每个字段、调用 CLI、转述检查结果。
+带用户走完：**选择插件目录和模块 → 生成空白骨架 → 用户填配置 → 检查 → 技能（导入或填写空白）→ 打包**。配置和技能内容由用户决定；你负责提供选项、解释每个字段、调用 CLI、转述检查结果。
 
 ## 提问方式
 
@@ -18,30 +18,28 @@ metadata:
 - 不要手工加“其他”选项，客户端会自动提供自由输入；需要路径、名称这类具体内容时，在问题里说明“可以在 Other 中直接填写”，选项给出最常见的取值；
 - 候选超过 3 个时，先在消息里列出完整清单，选择题只放最相关的 2–3 个；
 - 用户已经说清楚的内容不要再问；必须等用户回答，不要替用户选；
-- `request_user_input` 不可用时，用文字列出同样的问题和选项，让用户回复编号。
 
 ## 调用 CLI
 
-本技能与 `autobiz-plugin-creator` 在同一个插件包中，共用它的 CLI（下文写作 `<pyz>`）：
+用 CLI（下文写作 `<pyz>`）：
 
 ```bash
-python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz" <命令> --json
+python "../autobiz-plugin-creator/scripts/autobiz-plugin.pyz" <命令> --json
 ```
 
-- 对已有插件目录的命令加 `-C "<插件目录>"`；Windows 上把 `python3` 换成 `python`；
-- `${pluginPath}` 没有被替换时，按本文件所在目录的同级目录定位 `../autobiz-plugin-creator/scripts/autobiz-plugin.pyz`；
+- 对已有插件目录的命令加 `-C "<插件目录>"`；
+- 上面的路径相对本文件所在目录：`autobiz-plugin.pyz` 在本技能目录的同级目录 `autobiz-plugin-creator/scripts/` 下，执行前换成它的绝对路径；
 - 退出码：`0` 成功（可能有 warning）；`1` 有 error，没有写入任何文件；`2` 用法错误；
 - `--json` 输出 `{"ok", "issues": [{level, code, file, pointer, message, hint}], "written": [...]}`。判断一律以退出码和 `issues` 为准，不要自己宣称“检查通过”。
 
 ## 流程
 
-### 1. 选择起点和模块
+### 1. 选择插件目录和模块
 
-先运行 `hook list --json`（不需要插件目录）拿到全部全局钩子，再出第一轮选择题：
+起点总是空白骨架：只有结构和 `[TODO]` 占位，由用户自己填。先运行 `hook list --json`（不需要插件目录）拿到全部全局钩子，再出第一轮选择题：
 
 | id | 问题 | 选项 |
 |---|---|---|
-| `start_point` | 从什么起点开始？ | **空白骨架，自己填 (Recommended)**：只有结构和 `[TODO]` 占位；**lite 样例**：需求 → 规格 → 计划 → 编码四个节点，已填好；**fullstack 样例**：Biz → Dev → Ops 七个节点，已填好 |
 | `plugin_dir` | 插件放在哪个目录？（必须不存在或为空，可以在 Other 中填写路径） | 当前工作区下的 `my-plugin`；上一级目录下的 `my-plugin` |
 | `artifact_sync` | 要不要把节点产物上传到外部服务？ | **不需要 (Recommended)**；需要（启用产物同步模块） |
 
@@ -53,10 +51,13 @@ python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz"
 | `global_hooks` | 要不要启用全局钩子？（先在消息里列出 `hook list` 的全部钩子和说明） | **全部启用，之后删掉不要的 (Recommended)**；都不要 |
 | `session_policy` | 节点的运行策略？ | **全部用默认的 multi (Recommended)**；需要给个别节点单独配置（生成 session 模块） |
 
-按回答生成：
+按回答生成空白骨架：
 
-- 选了 lite 或 fullstack：`new "<插件目录>" --from lite|fullstack --yes --json`，样例的配置都已填好，第 2 步改成“按自己的流程修改”；
-- 选了空白骨架：`new "<插件目录>" --skeleton --module board [--module artifactSync] [--module knowledge] [--module globalHooks] [--module session] --json`。`board` 总是带上（至少要填看板上的流程名称）。
+```bash
+python "<pyz>" new "<插件目录>" --skeleton --module board [--module artifactSync] [--module knowledge] [--module globalHooks] [--module session] --json
+```
+
+`board` 总是带上，至少要填看板上的流程名称。
 
 ### 2. 讲清怎么填，然后停下来
 
@@ -72,7 +73,7 @@ python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz"
 ### 3. 检查配置
 
 ```bash
-python3 "<pyz>" -C "<插件目录>" lint --json
+python "<pyz>" -C "<插件目录>" lint --json
 ```
 
 - `TODO_FIELD`：按 `file`、`pointer` 列出还没填的占位，原样转述 `message`；
@@ -92,7 +93,7 @@ python3 "<pyz>" -C "<插件目录>" lint --json
 **导入已有技能**：再问 agents 目录（`modules/session.json` 引用了子代理文件时需要）：选项为“没有 agents 目录”和“与技能集合同级的 `agents/`”，其他路径在 Other 中填写。然后：
 
 ```bash
-python3 "<pyz>" -C "<插件目录>" add skills --from "<技能集合目录>" [--agents "<agents 目录>"] --json
+python "<pyz>" -C "<插件目录>" add skills --from "<技能集合目录>" [--agents "<agents 目录>"] --json
 ```
 
 - 技能目录名就是技能名，必须与 `workflow.json` 中节点的 `skill` 一致；导入后仍报 `SKILL_MISSING` 的节点，说明名字对不上或缺技能，告诉用户；
@@ -111,8 +112,8 @@ python3 "<pyz>" -C "<插件目录>" add skills --from "<技能集合目录>" [--
 用户说技能都填好后：
 
 ```bash
-python3 "<pyz>" -C "<插件目录>" doctor --json
-python3 "<pyz>" -C "<插件目录>" package --json
+python "<pyz>" -C "<插件目录>" doctor --json
+python "<pyz>" -C "<插件目录>" package --json
 ```
 
 - 改了技能 `description` 后必须先 `doctor`，否则报 `BUILD_STALE`；

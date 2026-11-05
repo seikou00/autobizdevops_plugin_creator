@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/workflow.schema.json",
+  "$schema": "../../booter/schemas/workflow.schema.json",
   "nodes": {
     "biz": [
       {

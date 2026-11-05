@@ -10,7 +10,7 @@ mods.md 中的 P0/P1/P2 是 mod 能力自己的分档，与本文无关。
 
 | 档 | 标准 |
 |---|---|
-| P0 | 第一个交付版本必须有：开发者以样例或手写的核心配置为起点，用 CLI 生成、检查、打包插件，DevClaw 导入后能展示看板、发起会话、推进状态；lite 能迁入并通过金样测试。缺了会有正确性风险的检查也放在这一档 |
+| P0 | 第一个交付版本必须有：开发者以手写的核心配置为起点，用 CLI 生成、检查、打包插件，DevClaw 导入后能展示看板、发起会话、推进状态；lite 能迁入并通过金样测试。缺了会有正确性风险的检查也放在这一档 |
 | P1 | 在 P0 之后交付：降低上手门槛（向导、插件开发技能、编辑命令），补齐全栈版迁入（产物同步等），以及脚手架发布第二个版本之前才需要的升级处理。不做时有替代做法，例如手写配置、手工操作 |
 
 ## 2. P0
@@ -35,7 +35,6 @@ mods.md 中的 P0/P1/P2 是 mod 能力自己的分档，与本文无关。
 | `doctor`：lint → build → 复查，同步技能的状态维护片段（影响报告见 P1） | D38、D54 |
 | `lint`、`check`：技能内容规则（`SKILL_FRONTMATTER`、`SKILL_STATE_BLOCK`、`LEGACY_ENTRY_REF`、`TODO_PLACEHOLDER` 等）、`DRIFT_GENERATED`、契约测试 | D51、D54、D55 |
 | `package`：打包规则、zip 只有一个顶层目录 `<plugin.id>/`、可重复 | D57 |
-| `new --from blank\|lite\|fullstack --yes`：以样例为起点，安装包带种子 | D24、D56 |
 | `add skill --from`：导入已有技能，`version`、`author` 迁入 `metadata`，内容问题报 warning | D51、D56 |
 | `autobiz-plugin.pyz`：用 zipapp 发布成一个文件 | D57 |
 
@@ -70,7 +69,7 @@ mods.md 中的 P0/P1/P2 是 mod 能力自己的分档，与本文无关。
 
 | 功能点 | 依据 | 不做时 |
 |---|---|---|
-| 初始化向导的交互问答、`new --answers` | interfaces.md §1.4、D56 | 从样例拷贝后手改 |
+| 初始化向导的交互问答、`new --answers` | interfaces.md §1.4、D56 | 用 `new --skeleton` 写出骨架后手填 |
 | `add node`、`module list`、`module enable`/`disable`、`--set`，以及保留键序和缩进的配置编辑 | D56 | 手改核心配置后执行 doctor |
 | 插件开发技能 `autobiz-plugin-creator` 和它的 DevClaw 插件包；依赖 `new --answers`、doctor 的 `changes`、`simulate` | D9、D58 | 开发者直接用 CLI |
 | `simulate` 命令：复用 check 的契约测试流程 | D55 | `check` 中的契约测试 |
@@ -126,7 +125,7 @@ P0、P1 已全部实现。代码都在 `booter/` 下：`scaffold/`（CLI、构�
 
 | 测试 | 内容 |
 |---|---|
-| `tests/golden/test_examples.py` | 三个示例 build 后与 `examples/*/output/` 逐字节一致，重复 build 不写文件 |
+| `tests/golden/test_examples.py` | `booter/examples/minimal` 和仓库根目录 `fixtures/` 下的 lite、fullstack（不在时跳过）build 后与各自的 `output/` 逐字节一致，重复 build 不写文件 |
 | `tests/golden/test_reference.py` | 命令输出的看板数据与 lite、全栈版现有 `board_config.json` 比较；lite 全部一致，全栈版只有文件开头列出的有意差异（参考仓库不在时跳过） |
 | `tests/contract/` | 状态推进、存在且非空检查、重开、终态节点、`pluginId` 隔离、只读命令、保留字段拒绝加载、校验命令；看板事件用模拟的 DevClaw 服务验证 |
 | `tests/test_cli.py` | `new` → `check`（含契约测试）→ `package`，lint 核心规则，改 `plugin.id` 的放行，doctor 删节点，`add skill --from` 导入 lite 技能 |
@@ -135,17 +134,18 @@ P0、P1 已全部实现。代码都在 `booter/` 下：`scaffold/`（CLI、构�
 
 P1 中定下的新决策：全栈版已有项目的状态接续（D60，README §9 第 3 条）。
 
+2026-11-05 调整（D67）：`new` 去掉 `--from blank|lite|fullstack`，`autobiz-plugin.pyz` 不再带样例种子。`new` 只从问答或 `--answers` 生成核心配置（`--yes` 时必须给出 `plugin` 和 `nodes`），自己手写时用 `new --skeleton`；骨架引导技能只提供空白骨架。lite、fullstack 样例从 `booter/examples/` 移到仓库根目录的 `fixtures/`，只供测试，不随 booter 分发；用到它们的测试在 `fixtures/` 不在时跳过。
+
 与设计文档不同、需要确认的地方：
 
 | 位置 | 做法 | 原因 |
 |---|---|---|
 | `BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` | 在模块规则之后报，不挡住模块规则 | 改完配置后最常见的就是过期；按 D47 的两段式，lint 此时只报“过期”，模块配置的问题要等 doctor 才看得到。过期不影响 IR 是否可靠 |
-| `add skill --from` | 目标目录里只有 doctor 生成的空白 `SKILL.md` 时允许覆盖导入 | `new --from lite` 会为每个节点生成空白 `SKILL.md`，否则 interfaces.md §1.4 的迁移路径（先 `new`、再 `add skill --from`）走不通 |
+| `add skill --from` | 目标目录里只有 doctor 生成的空白 `SKILL.md` 时允许覆盖导入 | `new` 会为每个节点生成空白 `SKILL.md`，否则 interfaces.md §1.4 的迁移路径（先 `new`、再 `add skill --from`）走不通 |
 | 编辑命令写入的新内容 | 跟随同级元素的写法；新写的对象逐个键换行，只含标量的数组写在一行 | 与示例的手排格式一致；原有内容的字节不变 |
-| 初始化向导 | 带 `--from lite/fullstack` 时只问基础信息，再问是否保留样例的流程和模块配置；不保留时按七类问题重新回答 | 样例的节点和模块配置较多，逐项问不如保留后用 `add node`、`module` 修改 |
 | 内置知识组装脚本 | 缺 `gray-matter` 时不执行 `npm install`，直接按清单映射加载 | 会话入口不得写文件（interfaces.md §3.1）；Node 依赖仍待定（README §9 第 7 条） |
 | 内置知识组装脚本 | 按全栈版的结构（`<SCOPE>`、`<SYSTEM>`、`<UNIT>`、`<DOMAIN_CONTEXT>`）重写，没有逐行移植 | 全栈版的脚本依赖 1100 多行的旧会话入口；已用清单映射和本地 `AGENTS.md` 验证，collector 分支还没有在装了 `gray-matter` 的环境中跑过 |
 | 产物同步技能 | 带上全栈版共享的 `references/ask-user-question.md` | 技能正文引用了它，原来在 `skills/references/` 下，单独拷出技能后链接会断 |
 | 运行框架目录 | 各级 `__init__.py`、`runtime/knowledge/__init__.py` 记入 build-manifest | 避免其他同名的 `runtime` 包遮住插件的包；三个示例的 build-manifest 已补上（摘要写作 `…`） |
-| `examples/fullstack/` | 新增 `.mcp.json`、`hooks/hooks.json` 两个占位文件 | 入口文件引用了它们，D57 之后缺失会报 `PLUGIN_REF_MISSING` |
+| `fixtures/fullstack/` | 新增 `.mcp.json`、`hooks/hooks.json` 两个占位文件 | 入口文件引用了它们，D57 之后缺失会报 `PLUGIN_REF_MISSING` |
 | 全栈版 v3 状态 | 旧别名 `discuss_in_progress`、`discuss_done` 不做映射，停在它们上面的 Feature 只读 | 别名是全栈版自己的历史，运行框架不写死某个插件的名字 |

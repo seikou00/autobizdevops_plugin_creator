@@ -3,7 +3,7 @@
 协议：stdin 读一个 JSON 请求（schema = autobiz.session.request.v1），stdout 输出
 {"sessionContext", "agentmdLoadStatus", "message"}；日志写 stderr；不修改项目文件和知识目录。
 
-组装顺序（来自全栈版 render_collected_session_context.py）：
+组装顺序：
 1. 调用同目录的 collect-knowledge.js（需要 Node 和 gray-matter）列出支持的发布单元，再逐个取所选单元的知识；
 2. collector 不可用或单元不在它的列表中时，按清单映射加载系统 AGENTS.md 和单元文档；
 3. 仍没有时回退 <localRepoPath>/AGENTS.md；

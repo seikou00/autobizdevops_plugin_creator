@@ -1,7 +1,7 @@
 """deploy_units：解析知识清单，输出支持的系统和发布单元（interfaces.md §3.3.8）。
 
 同时是知识模块的清单解析库：内置知识组装脚本在 collector 未命中时、sync_knowledge 校验克隆结果时都复用它。
-清单格式（v1 只有 agents-manifest-v1，来自 lite 的 agents_repo.py）::
+清单格式（v1 只有 agents-manifest-v1）::
 
     {"schemaVersion": "…", "systems": [{"systemId": "LF39", "description": "…", "agentsPath": "LF39/AGENTS.md",
       "deployUnits": [{"deployUnitId": "LF39.18_Outservice", "description": "…", "agentsPath": "…"}]}]}

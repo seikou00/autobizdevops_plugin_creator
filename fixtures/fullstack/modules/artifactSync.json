@@ -1,5 +1,5 @@
 {
-  "$schema": "../../../schemas/modules/artifactSync.schema.json",
+  "$schema": "../../../booter/schemas/modules/artifactSync.schema.json",
   "allowedFrom": "plan:done",
   "excludeCheckpoints": ["code_in_progress"],
   "artifacts": {

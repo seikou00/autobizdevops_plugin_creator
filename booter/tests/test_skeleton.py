@@ -105,9 +105,9 @@ class SkeletonTest(unittest.TestCase):
 
     def test_usage_errors(self):
         target = temp_dir(self) / "plugin"
-        self.assertEqual(cli("new", str(target), "--skeleton", "--from", "lite")[0], 2)
+        self.assertEqual(cli("new", str(target), "--skeleton", "--yes")[0], 2)
         self.assertEqual(cli("new", str(target), "--skeleton", "--module", "nope")[0], 2)
-        self.assertEqual(cli("new", str(target), "--from", "lite", "--yes", "--module", "board")[0], 2)
+        self.assertEqual(cli("new", str(target), "--yes", "--module", "board")[0], 2)
         self.assertFalse(target.exists())
         root = self.skeleton()
         self.assertEqual(cli("new", str(root), "--skeleton")[0], 2)

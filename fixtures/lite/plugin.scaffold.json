@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/plugin-scaffold.schema.json",
+  "$schema": "../../booter/schemas/plugin-scaffold.schema.json",
   "scaffoldVersion": 1,
   "plugin": {
     "id": "autodev-planning-kanban",

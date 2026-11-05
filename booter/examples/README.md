@@ -18,5 +18,3 @@
 | 示例 | 用到的能力 |
 |---|---|
 | [minimal/](minimal/) | 两个节点（都在 `biz` 组，`seq` 为 1、2）；不写模块配置 |
-| [lite/](lite/) | legacy 布局、没有输出的编码节点、节点 `nextAction` 覆写、知识模块（含仓库同步）、知识沉淀入口、产物同步 |
-| [fullstack/](fullstack/) | 在 lite 基础上加：终态节点（状态维护片段只有推进到 `archived` 一条）、可选输出、重复输出的产物、`mcpServers`/`hooks` 透传、`extraPaths` 与 `excludeCheckpoints` |

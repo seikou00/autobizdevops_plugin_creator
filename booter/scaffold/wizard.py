@@ -78,20 +78,20 @@ def yes(prompter: Prompter, question: str, default: bool) -> bool:
     return prompter.ask(question, default="Y" if default else "N", choices=("Y", "N", "y", "n")) in YES
 
 
-def ask_plugin(prompter: Prompter, seed: dict) -> dict:
+def ask_plugin(prompter: Prompter) -> dict:
     prompter.say("── 1 插件基础信息 ──")
     while True:
-        raw = prompter.ask("插件 ID（slug，发布后不可修改）", default=seed.get("id"))
+        raw = prompter.ask("插件 ID（slug，发布后不可修改）")
         plugin_id = normalize_id(raw)
         if plugin_id and PLUGIN_ID.match(plugin_id) and len(plugin_id) <= 64:
             if plugin_id != raw:
                 prompter.say(f"  已规范化为 {plugin_id}")
             break
         prompter.say("  插件 ID 只能含英文字母、数字、短横线和下划线，不超过 64 字符")
-    name = prompter.ask("插件名", default=seed.get("name") or plugin_id)
-    version = prompter.ask("版本", default=seed.get("version", "0.1.0"))
-    description = prompter.ask("一句话描述", default=seed.get("description") or name)
-    return {**seed, "id": plugin_id, "name": name, "version": version, "description": description}
+    name = prompter.ask("插件名", default=plugin_id)
+    version = prompter.ask("版本", default="0.1.0")
+    description = prompter.ask("一句话描述", default=name)
+    return {"id": plugin_id, "name": name, "version": version, "description": description}
 
 
 def _outputs(text: str) -> list:
@@ -239,17 +239,10 @@ def ask_hooks(prompter: Prompter) -> list:
             if yes(prompter, f"启用 {spec.title}（{hook_id}）：{spec.description}？", False)]
 
 
-def ask(prompter: Prompter, *, seed_plugin: dict | None = None, seeded: bool = False,
-        existing_skills: list | None = None) -> dict:
-    """返回 --answers 结构的回答。seeded 为 True（--from lite/fullstack）时可以保留样例的流程和模块配置。"""
+def ask(prompter: Prompter, *, existing_skills: list | None = None) -> dict:
+    """返回 --answers 结构的回答。"""
     existing_skills = existing_skills or []
-    answers = {"plugin": ask_plugin(prompter, seed_plugin or {})}
-    if seeded and yes(prompter, "保留样例的流程、模块配置？", True):
-        hooks = ask_hooks(prompter)
-        if hooks:
-            answers["globalHooks"] = {"hooks": hooks}
-        prompter.say("── 7 自定义扩展 ──\n  将创建 hooks/（agents/ 可选，需要外挂子代理时再创建）")
-        return answers
+    answers = {"plugin": ask_plugin(prompter)}
     answers["nodes"] = ask_nodes(prompter, existing_skills)
     answers["skills"] = ask_skills(prompter, answers["nodes"], existing_skills)
     for key, value in (("board", ask_board(prompter)), ("session", ask_session(prompter, answers["nodes"]))):

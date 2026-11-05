@@ -1,4 +1,6 @@
-"""金样测试：对三个示例执行 build，生成内容与 examples/*/output/ 逐字节一致（examples/README.md）。
+"""金样测试：对示例执行 build，生成内容与示例的 output/ 逐字节一致（examples/README.md）。
+
+minimal 在 booter/examples/，lite、fullstack 在仓库根目录的 fixtures/（不在时跳过）。
 
 build-manifest 中内容固定的托管文件摘要写作 "…"，只比较归属。
 """
@@ -6,7 +8,7 @@ build-manifest 中内容固定的托管文件摘要写作 "…"，只比较归�
 import json
 import unittest
 
-from tests.helpers import REPO, built_example
+from tests.helpers import built_example, example_dir
 from scaffold.build.pipeline import build
 from scaffold.lib.tree import Tree
 
@@ -18,8 +20,8 @@ class ExamplesTest(unittest.TestCase):
 
     def compare(self, name):
         root = built_example(self, name)
-        expected_root = REPO / "examples" / name / "output"
-        for expected in sorted(path for path in expected_root.rglob("*") if path.is_file()):
+        expected_root = example_dir(self, name) / "output"
+        for expected in sorted(path for path in expected_root.rglob("*") if path.is_file() and path.name != ".DS_Store"):
             rel = expected.relative_to(expected_root).as_posix()
             actual = root / rel
             self.assertTrue(actual.is_file(), f"{name}: 没有生成 {rel}")

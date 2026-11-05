@@ -924,7 +924,7 @@ def new(target: Path, *, template: str = "blank", answers: Answers | None = None
 
 评审结论（2026-11-03，D56）：
 
-- **Q12.1 新建插件的种子（已定）。** 脚手架安装包带上 `examples/lite/`、`examples/fullstack/` 的核心配置，不带 `output/`。种子文件显式列出：入口文件、`workflow.json`，以及入口文件引用的 `modules/*.json`。拷贝时把 `$schema` 改写为 `./.scaffold/…`（入口文件、`workflow.json`）和 `../.scaffold/modules/…`（模块配置），其余内容和格式不变。安装包怎么组织取决于 Q13.3。
+- **Q12.1 新建插件的种子（已定，已由 D67 取代：安装包不再带种子）。** 脚手架安装包带上 `examples/lite/`、`examples/fullstack/` 的核心配置，不带 `output/`。种子文件显式列出：入口文件、`workflow.json`，以及入口文件引用的 `modules/*.json`。拷贝时把 `$schema` 改写为 `./.scaffold/…`（入口文件、`workflow.json`）和 `../.scaffold/modules/…`（模块配置），其余内容和格式不变。安装包怎么组织取决于 Q13.3。
 - **Q12.2 增加 `--optional-output`（已定）。** `add node` 增加可以重复的 `--optional-output <path>`，写成 `{path, optional: true}`。它与 `--output` 记到同一个列表中，`outputs` 的顺序就是命令行上的顺序。含 glob 的路径要加引号，避免被 shell 展开，写进参数说明。
 - **Q12.3 保留原文格式（已定）。** 不整份重新输出，由 `lib/jsonedit.py` 在原文上插入或替换片段，只需要三种操作：往数组中插入一项、对象中增加或替换一个键、删除一个键。只改动涉及的片段，其余字节不变；新内容的写法跟随同级元素（多行还是单行、缩进单位），换行符沿用原文件（D42）。标准库的 `json` 不给出位置，所以实现一个记录位置的小型 JSON 解析器。
 - **Q12.4 编辑命令先在内存中完成（已定）。** 原来先写配置再执行 doctor：doctor 失败时（例如 `DRIFT_MANAGED`）退出码为 1，配置却已经写入，与 interfaces.md §1.2 “退出码 1 表示没有写入任何文件”矛盾。改为在内存中算出修改后的文件，用它们覆盖读入的内容执行 doctor 流水线（`load` 接受覆盖内容），没有 error 时与生成结果一起写盘，有 error 时什么都不写。原来“`seq` 冲突时当场报 `SEQ_DUP`”的特殊处理由完整的 lint 覆盖。managed 文件被手改时，hint 提示先执行 `doctor --force`。

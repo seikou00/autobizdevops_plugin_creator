@@ -1,5 +1,5 @@
 {
-  "$schema": "../../../schemas/modules/knowledge.schema.json",
+  "$schema": "../../../booter/schemas/modules/knowledge.schema.json",
   "assembly": { "assembler": "plugin" },
   "source": {
     "type": "git",

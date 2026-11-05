@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.helpers import cli, temp_dir
+from tests.helpers import cli, new_from_example, temp_dir
 from scaffold.commands import edit
 
 
@@ -33,10 +33,7 @@ def snapshot(root: Path) -> dict[str, bytes | None]:
 
 class AddSkillsTest(unittest.TestCase):
     def new_lite(self) -> Path:
-        root = temp_dir(self) / "plugin"
-        code, payload = cli("new", str(root), "--from", "lite", "--yes")
-        self.assertEqual(code, 0, payload)
-        return root
+        return new_from_example(self, "lite")
 
     def test_imports_all_direct_skills_and_reports_names_in_json(self):
         root = self.new_lite()
@@ -159,10 +156,16 @@ class AddSkillsTest(unittest.TestCase):
     def test_new_answers_import_agents(self):
         agents = self.write_agents()
         answers = temp_dir(self) / "answers.json"
-        answers.write_text(json.dumps({"agents": str(agents)}), "utf-8")
+        answers.write_text(json.dumps({
+            "plugin": {"id": "agents-demo", "name": "子代理", "version": "0.1.0", "description": "d"},
+            "nodes": [{"stage": "dev", "id": "plan", "seq": 1, "name": "计划", "skill": "autodev-plan",
+                       "outputs": ["PLAN.md"]}],
+            "session": {"policies": {"nodes": {"dev": [{"id": "plan", "subagentConfig": {
+                "customSubagentFiles": ["agents/explore.md", "agents/critic_autodev_plan_zh.md"]}}]}}},
+            "agents": str(agents)}), "utf-8")
         root = temp_dir(self) / "plugin"
 
-        code, payload = cli("new", str(root), "--from", "lite", "--yes", "--answers", str(answers))
+        code, payload = cli("new", str(root), "--yes", "--answers", str(answers))
 
         self.assertEqual(code, 0, payload)
         self.assertEqual((root / "agents/explore.md").read_text("utf-8"), "探索子代理")
@@ -172,11 +175,8 @@ class AddSkillsTest(unittest.TestCase):
 class NestedCollectionTest(unittest.TestCase):
     """技能集合按插件 skills/ 的布局导入：一层分组、共享资源和 build 生成的空白技能。"""
 
-    def new_plugin(self, template: str = "lite") -> Path:
-        root = temp_dir(self) / "plugin"
-        code, payload = cli("new", str(root), "--from", template, "--yes")
-        self.assertEqual(code, 0, payload)
-        return root
+    def new_plugin(self) -> Path:
+        return new_from_example(self, "lite")
 
     def write_collection(self) -> Path:
         collection = temp_dir(self) / "skills"

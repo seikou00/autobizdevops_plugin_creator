@@ -11,12 +11,12 @@
     "artifactSync": "1.0.0"
   },
   "inputs": {
-    "plugin.scaffold.json": "sha256:5cbbf7987dbc102b256a1069b2ef65efea6d99a38cd6403356dd480228154d71",
-    "workflow.json": "sha256:066b01948341326bf2656c5c0cc22873d388c409e6906e03022291eede64e301",
-    "modules/board.json": "sha256:2500cecd3c82f6b37f0c5821f54c4b6a9f2963af95e4ca6ab2cf302be7cadcec",
-    "modules/session.json": "sha256:9731bb3486de2e211ddd6a629a0b32eb837abe3c5859f03fa3b20d91746338a0",
-    "modules/knowledge.json": "sha256:10351ec24714d7554c1640cf63c086eeba299727a8cbb33ecb33910ea18d648a",
-    "modules/artifactSync.json": "sha256:792b9429283d4c5a7287d5c32d28e47b5e92a690309d8e8f870b28df5c799cd9",
+    "plugin.scaffold.json": "sha256:0e95bd325954528a662ae78bc78b874a63d6b2203e4880a59df259d4973f0855",
+    "workflow.json": "sha256:4137ab29642f0a2ecb1f7e12bdcd807d67c8fb53704b4f380eac71b3c2a66066",
+    "modules/board.json": "sha256:0a41229c897622803ed15db6dd78c92b29f95c5076dd6ed4e7cf2d9435404429",
+    "modules/session.json": "sha256:7e7a35dd4a26bf6e2b2573c3c30e2aa944984e4164015627baf73d32dc451cf2",
+    "modules/knowledge.json": "sha256:b5f3b0e491d90a6a158b79c64ca6619aa520d833e915e67f35cf0575fd5763bd",
+    "modules/artifactSync.json": "sha256:e5e959e03be051eacbac0d7093a2d47a77b7a72aae12a0f370dc2d500beb8a3f",
     "skills/autobiz/autobiz-prd/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
     "skills/autodev/autodev-code/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
     "skills/autodev/autodev-plan/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
@@ -127,7 +127,7 @@
     },
     "runtime/config/flow.json": {
       "ownership": "generated",
-      "sha256": "sha256:28129c2ac43167815396b1e30f0a0b344935ba5446edef13f7ddad356c33ac9a"
+      "sha256": "sha256:e4b393e4277036f4dfffefd710d6cdf9f39b692176641cf26f7215dfeb9d7a0b"
     },
     "runtime/config/knowledge.json": {
       "ownership": "generated",

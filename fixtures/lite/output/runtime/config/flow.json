@@ -1,7 +1,7 @@
 {
   "schema": "autobiz.flow.v1",
   "source": {
-    "workflow.json": "sha256:066b01948341326bf2656c5c0cc22873d388c409e6906e03022291eede64e301"
+    "workflow.json": "sha256:4137ab29642f0a2ecb1f7e12bdcd807d67c8fb53704b4f380eac71b3c2a66066"
   },
   "stages": [
     "Biz",

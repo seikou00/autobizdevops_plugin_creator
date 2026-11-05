@@ -48,7 +48,7 @@ def atomic_write(path: Path, content: str) -> None:
 
 @contextmanager
 def file_lock(path: Path, timeout: float = 5.0):
-    """跨进程锁：POSIX 用 flock，Windows 用 msvcrt.locking（沿用 lite）。"""
+    """跨进程锁：POSIX 用 flock，Windows 用 msvcrt.locking。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+b") as handle:
         handle.seek(0, os.SEEK_END)
@@ -97,7 +97,7 @@ def _drop_history(payload: dict) -> None:
 def _commit(project_path: Path, payload: dict) -> int:
     path = query.state_path(project_path)
     if payload.pop(query.MIGRATED_FROM, None):
-        # 第一次写入全栈版 v3 状态：先备份原文件，再升级为 schemaVersion 1（D60）
+        # 第一次写入旧版 v3 状态：先备份原文件，再升级为 schemaVersion 1（D60）
         backup = path.with_name("state.v3.bak.json")
         if path.exists() and not backup.exists():
             atomic_write(backup, path.read_text(encoding="utf-8-sig"))

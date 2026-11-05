@@ -33,7 +33,7 @@ v1 范围：
 
 脚手架位于独立仓库 `autobizdevops_plugin_creator`（即本仓库，结构见 §3.1）。§8 汇总了已经确认的决策，§10 列出本次相对初稿的调整。
 
-两个参考插件是 lite（仓库 `autobizdevops_lite`）和全栈版（仓库 `autobiz_kanban`）。全栈版用到的流程能力除回流修复（`needs_fix`）外都在 v1 中支持，样例见 [examples/fullstack/](../booter/examples/fullstack/)；它自有的校验与钩子配置（声明式校验器清单、编译守卫、人工确认关卡、回滚归档清单）留在插件自己的文件中（§6.8，D23）。回流修复、模板子集和 collector 知识组装预留到 v2（§7）。
+两个参考插件是 lite（仓库 `autobizdevops_lite`）和全栈版（仓库 `autobiz_kanban`）。全栈版用到的流程能力除回流修复（`needs_fix`）外都在 v1 中支持，样例见 [fixtures/fullstack/](../fixtures/fullstack/)；它自有的校验与钩子配置（声明式校验器清单、编译守卫、人工确认关卡、回滚归档清单）留在插件自己的文件中（§6.8，D23）。回流修复、模板子集和 collector 知识组装预留到 v2（§7）。
 
 文档索引：
 
@@ -52,9 +52,9 @@ v1 范围：
 | [schemas/workflow.schema.json](../booter/schemas/workflow.schema.json) | 核心流程 JSON Schema |
 | [schemas/plugin-scaffold.schema.json](../booter/schemas/plugin-scaffold.schema.json) | 入口文件 JSON Schema |
 | [schemas/modules/](../booter/schemas/modules/) | 看板、会话、知识模块配置的 JSON Schema |
-| [examples/lite/](../booter/examples/lite/) | 复刻 autobizdevops_lite 的完整输入样例 |
-| [examples/fullstack/](../booter/examples/fullstack/) | 按全栈版（autobiz_kanban）编写的完整输入样例，用到全部流程规则（input-config.md §9.2） |
 | [examples/minimal/](../booter/examples/minimal/) | 两个节点、没有模块配置文件的最小样例（input-config.md §8） |
+| [fixtures/lite/](../fixtures/lite/) | 复刻 autobizdevops_lite 的完整输入样例；只供测试，不随 booter 分发（D67） |
+| [fixtures/fullstack/](../fixtures/fullstack/) | 按全栈版（autobiz_kanban）编写的完整输入样例，用到全部流程规则（input-config.md §9.2）；只供测试，不随 booter 分发（D67） |
 
 ## 2. 从两个参考插件中提取的结论
 
@@ -75,7 +75,7 @@ lite 版 `board_config.json` 有 509 行，开发者真正做出的决策只有�
 - 两处是运行期回写字段。其中 win32 的 `knowledge_path` 已被本地同步写成个人机器路径 `C:\Users\80319167\...` 并提交进了仓库。v1 不再回写任何配置文件（§6.1）；
 - 一处是样例额外启用的产物同步带来的 `artifact_sync` 入口（lite 本身没有这个能力）。
 
-本次调整后，输入拆成 [examples/lite/](../booter/examples/lite/) 下的五个文件（入口、流程、三个模块配置），内容基本不变，只是换了位置；`plan.md` 对旧文件名 `PLAN.md` 的回退不再表达（interfaces.md §5）。框架入口迁到 `runtime/`、宿主命令一律加 `-X utf8`（D40）、会话入口的键改为 `session_collector_context_inject`（D40）后，`inspectCommands` 中的这几处不再与 lite 一致，金样测试改为比对它们以外的部分（§3.1）。
+本次调整后，输入拆成 [fixtures/lite/](../fixtures/lite/) 下的五个文件（入口、流程、三个模块配置），内容基本不变，只是换了位置；`plan.md` 对旧文件名 `PLAN.md` 的回退不再表达（interfaces.md §5）。框架入口迁到 `runtime/`、宿主命令一律加 `-X utf8`（D40）、会话入口的键改为 `session_collector_context_inject`（D40）后，`inspectCommands` 中的这几处不再与 lite 一致，金样测试改为比对它们以外的部分（§3.1）。
 
 这些推导结果原来写在 `board_config.json` 中，一份文件同时给 DevClaw 和插件脚本读。v1 把两者分开（D31）：`board_config.json` 只剩宿主命令，流程和文案编译进 `runtime/config/`，由命令输出给 DevClaw。
 
@@ -167,6 +167,7 @@ DevClaw ─▶ runtime/adapters/init_workspace.py、init_feature.py ────
 autobizdevops_plugin_creator/
 ├── README.md
 ├── docs/                               # 设计文档
+├── fixtures/                           # 只供测试的样例 lite/、fullstack/，结构同 booter/examples/，不随 booter 分发（D67）
 └── booter/                             # 脚手架本身：构建、测试、打包都在这里进行，下文提到的 scaffold/、schemas/ 等路径都相对它
     ├── scaffold/                       # CLI、初始化向导与构建流水线，模块拆分见 scaffold.md
     │   └── modules/
@@ -178,7 +179,7 @@ autobizdevops_plugin_creator/
     ├── skills/autobiz-plugin-creator/  # 插件开发技能：SKILL.md  references/modeling-guide.md；scripts/autobiz-plugin.pyz 发布时放入（D58）
     ├── schemas/                        # workflow.schema.json、plugin-scaffold.schema.json、modules/*.schema.json；
     │                                   # host/outputs.schema.json：宿主命令的输出结构，只供 simulate、check 使用，不拷进插件（D55）
-    ├── examples/                       # lite/、fullstack/、minimal/
+    ├── examples/                       # minimal/
     ├── tools/make_pyz.py               # 用标准库 zipapp 把脚手架打成 autobiz-plugin.pyz（D57），再组装插件开发技能的 DevClaw 插件包（D58）
     └── tests/
         ├── golden/                     # 示例逐字节比对；以 lite、全栈版为基线：命令输出的看板数据与其 board_config 中对应内容比对（inspectCommands 的脚本路径、`-X utf8`、会话入口键名及 input-config.md §9.2 列出的差异除外）
@@ -339,7 +340,7 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 
 ### 6.8 全栈版迁入
 
-全栈版（仓库 `autobiz_kanban`）用到的流程能力都能在核心配置中表达，样例见 [examples/fullstack/](../booter/examples/fullstack/)（input-config.md §9.2）。对应关系：
+全栈版（仓库 `autobiz_kanban`）用到的流程能力都能在核心配置中表达，样例见 [fixtures/fullstack/](../fixtures/fullstack/)（input-config.md §9.2）。对应关系：
 
 | 全栈版现有形态 | 迁入后 |
 |---|---|
@@ -402,7 +403,7 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 | D20 | （提交前钩子和 CI 部分已由 D41 取代，其余仍有效）核心配置自动检测：Schema 只管结构，语义规则由 `autobiz-plugin lint` 检查；lint 在 agent 修改后、提交前（`.githooks/pre-commit`）和 build 前自动执行，CI 运行 `check --strict`；改了核心配置未重新 build 时报 `BUILD_STALE` | §6.7；input-config.md §7 |
 | D22 | 全栈版用到的流程规则进入 v1：终态节点、动态阶段、跳过节点、可选输入、可选输出；动态阶段和跳过节点统一写在 `workflow.json` 的 `rules` 中；技能目录支持一层分组。回流修复（`needs_fix`）暂不支持 | input-config.md §2；output-spec.md §3、§4、§5.2；interfaces.md §3.3、§4.2 |
 | D23 | 插件自有的校验与钩子配置（声明式校验器清单、编译守卫、`hookDefinitions`、人工确认关卡、回滚归档清单）不进脚手架输入，留在插件自己的文件中 | §6.8；input-config.md §2.4 |
-| D24 | 不提供从已有插件反推核心配置的命令；迁移 lite、全栈版时以 `examples/` 下的样例为起点（`new --from`） | interfaces.md §1.1、§1.4 |
+| D24 | （`new --from` 样例起点部分已由 D67 取代，其余仍有效）不提供从已有插件反推核心配置的命令；迁移 lite、全栈版时以 `examples/` 下的样例为起点（`new --from`） | interfaces.md §1.1、§1.4 |
 | D25 | （已由 D37 取代）代码提交作为 git 类型的产物：节点开始时 engine 记录各仓库的基线分支和 HEAD；基线分支上有新提交、没有未提交的改动、没有未合并回来的工作树分支，才算齐全。直接查仓库，不拦截 `git commit`；仓库取 Feature 所选发布单元的 `localRepoPath`，建 Feature 时记入 `state.json` | input-config.md §2.9；output-spec.md §4.2、§4.4；interfaces.md §3.3.3；interfaces.md §3.3.2、§3.3.4、§4.2、§4.3 |
 | D21 | 看板数据改为插件推送（P0）：DevClaw 启动时在 `127.0.0.1` 上开一个 JSON-RPC 2.0 服务，通过 `AUTOBIZ_BOARD_ENDPOINT` 告诉插件；插件的写入口提交后发送 `board/changed`，内容与读取命令的输出相同，按 `boardSeq` 排序；DevClaw 缓存并展示，读取命令只用于冷启动和兜底。鉴权、产物实时刷新、静态结果预生成放到后续 | interfaces.md §3.5；output-spec.md §3.1、§4.2 |
 | D26 | 知识组装默认由插件完成（`assembler = plugin`），内置组装脚本取自全栈版的 `render_collected_session_context.py` + `collect-knowledge.js`，lite 和全栈版都使用它；内置脚本兜底读取各仓库和会话工作区的 `AGENTS.md`，没有 collector 知识的插件也能直接用。插件需要不同的组装方式时直接替换这个文件（协议不变，只负责知识段，build 和 upgrade 不覆盖），不设组装脚本的配置项；去掉 `session.customEntry` | input-config.md §4.3；interfaces.md §2.4、§4.5 |
@@ -435,7 +436,7 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 | D53 | 四个模块的评审结论（2026-11-03，scaffold.md 单元 9）：① 内置知识组装脚本继续调用知识库开发同事提供的 `collect-knowledge.js`，脚手架原样拷贝，不改写；② 去掉 `knowledge.root`，插件自己的知识目录固定为 `sys/`，`knowledge_path` 固定为 `${pluginPath}/sys`；启用知识模块时，会话入口命令末尾带 `--knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledge-path}"`，新增宿主占位符 `${knowledge-path}` 由 DevClaw 替换为它维护的知识目录（不维护时为空）；`--knowledge-path-platform` 不为空时取它，为空时取 `--knowledge-path`；`ModuleContext` 增加 `enabled`；③ `deploy_units` 带同样两个参数，按同样规则选知识目录；④ board、session 的版本号取 `coreVersion`，knowledge、artifactSync 各自维护版本号 | §1、§6.1；input-config.md §4.3；output-spec.md §1、§3.2；interfaces.md §2.1、§2.2、§3.2、§3.3.7、§3.3.8、§4.5、§5；scaffold.md §6、§9 |
 | D54 | CLI 与核心命令的评审结论（2026-11-03，scaffold.md 单元 10）：① check 总是在内存中重放 build 并与磁盘比较，不设 `--check` 参数；② `runtime/config/flow.json` 不存在或无法解析时，doctor 不做比较，报 warning `DOCTOR_BASELINE_MISSING`，直接重新生成；③ CLI 不再提供 `build` 命令，build 只是内部流水线的名字，供 `new` 和 `doctor` 调用；放行参数只用于 doctor；④ 各命令 `--json` 输出的附加字段：`doctor` 的 `changes`、`check` 的 `contract`、`simulate` 的 `simulation`、`module list` 的 `modules`、`package` 的 `package` | §5；input-config.md §1.2；interfaces.md §1.1、§1.2、§1.3、§1.4、§1.6、§1.7；scaffold.md §4、§10 |
 | D55 | simulate 的评审结论（2026-11-03，scaffold.md 单元 11）：① 宿主占位符 `${…}` 的格式和引号规则不变，simulate 先按 POSIX 规则拆分参数、再逐个参数替换来模拟 DevClaw；② check 不起模拟的看板事件服务，推送规则只在 `tests/contract/` 中验证，simulate 不设 `AUTOBIZ_BOARD_ENDPOINT`；③ 命令输出用 JSON Schema 校验，放在一个文件 `schemas/host/outputs.schema.json` 中；`.scaffold/` 改为显式拷贝 6 个输入配置的 Schema；④ 生成结果过期时 simulate 只报 warning `BUILD_STALE`，check 在 lint 或漂移检查有 error 时不跑契约测试；⑤ v1 去掉 `--skip-validate`；⑥ simulate 按打包清单把插件拷到临时目录再执行，只写临时目录；“不访问网络”不包括内置知识组装调用的 collector；⑦ 宿主命令只带参数，状态维护片段的命令才注入会话变量；⑧ 片段命令中的 `python` 换成所选平台在 `board.target.python` 中配置的解释器（darwin、linux 取 `posix`，win32 取 `win32`），找不到时报 warning `INTERPRETER_MISSING`；⑨ `simulation` 与 check 的 `contract` 结构相同，失败的步骤报 `CONTRACT_TEST` | §3.1、§5；input-config.md §7.2、§7.3；output-spec.md §1；interfaces.md §1.1、§1.3、§1.5；scaffold.md 总览、§7、§10、§11 |
-| D56 | 配置编辑与向导的评审结论（2026-11-03，scaffold.md 单元 12）：① 安装包带上 lite、fullstack 示例的核心配置作为 `new --from` 的种子，显式列出文件，拷贝时把 `$schema` 改写为 `.scaffold/` 下的路径；② `add node` 增加 `--optional-output`，与 `--output` 按命令行顺序写入 `outputs`；③ 修改核心配置时在原文上插入或替换片段，保留原有键序、缩进和换行；④ `add`、`module`、`new` 先在内存中修改配置并走 doctor 流水线，没有 error 时与生成结果一起写盘，否则什么都不写；⑤ 导入技能时发现的内容问题（`LEGACY_ENTRY_REF` 等）只报 warning、照样导入，frontmatter 的 `name` 改为技能名；⑥ `add node` 增加 `--terminal`，向导询问最后一个节点是否为终态节点；⑦ `--set` 沿 Schema 属性指定字段、按 Schema 类型转换值；`enable artifactSync` 必须给出 `allowedFrom` 或 `allowedCheckpoints`，`artifacts` 预填非 `.json` 输出、简述为 `[TODO: 简述]`；⑧ `new` 增加 `--answers`，`--yes` 只表示不提问；插件开发技能在建模确认后才调用 `new`；目标目录必须不存在或为空；⑨ 从未生成过（没有 build-manifest）时 doctor 把全部节点列为新增、不报 `DOCTOR_BASELINE_MISSING`；`new` 执行 doctor | input-config.md §7.3；interfaces.md §1.1、§1.2、§1.4、§1.6、§1.7；mods.md §3.2；scaffold.md 总览、§10、§12 |
+| D56 | （① 已由 D67 取代，其余仍有效）配置编辑与向导的评审结论（2026-11-03，scaffold.md 单元 12）：① 安装包带上 lite、fullstack 示例的核心配置作为 `new --from` 的种子，显式列出文件，拷贝时把 `$schema` 改写为 `.scaffold/` 下的路径；② `add node` 增加 `--optional-output`，与 `--output` 按命令行顺序写入 `outputs`；③ 修改核心配置时在原文上插入或替换片段，保留原有键序、缩进和换行；④ `add`、`module`、`new` 先在内存中修改配置并走 doctor 流水线，没有 error 时与生成结果一起写盘，否则什么都不写；⑤ 导入技能时发现的内容问题（`LEGACY_ENTRY_REF` 等）只报 warning、照样导入，frontmatter 的 `name` 改为技能名；⑥ `add node` 增加 `--terminal`，向导询问最后一个节点是否为终态节点；⑦ `--set` 沿 Schema 属性指定字段、按 Schema 类型转换值；`enable artifactSync` 必须给出 `allowedFrom` 或 `allowedCheckpoints`，`artifacts` 预填非 `.json` 输出、简述为 `[TODO: 简述]`；⑧ `new` 增加 `--answers`，`--yes` 只表示不提问；插件开发技能在建模确认后才调用 `new`；目标目录必须不存在或为空；⑨ 从未生成过（没有 build-manifest）时 doctor 把全部节点列为新增、不报 `DOCTOR_BASELINE_MISSING`；`new` 执行 doctor | input-config.md §7.3；interfaces.md §1.1、§1.2、§1.4、§1.6、§1.7；mods.md §3.2；scaffold.md 总览、§10、§12 |
 | D57 | 打包与升级的评审结论（2026-11-03，scaffold.md 单元 13）：① `package` 不再“重置运行期字段”；② CLI 不提供 `upgrade`，版本变化由 doctor 处理：同一主版本内直接替换 managed、module 文件并在 `changes.versions` 中报告，`coreVersion` 主版本变化报 `CORE_MAJOR_CHANGED`（`doctor --allow-major-upgrade` 放行），脚手架比记录旧时报 `SCAFFOLD_OUTDATED` 并拒绝；lint、check 对可升级的插件报 `SCAFFOLD_VERSION_CHANGED`；漂移只按磁盘与 build-manifest 记录是否一致判断；v1 不提供 `migrate`；③ 脚手架用标准库 zipapp 发布成一个文件 `autobiz-plugin.pyz`，插件开发技能在 `scripts/` 下带同一个文件；④ zip 中只有一个顶层目录 `<plugin.id>/`（待 DevClaw 确认）；⑤ 打包时 `plugin.json`、`board_core/`、`runtime/` 只收 build-manifest 记录的文件，开发者目录跳过缓存和系统文件，按实际路径收清单引用的文件（缺失时报 `PLUGIN_REF_MISSING`），`sys/` 只在启用知识模块且没有声明 `source` 时打包，zip 可重复；⑥ Node 依赖仍待定，在此之前 package 不安装、不带 `node_modules/` | §2.3、§3、§3.1、§4、§9；input-config.md §3.3、§4.4、§7.1、§7.2、§7.3；output-spec.md §1、§7.1、§8；interfaces.md §1.1、§1.3、§1.7、§4.5、§5；scaffold.md 总览、§9、§10、§13 |
 | D58 | 插件开发技能的评审结论（2026-11-03，scaffold.md 单元 14）：① 技能不带 `input-config.md` 副本，SKILL.md 只写建模和配置的要点，细节以 CLI 的 Issue 和插件目录 `.scaffold/` 下的 Schema 为准，`references/` 只有 `modeling-guide.md`；② 去掉技能自己的 `agents/openai.yaml`；③ 以只含这个技能的 DevClaw 插件发布（同 demo）：`tools/make_pyz.py` 打出 `.pyz` 后组装 `plugin.json` 和技能目录，`.pyz` 放在技能的 `scripts/` 下、不提交进仓库；SKILL.md 中的命令用 `${pluginPath}` 定位 `.pyz`，没有被替换时按 SKILL.md 所在目录定位；④ 对话流程与已定决策对齐：不问知识沉淀入口（D33），触发场景不写“给节点加校验”（D32），填写空白 SKILL.md 的 `description` 后再执行一次 doctor（D49），每次修改后 lint、一组修改完成后 doctor 再 check，`--force` 和 `--allow-*` 只在开发者明确同意后使用 | §3.1；interfaces.md §1.1、§1.6、§1.7；scaffold.md 总览、§14 |
 | D59 | 运行框架模板的评审结论（2026-11-03，scaffold.md 单元 15）：① `runtime/common/cli.py`（入口共用的参数、输出与退出码）和 `runtime/adapters/board_view.py`（看板数据拼装，`inspect_state.py`、`inspect_workflow_templates.py`、`render_session_context.py`、`board_events.py` 共用，节点文案读 `runtime/config/board.json`）加入输出目录，归属 managed；`BoardError` 定义在 `query.py`；② `sync_knowledge.py` 只更新知识目录，不回写配置文件；③ v1 运行框架不实现动态阶段和跳过节点：`flow.json` 保留 `dynamicStages`、`skip`，出现非默认值时 `query.load_flow` 拒绝加载，`update_state.py` 不提供 `--skip-node`，`query.pending_choice`、`engine.skip_nodes` 留到 v2；`inputs`、`validate` 照常实现；v1 的写入口只有 `init_workspace.py`、`init_feature.py`、`update_state.py` 三个；④ 改掉“框架只查存在性”的旧说法，完成判定是存在且非空（D37） | §2.2、§6.4；input-config.md §2.5、§2.7、§2.8；output-spec.md §1、§5.2；interfaces.md §3.1、§3.5.2、§3.5.3、§4.1、§4.2、§4.6、§5；scaffold.md §15 |
@@ -444,8 +445,9 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 | D62 | 插件全局钩子模块（2026-11-04）：新增非核心模块 `globalHooks`（`modules/globalHooks.json`，入口文件 `modules.globalHooks` 引用即启用），配置只有 `hooks`（要启用的钩子 id 数组）；模块包 `booter/scaffold/modules/global_hooks/` 的 `hooks/<包>/` 下每个目录一个公共钩子（`hook.json` 加 `files/` 中的脚本），`catalog()` 自动发现，新增钩子不改代码；`contribute` 把脚本拷到 `hooks/<id>/`（module），条目经新增的 `Contribution.hooks` 写进 `hooks/hooks.json`，排在框架的产物检查钩子之后、开发者条目之前；`new` 的向导逐个询问，`--answers` 写 `globalHooks`，`hook list/enable/disable` 是编辑模块文件的便捷命令；validate 报 `GLOBAL_HOOK_UNKNOWN`、`GLOBAL_HOOK_DUP`。首批为全栈版的 `secrets-check`（明文密码检查）和 `performance-check`（前端性能检查，适配新入口 `update_state.py`） | interfaces.md §1.1、§1.4、§4.7、§4.8；input-config.md §3.2、§4.6、§7.1；output-spec.md §1 |
 | D63 | 核心配置骨架（2026-11-04）：`new <dir> --skeleton [--module <id> …]` 只写出带 `[TODO: …]` 占位的入口文件、`workflow.json`（biz、dev 各一个节点）、所选模块配置和 `.scaffold/` Schema，不执行 doctor；load 在 Schema 校验时逐项报出占位 `TODO_FIELD`（默认 error，doctor 不生成；`artifactSync` 的简述为 warning，沿用 D56，打包前由 `TODO_PLACEHOLDER` 拦下），占位处的 Schema 问题不再另报 `INPUT_SCHEMA`；开发者填完后 `lint` → `doctor` → `package` | interfaces.md §1.1、§1.4.1；input-config.md §7.1 |
 | D64 | 节点技能按阶段分组（2026-11-04）：节点技能放在 `skills/autobiz\|autodev\|autoops/<技能>/`，分组由节点所属阶段决定（biz、dev、ops），与技能名无关；空白 `SKILL.md` 直接生成在分组目录；找到的技能不在分组目录时 lint 报 `SKILL_LAYOUT` warning，doctor 先挪整个技能目录，并把 `skills/` 下开发者文件中对旧目录的引用改成新目录，结果列在 `changes.skills.moved`；目标已存在报 `SKILL_LAYOUT_CONFLICT`；`add skills` 导入平铺的技能集合（如 lite）后同样挪进分组；不绑定节点的辅助技能和模块生成的技能不分组 | input-config.md §5、§7.1；interfaces.md §1.7；output-spec.md §1 |
-| D65 | 骨架引导的易用性修订（2026-11-04）：`plugin.id` 改为只含英文字母、数字、短横线和下划线（`^[A-Za-z0-9_-]+$`，不超过 64 字符），向导规范化时不再转小写；`new --skeleton` 的 `modules/globalHooks.json` 直接列出全部可用钩子，用户删掉不需要的；`hook list` 不在插件目录中也能运行；骨架引导技能用 `request_user_input` 出选择题（起点、目录、模块、填写方式、技能来源），并内置 workflow 与各模块的填写指南 | input-config.md §3.3；interfaces.md §1.1、§1.4.1 |
+| D65 | （选择题中的“起点”已由 D67 取代，其余仍有效）骨架引导的易用性修订（2026-11-04）：`plugin.id` 改为只含英文字母、数字、短横线和下划线（`^[A-Za-z0-9_-]+$`，不超过 64 字符），向导规范化时不再转小写；`new --skeleton` 的 `modules/globalHooks.json` 直接列出全部可用钩子，用户删掉不需要的；`hook list` 不在插件目录中也能运行；骨架引导技能用 `request_user_input` 出选择题（起点、目录、模块、填写方式、技能来源），并内置 workflow 与各模块的填写指南 | input-config.md §3.3；interfaces.md §1.1、§1.4.1 |
 | D66 | 产物同步技能取全栈版原文（2026-11-05）：`artifactSync` 模块带入全栈版 `autobizdevops-artifact-sync` 最新提交的技能，只改脚本的导入和路径（运行框架 `runtime.common.query`、生成的同步配置）和文案中的路径说明，并去掉对全栈版独有文件的依赖：① 生成 `FEATURE_API_DETAIL.md` 的步骤保留，代码仓库改取 Feature 记录的 `deployUnits`（`--check` 输出 `deploy_units`），没有时取会话工作区的 Git 仓库，实现范围取带“cmbdevclaw提交”的提交，不再读 `plan.json` 的 `codeWorkspaces`、Batch manifest、implementation evidence，多仓库时代码依据注明 `deployUnitId`；② 同步配置默认把 `FEATURE_API_DETAIL.md` 列入 `extraPaths`（已作为节点输出登记或 `extraPaths` 中已写时不追加）；③ `ARTIFACT_CATALOG.json` 的 `source` 按是否来自 `extraPaths` 判断，`category` 对照表另外认 lite 的 `plan.md`；④ `references/ask-user-question.md` 用全栈版共享协议的完整原文 | output-spec.md §7.2；input-config.md §4.5 |
+| D67 | 样例移出 booter（2026-11-05）：① `new` 去掉 `--from blank\|lite\|fullstack`，`autobiz-plugin.pyz` 不再带样例种子；`new` 只从问答或 `--answers` 生成核心配置，`--yes` 时 `--answers` 必须给出 `plugin` 和 `nodes`；自己手写时用 `new --skeleton`（取代 D24 中以样例为起点的迁移方式、D56 ①）；② 骨架引导技能不再问起点，总是生成空白骨架（取代 D65 中的“起点”一题）；③ lite、fullstack 样例从 `booter/examples/` 移到仓库根目录的 `fixtures/`，只供脚手架自身的测试，不随 booter 分发；用到它们的测试在 `fixtures/` 不在时跳过，`booter/examples/` 只留 `minimal`；④ 随插件发布的运行框架、模块脚本和 Schema 说明中不再写来自 lite、全栈版的出处，行为不变 | §3.1；input-config.md §9；interfaces.md §1.1、§1.4；priorities.md §6 |
 
 ## 9. 遗留问题
 
@@ -475,7 +477,7 @@ Schema 只检查结构，引用、顺序、路径安全、命令格式等语义�
 | 目录 | 入口散在 `hooks/`、`board_core/`、根目录 | 入口统一到 `runtime/`，`hooks/` 归开发者，`board_core/` 只放 DevClaw 读取的命令与模块清单（D31），`.scaffold/lock.json` 改为 `runtime/build-manifest.json`（D16） |
 | 内核 | `board_core` + 对外稳定 API `board_core.api` | 内部库 `query.py` / `engine.py`，不对开发者代码开放（D17） |
 | 会话 | 只有策略和知识 | 增加流程上下文段；知识组装默认用全栈版的 collector，插件可以直接替换组装脚本（D26） |
-| 初始化 | `new` 问答 | 初始化向导按七类输入问答，可导入已有技能资源；以 lite、全栈版样例为起点，不从已有插件反推（D24） |
+| 初始化 | `new` 问答 | 初始化向导按七类输入问答，可导入已有技能资源；不带样例种子，核心配置来自问答、`--answers` 或 `new --skeleton` 骨架，不从已有插件反推（D24、D67） |
 | 流程规则 | 只有线性流程 | 终态节点、可选输出进 v1；动态阶段、跳过节点、输入只在 `flow.json` 中保留字段，用户不配置（D32）；插件自有的校验与钩子配置留在插件文件中（D22、D23） |
 | 代码产物 | 代码节点没有产物 | 仍不作为产物，所有节点按同一套规则推进；更严格的判断写在技能正文中（D37） |
 | 状态推进 | 技能中的 `scaffold` 状态片段 | 状态维护片段写在 `SKILL.md` 开头，checkpoint 与节点一一对应；技能可以不提供，build 生成空白 `SKILL.md`；改配置后用 `doctor` 重新生成（D38） |

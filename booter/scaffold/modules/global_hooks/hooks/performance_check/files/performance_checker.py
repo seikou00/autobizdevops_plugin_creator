@@ -4,9 +4,8 @@
 7 条核心性能规则，每条规则独立为一个检测方法。
 用于在 skill hook 中调用。
 
-来源：全栈版 autobiz_kanban 的 hooks/performance_checker.py，作为插件全局钩子模块的 performance-check 发布
-（booter/scaffold/modules/global_hooks/hooks/performance_check/）。相对原脚本的改动：触发命令兼容新入口 update_state.py，
-触发的 checkpoint 可以由命令行参数指定，工作区缺省时按 PLUGIN_WORKSPACE + PROJECT_DIR 定位，去掉对全栈版 paths 模块的依赖。
+作为插件全局钩子模块的 performance-check 发布（booter/scaffold/modules/global_hooks/hooks/performance_check/）。
+触发命令兼容新入口 update_state.py，触发的 checkpoint 可以由命令行参数指定，工作区缺省时按 PLUGIN_WORKSPACE + PROJECT_DIR 定位。
 
 工作流程：
 1. 宿主传入的命令是 update_state.py（或旧入口 update_checkpoint.py）推进到指定 checkpoint（默认 code_done）时才继续，否则静默退出

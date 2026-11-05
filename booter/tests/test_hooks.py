@@ -6,7 +6,7 @@ import json
 import unittest
 from pathlib import Path
 
-from tests.helpers import cli, temp_dir
+from tests.helpers import cli, new_from_example
 
 GUARD = "python -X utf8 hooks/artifact_guard.py"
 MINE = {"matcher": "write_file", "hooks": [{"type": "command", "command": "python hooks/mine.py"}]}
@@ -20,10 +20,7 @@ def commands(hooks: dict) -> list:
 
 class HooksTest(unittest.TestCase):
     def new_lite(self) -> Path:
-        root = temp_dir(self) / "plugin"
-        code, payload = cli("new", str(root), "--from", "lite", "--yes")
-        self.assertEqual(code, 0, payload)
-        return root
+        return new_from_example(self, "lite")
 
     def read(self, root: Path) -> dict:
         return json.loads((root / "hooks/hooks.json").read_text("utf-8"))

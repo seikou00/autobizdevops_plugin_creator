@@ -39,7 +39,7 @@
         "dialogTips": { "type": "string", "default": "发起产物同步" }
       }
     },
-    "uploadUrl": { "type": "string", "pattern": "^https?://", "default": "https://tscode-cos-plugin.paasuat.cmbchina.cn/file/upload", "description": "上传服务地址；默认值取自全栈版 sync_artifacts.py。" },
+    "uploadUrl": { "type": "string", "pattern": "^https?://", "default": "https://tscode-cos-plugin.paasuat.cmbchina.cn/file/upload", "description": "上传服务地址。" },
     "maxFileSizeMiB": { "type": "integer", "minimum": 1, "default": 5 },
     "extraPaths": {
       "type": "object",

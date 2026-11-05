@@ -6,15 +6,12 @@ import json
 import unittest
 from pathlib import Path
 
-from tests.helpers import cli, temp_dir
+from tests.helpers import cli, new_from_example
 
 
 class SkillLayoutTest(unittest.TestCase):
     def new_lite(self) -> Path:
-        root = temp_dir(self) / "plugin"
-        code, payload = cli("new", str(root), "--from", "lite", "--yes")
-        self.assertEqual(code, 0, payload)
-        return root
+        return new_from_example(self, "lite")
 
     def test_blank_skills_are_created_in_stage_groups(self):
         root = self.new_lite()

@@ -1,4 +1,4 @@
-"""脚手架自带的资源：runtime/、schemas/、模块包文件和 new 的种子。
+"""脚手架自带的资源：runtime/、schemas/ 和模块包文件。
 
 在仓库中运行时从仓库根目录读取；打成 autobiz-plugin.pyz 后从包内的 scaffold/_data/ 读取（D57），
 两种情况都通过 importlib.resources 访问，不依赖 __file__ 能否打开。

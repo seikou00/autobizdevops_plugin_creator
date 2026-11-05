@@ -13,7 +13,7 @@
       "default": {},
       "description": "清单解析方式。",
       "properties": {
-        "format": { "enum": ["agents-manifest-v1"], "default": "agents-manifest-v1", "description": "v1 只支持 lite 的 agents.manifest.json 格式。" },
+        "format": { "enum": ["agents-manifest-v1"], "default": "agents-manifest-v1", "description": "v1 只支持 agents.manifest.json 格式。" },
         "path": { "$ref": "#/definitions/relativeDir", "default": "agents.manifest.json", "description": "清单文件，相对知识目录 sys/。" }
       }
     },

@@ -1,4 +1,8 @@
-"""测试共用：把示例的核心配置拷到临时目录并生成插件。"""
+"""测试共用：把示例的核心配置拷到临时目录并生成插件。
+
+示例在 booter/examples/（随 booter 分发）或仓库根目录的 fixtures/（只供测试，不随 booter 分发），
+fixtures/ 不在时，用到它的测试跳过。
+"""
 
 from __future__ import annotations
 
@@ -11,6 +15,7 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]          # booter/
+FIXTURES = REPO.parent / "fixtures"                 # 仓库根目录下只供测试的样例
 SIBLINGS = REPO.parents[1]                          # 与本仓库并列存放参考插件仓库的目录
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
@@ -25,15 +30,30 @@ def temp_dir(test) -> Path:
     return path
 
 
-def copy_example(name: str, target: Path) -> Path:
-    shutil.copytree(REPO / "examples" / name, target, ignore=shutil.ignore_patterns("output"))
+def example_dir(test, name: str) -> Path:
+    for base in (REPO / "examples", FIXTURES):
+        if (base / name).is_dir():
+            return base / name
+    test.skipTest(f"没有示例 {name}（booter/examples/ 或 fixtures/）")
+
+
+def copy_example(test, name: str, target: Path) -> Path:
+    shutil.copytree(example_dir(test, name), target, ignore=shutil.ignore_patterns("output", ".DS_Store"))
     return target
 
 
 def built_example(test, name: str) -> Path:
-    root = copy_example(name, temp_dir(test) / name)
+    root = copy_example(test, name, temp_dir(test) / name)
     result = build(Tree(root))
     test.assertTrue(result.ok, [issue for issue in result.report.issues if issue.level == "error"])
+    return root
+
+
+def new_from_example(test, name: str) -> Path:
+    """以示例的核心配置为起点，像开发者那样执行 doctor 生成插件。"""
+    root = copy_example(test, name, temp_dir(test) / "plugin")
+    code, payload = cli("-C", str(root), "doctor")
+    test.assertEqual(code, 0, payload)
     return root
 
 

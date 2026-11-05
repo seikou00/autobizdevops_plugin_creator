@@ -40,15 +40,20 @@ class CatalogTest(unittest.TestCase):
             self.assertNotIn(HOOK_DIR, json.dumps(spec.rendered_entries()))
 
 
+ANSWERS = {"plugin": {"id": "hooks-demo", "name": "全局钩子", "version": "0.1.0", "description": "d"},
+           "nodes": [{"stage": "biz", "id": "prd", "seq": 1, "name": "需求", "skill": "demo-prd", "outputs": ["PRD.md"]},
+                     {"stage": "dev", "id": "code", "seq": 2, "name": "编码", "skill": "demo-code"}]}
+
+
 class GlobalHooksModuleTest(unittest.TestCase):
     def new(self, hooks=None) -> Path:
         root = temp_dir(self) / "plugin"
-        args = ["new", str(root), "--from", "lite", "--yes"]
+        answers = dict(ANSWERS)
         if hooks is not None:
-            answers = temp_dir(self) / "answers.json"
-            answers.write_text(json.dumps({"globalHooks": {"hooks": hooks}}), "utf-8")
-            args += ["--answers", str(answers)]
-        code, payload = cli(*args)
+            answers["globalHooks"] = {"hooks": hooks}
+        path = temp_dir(self) / "answers.json"
+        path.write_text(json.dumps(answers, ensure_ascii=False), "utf-8")
+        code, payload = cli("new", str(root), "--yes", "--answers", str(path))
         self.assertEqual(code, 0, payload)
         return root
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """发布脚手架：打出 autobiz-plugin.pyz（标准库 zipapp，D57），再组装插件开发技能的 DevClaw 插件包（D58）。
 
-.pyz 包内：scaffold/ 包（含模块包的 files/），以及 scaffold/_data/ 下的 runtime/、schemas/ 和 new 的种子
-（examples/lite、examples/fullstack 的核心配置，显式列出，Q12.1）。执行方式：python3 autobiz-plugin.pyz <命令>。
+.pyz 包内：scaffold/ 包（含模块包的 files/），以及 scaffold/_data/ 下的 runtime/、schemas/。
+执行方式：python3 autobiz-plugin.pyz <命令>。
 
 插件包 autobiz-plugin-creator-<版本>.zip 只有一个顶层目录 autobiz-plugin-creator/：生成的 plugin.json，
 skills/autobiz-plugin-creator/ 下的 SKILL.md、references/ 和放进 scripts/ 的同一个 .pyz（不提交进仓库），
@@ -24,12 +24,6 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]          # booter/
 SKIPPED = ("__pycache__", ".DS_Store", "Thumbs.db")
-SEED_FILES = {
-    "lite": ("plugin.scaffold.json", "workflow.json", "modules/board.json", "modules/session.json",
-             "modules/knowledge.json", "modules/artifactSync.json"),
-    "fullstack": ("plugin.scaffold.json", "workflow.json", "modules/board.json", "modules/session.json",
-                  "modules/knowledge.json", "modules/artifactSync.json", ".mcp.json", "hooks/hooks.json"),
-}
 MAIN = "import sys\n\nfrom scaffold.cli import main\n\nsys.exit(main())\n"
 CREATOR = "autobiz-plugin-creator"
 # 插件包中的技能 → 要打包的文件；.pyz 只放在 autobiz-plugin-creator/scripts/ 下，其他技能引用它
@@ -53,11 +47,6 @@ def stage(directory: Path) -> None:
     data = directory / "scaffold" / "_data"
     _copy_tree(REPO / "runtime", data / "runtime")
     _copy_tree(REPO / "schemas", data / "schemas")
-    for name, files in SEED_FILES.items():
-        for rel in files:
-            destination = data / "examples" / name / rel
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(REPO / "examples" / name / rel, destination)
     (directory / "__main__.py").write_text(MAIN, encoding="utf-8")
 
 

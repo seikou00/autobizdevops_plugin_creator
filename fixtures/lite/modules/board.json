@@ -1,0 +1,6 @@
+{
+  "$schema": "../../../booter/schemas/modules/board.schema.json",
+  "display": {
+    "workflowLabel": "需求开发"
+  }
+}

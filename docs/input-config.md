@@ -675,7 +675,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 
 ### 9.1 lite
 
-[examples/lite/](../booter/examples/lite/)：复刻 autobizdevops_lite，共六个配置文件：
+[fixtures/lite/](../fixtures/lite/)：复刻 autobizdevops_lite，共六个配置文件（只供测试，不随 booter 分发，D67）：
 
 | 文件 | 内容 |
 |---|---|
@@ -686,11 +686,11 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `modules/knowledge.json` | 内置组装器和知识仓库同步 |
 | `modules/artifactSync.json` | 从 `plan` 完成起同步 5 个文档产物 |
 
-生成内容见 [examples/lite/output/](../booter/examples/lite/output/)。产物同步是样例额外启用的，lite 本身没有这个能力。lite 中 `plan.md` 对旧文件名 `PLAN.md` 的回退在 v1 核心配置中不再表达（interfaces.md §5）。
+生成内容见 [fixtures/lite/output/](../fixtures/lite/output/)。产物同步是样例额外启用的，lite 本身没有这个能力。lite 中 `plan.md` 对旧文件名 `PLAN.md` 的回退在 v1 核心配置中不再表达（interfaces.md §5）。
 
 ### 9.2 全栈版
 
-[examples/fullstack/](../booter/examples/fullstack/)：按全栈版插件（仓库 `autobiz_kanban`）的现有内容编写：
+[fixtures/fullstack/](../fixtures/fullstack/)：按全栈版插件（仓库 `autobiz_kanban`）的现有内容编写（只供测试，不随 booter 分发，D67）：
 
 | 文件 | 内容 |
 |---|---|
@@ -701,7 +701,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `modules/knowledge.json` | 内置组装器和知识仓库同步 |
 | `modules/artifactSync.json` | 从 `plan` 完成起同步（编码进行中除外）5 个文档产物，以及 `prd` 的原始材料 |
 
-生成内容见 [examples/fullstack/output/](../booter/examples/fullstack/output/)。
+生成内容见 [fixtures/fullstack/output/](../fixtures/fullstack/output/)。
 
 与全栈版现有 `board_config.json` 的差异：
 

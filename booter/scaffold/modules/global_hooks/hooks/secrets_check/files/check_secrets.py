@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """明文密码检查：写入 .yaml/.yml/.properties 时发现明文的密码、密钥、token 就拦截（退出码 2）。
 
-来源：全栈版 autobiz_kanban 的 hooks/check-secrets-new.py，原样作为插件全局钩子模块的 secrets-check 发布
-（booter/scaffold/modules/global_hooks/hooks/secrets_check/）。
+作为插件全局钩子模块的 secrets-check 发布（booter/scaffold/modules/global_hooks/hooks/secrets_check/）。
 """
 import sys
 import json

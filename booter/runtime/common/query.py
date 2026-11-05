@@ -269,7 +269,7 @@ def empty_state() -> dict:
 
 
 def _from_v3(payload: dict) -> dict:
-    """全栈版的 autobizdevops.state.v3（不带 pluginId）当作本插件的旧格式读取（D60）。
+    """旧版 autobizdevops.state.v3 状态（不带 pluginId）当作本插件的旧格式读取（D60）。
 
     记录可以是对象或 checkpoint 字符串；已下架的 lean、custom 模板按 standard 继续，原值记在 legacyWorkflowTemplate。
     首次写入时由 engine 备份原文件并升级为 schemaVersion 1。

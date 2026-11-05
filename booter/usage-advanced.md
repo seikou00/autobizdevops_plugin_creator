@@ -140,7 +140,7 @@ P/
 - **你自己的钩子直接写在 `hooks/hooks.json` 里**，照着脚手架生成的条目打样，脚本也放在 `hooks/` 下。写法 `{"PreToolUse": [{"matcher": …, "hooks": […]}]}` 或包在 `{"hooks": {…}}` 下都可以；
 - 命令指向 `hooks/artifact_guard.py` 或 `hooks/<全局钩子 id>/` 的条目归脚手架：每次重新生成都排在最前面并按当前配置重写，手改会被覆盖；其他条目都是你的，原样保留；
 - 改自己的条目直接生效，不需要 doctor；结构不对报 `PLUGIN_HOOKS_INVALID`；
-- 钩子命令写的是 `python -X utf8 hooks/artifact_guard.py`，路径相对插件根目录，与全栈版 `hooks.json` 的写法一致。
+- 钩子命令写的是 `python -X utf8 hooks/artifact_guard.py`，路径相对插件根目录。
 
 **插件全局钩子模块**：脚手架还自带一组可以按需启用的公共钩子，由模块 `globalHooks` 管理（见 §3.8），合并顺序是：产物检查钩子 → 全局钩子（按 `modules/globalHooks.json` 中列出的顺序）→ 你自己在 `hooks/hooks.json` 里写的条目。
 
@@ -183,15 +183,13 @@ python3 -m scaffold -C P hook disable performance-check                 # 关闭
 ## 4. 新建插件：`new`
 
 ```bash
-python3 -m scaffold new <目录> [--from blank|lite|fullstack] [--yes] [--answers <file>|-]
+python3 -m scaffold new <目录> [--yes --answers <file>|-]
 ```
 
 | 写法 | 效果 |
 |---|---|
 | `new P` | 交互向导；回答先在内存中校验，有错时让你重答，放弃则什么都不写 |
-| `new P --from lite --yes` | 直接用样例（`booter/examples/lite/`、`fullstack/`）的核心配置 |
-| `new P --from lite --yes --answers a.json` | 样例 + 回答覆盖 |
-| `new P --from blank --yes --answers a.json` | 完全由回答生成，此时必须给出 `plugin` 和 `nodes` |
+| `new P --yes --answers a.json` | 不提问，完全由回答生成，必须给出 `plugin` 和 `nodes` |
 | `new P --skeleton [--module <id> …]` | 只写出带 `[TODO: …]` 占位的核心配置骨架，不生成插件；填完后 `lint` 查看还缺什么，再 `doctor`、`package`（见下文） |
 
 回答文件（`-` 表示从 stdin 读取）：
@@ -211,19 +209,19 @@ python3 -m scaffold new <目录> [--from blank|lite|fullstack] [--yes] [--answer
 }
 ```
 
-- `plugin` 按字段覆盖样例；`nodes`、`board`、`session`、`knowledge`、`artifactSync` 写了就整体替换样例中的对应内容；写了 `knowledge`、`artifactSync` 即启用；
-- `skills` 是技能名 → 技能目录，`null` 表示先不提供（生成空白 `SKILL.md`）；要逐个写，导入到 `skills/<skill>/`，不保留分组。整个技能集合（尤其是分组的 fullstack）建议 `new` 之后用 `add skills --from` 导入；
+- `plugin`、`nodes` 必填；`board`、`session`、`knowledge`、`artifactSync` 不写就用默认值，写了 `knowledge`、`artifactSync` 即启用；
+- `skills` 是技能名 → 技能目录，`null` 表示先不提供（生成空白 `SKILL.md`）；要逐个写，导入到 `skills/<skill>/`，不保留分组。整个技能集合（尤其是分组的集合）建议 `new` 之后用 `add skills --from` 导入；
 - `agents` 是 agents 目录，原样拷到 `P/agents/`；不写就不创建 `agents/`；
 - `globalHooks` 写了就启用插件全局钩子模块（见 §3.8），不写就只有产物检查钩子。
 
-生成 fullstack 并带上分组的技能和 agents（技能会引用 `skills/references/`、`skills/autobiz/hooks/` 等共享路径，所以用 `add skills` 整体导入，而不是在 `--answers` 里逐个列出）：
+由回答生成插件，再带上分组的技能和 agents（技能会引用 `skills/references/`、`skills/autobiz/hooks/` 等共享路径，所以用 `add skills` 整体导入，而不是在 `--answers` 里逐个列出）：
 
 ```bash
 cd ~/Documents/GitHub/autobizdevops_plugin_creator/booter
-G=~/Documents/GitHub; OUT=$G/plugin-fullstack
+G=~/Documents/GitHub; OUT=$G/my-plugin
 
-python3 -m scaffold new $OUT --from fullstack --yes
-python3 -m scaffold -C $OUT add skills --from $G/autobiz_kanban/skills --agents $G/autobiz_kanban/agents
+python3 -m scaffold new $OUT --yes --answers answers.json
+python3 -m scaffold -C $OUT add skills --from $G/my-skills --agents $G/my-agents
 ```
 
 **只写骨架**：想自己手写配置时，先让脚手架按 Schema 写出结构，再照着占位填：
@@ -271,11 +269,11 @@ python3 -m scaffold -C P add skills --from ../skills --agents ../agents     # �
   | 集合根目录、分组目录下的其他内容（自己的 `SKILL.md`、`references/`、`hooks/` 等） | 共享资源 | 原路径，例如 `skills/references/`、`skills/<g>/hooks/` |
   | 技能目录内更深层的 `SKILL.md` | 技能自己的资源 | 随技能拷贝 |
 
-  - 来源本身是一个分组（自己含 `SKILL.md`、下面是技能，例如 `autobiz_kanban/skills/autodev`）时按 `skills/autodev/<skill>/` 导入，所以分组逐个导入和整体导入的结果一致；
+  - 来源本身是一个分组（自己含 `SKILL.md`、下面是技能，例如 `my-skills/autodev`）时按 `skills/autodev/<skill>/` 导入，所以分组逐个导入和整体导入的结果一致；
   - 共享资源已存在时，内容相同就跳过，不同就拒绝导入；其中的 `SKILL.md` 同样迁移 frontmatter；
   - 脚手架生成的技能（如产物同步模块的 `autobizdevops-artifact-sync`）跳过不导入；同名技能在集合中出现两次时拒绝导入；
   - 生成的空白 `SKILL.md` 会被导入的同名技能替换；
-  - 导入后 doctor 把节点技能挪进节点阶段对应的分组目录（biz → `skills/autobiz/`，dev → `skills/autodev/`，ops → `skills/autoops/`），平铺的集合（如 lite）也一样，见下文「技能目录」；
+  - 导入后 doctor 把节点技能挪进节点阶段对应的分组目录（biz → `skills/autobiz/`，dev → `skills/autodev/`，ops → `skills/autoops/`），平铺的集合也一样，见下文「技能目录」；
   - 未被节点绑定的技能也会导入，原样交付；
 - 导入时 frontmatter 的 `name` 改为目标技能名，顶层 `version`、`author` 迁到 `metadata`；
 - 技能已存在或其他分组下有同名技能时拒绝导入（同一集合重复导入也会被拒绝）；只有 build 生成的空白 `SKILL.md` 可以被导入覆盖；

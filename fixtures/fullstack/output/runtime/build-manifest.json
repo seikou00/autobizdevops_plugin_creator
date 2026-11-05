@@ -11,12 +11,12 @@
     "artifactSync": "1.0.0"
   },
   "inputs": {
-    "plugin.scaffold.json": "sha256:a0f3f700c66742cbf2e4ec9c2e8c8ca9b2f267ede8198487c1b9066455ddb1b9",
-    "workflow.json": "sha256:7f2f74261a68160f62ac325c331a152022d792a139df08b24d330120f3f3f5ca",
-    "modules/board.json": "sha256:26ee27b35e545c368d0b0565152615af4f231d0cd18c753b99f5a45b168e5878",
-    "modules/session.json": "sha256:b62fb2653e8113d5aeeba312a362da4f02c0fe34b348241e70f1fefb050c4508",
-    "modules/knowledge.json": "sha256:10351ec24714d7554c1640cf63c086eeba299727a8cbb33ecb33910ea18d648a",
-    "modules/artifactSync.json": "sha256:d1de5e629c39bab20eb66f4bfab0ddab0a612bb09f50606db36ac402abb07db8",
+    "plugin.scaffold.json": "sha256:d2984ecab82f30307862f200dbece944774cadec622163203fe12380fafedb69",
+    "workflow.json": "sha256:037ae3e1d1e28c5dba8d3a55f1d8eeb428db58eb3d36023957f909e2e252445c",
+    "modules/board.json": "sha256:144f102413c3affb271b4449e856bd99739e86eae5ee27efea50314731ab92bb",
+    "modules/session.json": "sha256:06666d77e412e0e36ad34e1615fc3effed5127cdf1e527236ae27025c4cde91c",
+    "modules/knowledge.json": "sha256:b5f3b0e491d90a6a158b79c64ca6619aa520d833e915e67f35cf0575fd5763bd",
+    "modules/artifactSync.json": "sha256:f8d2532cd9f9df21c11295fdc2f84bec14551edbcc5291557c4ed457558bda79",
     "skills/autobiz/autobiz-requirement-discuss/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
     "skills/autodev/autodev-code/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
     "skills/autodev/autodev-design/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
@@ -130,7 +130,7 @@
     },
     "runtime/config/flow.json": {
       "ownership": "generated",
-      "sha256": "sha256:229490491fc296697a57e4200c90195535cb519f4c8a2bd361ddead01c01d24e"
+      "sha256": "sha256:a804798a639c754d489d83b1f2c31a9baaea1108c2e968d58ddaf657b5178cd4"
     },
     "runtime/config/knowledge.json": {
       "ownership": "generated",

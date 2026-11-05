@@ -19,8 +19,8 @@
 
 | 命令 | 作用 |
 |---|---|
-| `autobiz-plugin new <dir> [--from blank\|lite\|fullstack] [--answers <file\|->] [--yes]` | 初始化向导：按 §1.4 的七类输入问答，生成入口文件 `plugin.scaffold.json`、`workflow.json`、需要的 `modules/*.json` 和工程目录，随后执行 doctor。`<dir>` 必须不存在或为空；`--answers` 给出回答（§1.4），`--yes` 不提问 |
-| `autobiz-plugin new <dir> --skeleton [--module <id> …]` | 只写出带 `[TODO: …]` 占位的核心配置骨架（入口文件、`workflow.json`、`--module` 选中的模块配置）和 `.scaffold/` Schema，不执行 doctor；开发者填完后执行 `lint` 查看还缺什么，再 `doctor`、`package`（§1.4.1，D63）。不能与 `--from`、`--answers`、`--yes` 一起使用 |
+| `autobiz-plugin new <dir> [--answers <file\|->] [--yes]` | 初始化向导：按 §1.4 的七类输入问答，生成入口文件 `plugin.scaffold.json`、`workflow.json`、需要的 `modules/*.json` 和工程目录，随后执行 doctor。`<dir>` 必须不存在或为空；`--answers` 给出回答（§1.4），`--yes` 不提问，此时 `--answers` 必须给出 `plugin` 和 `nodes`。脚手架不带样例种子，没有 `--from` |
+| `autobiz-plugin new <dir> --skeleton [--module <id> …]` | 只写出带 `[TODO: …]` 占位的核心配置骨架（入口文件、`workflow.json`、`--module` 选中的模块配置）和 `.scaffold/` Schema，不执行 doctor；开发者填完后执行 `lint` 查看还缺什么，再 `doctor`、`package`（§1.4.1，D63）。不能与 `--answers`、`--yes` 一起使用 |
 | `autobiz-plugin add node <id> --name <name> --skill <skill> --stage biz\|dev\|ops --seq <n> [--output <path> …] [--optional-output <path> …] [--terminal]` | 在 `workflow.json` 的 `nodes.<stage>` 中添加节点，按 `seq` 插到组内对应位置，不改其他节点的 `seq`。`--output` 是必需输出，`--optional-output` 是可选输出（写成 `{path, optional: true}`），两者按命令行上的顺序追加到 `outputs`；含 glob 的路径要加引号，避免被 shell 展开。`--terminal` 表示终态节点，不能带输出。写完后执行 doctor（技能不存在时生成空白 `SKILL.md`） |
 | `autobiz-plugin add skill <skill> [--from <dir>]` | 导入已有技能资源（正文、模板、脚本、校验器）到 `skills/<skill>/`；不带 `--from` 时创建空白 `SKILL.md`（只有 frontmatter 和状态维护片段，技能已绑定节点时才有片段）。导入时 frontmatter 的 `name` 改为 `<skill>`，顶层 `version`、`author` 迁到 `metadata`；正文中的旧状态命令（`LEGACY_ENTRY_REF`）等技能内容问题报 warning，照样导入，check 和 package 时报 error（input-config.md §7.3）。目标目录已存在，或其他分组下有同名技能时拒绝导入（D56） |
 | `autobiz-plugin add skills --from <skills-dir> [--agents <agents-dir>]` | 把 `<skills-dir>` 当作插件的 `skills/` 导入，保留一层分组：一级子目录含 `SKILL.md`、且它的子目录都不含 `SKILL.md` 时是技能，导入到 `skills/<skill>/`；一级子目录下有含 `SKILL.md` 的子目录时是分组，这些子目录是分组下的技能，导入到 `skills/<分组>/<skill>/`（与 build 查找技能的两层一致，input-config.md §7.3）。`<skills-dir>` 自己含 `SKILL.md`、有技能子目录且没有带 `SKILL.md` 的分组子目录时，它本身就是一个分组（例如 `skills/autodev`），按 `skills/<目录名>/<skill>/` 导入。技能以目录名作为技能名，技能目录内部更深层的 `SKILL.md` 是技能自己的资源。其余内容（集合根目录和分组目录自己的 `SKILL.md`、`references/`、`hooks/` 等）是共享资源，按原路径拷到 `skills/` 下：不存在时写入，内容相同时跳过，内容不同时拒绝导入；其中的 `SKILL.md` 同样迁移 frontmatter。上次构建登记为脚手架生成的技能（例如产物同步模块的 `autobizdevops-artifact-sync`）跳过不导入。同名技能在集合中出现两次时拒绝导入。build 生成的空白 `skills/<skill>/SKILL.md` 会被分组下的同名技能替换（删除空白文件）。每个技能沿用 `add skill --from` 的迁移、冲突检查和 warning 规则。整批先在内存中完成导入与一次 doctor，任一 error 均不写文件；成功时 JSON 输出增加 `importedSkills` 技能名数组。`agents/` 不属于技能集合，不会自动查找或创建：给了 `--agents` 时把该目录原样拷到插件的 `agents/`，与技能同批写入；已有同名文件内容相同时跳过，内容不同时拒绝导入 |
@@ -124,7 +124,7 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 - 选择“不提供”时，build 生成空白 `SKILL.md`：只有 frontmatter 和状态维护片段，正文由开发者自行填写（output-spec.md §6.1）；导入已有目录时，build 只在 `SKILL.md` 开头插入状态维护片段。模板由技能自己维护，向导不问、不生成（D29）；
 - 看板一类会生成接入脚本（`runtime/adapters/*`）和三平台命令映射；会话一类会生成默认会话入口和策略骨架；
 - 第 4–6 类的回答分别写入 `modules/board.json`、`modules/session.json`、`modules/knowledge.json` 和 `modules/artifactSync.json`，并在入口文件的 `modules` 中引用。全部取默认值的类别不生成文件，所以入口文件只有基础信息和真正用到的引用。启用产物同步时追问从哪个节点起允许同步，`artifacts` 的预填与 `module enable artifactSync` 相同（§1.1）；
-- `--yes` 时不提问，回答取自 `--from` 的样例和 `--answers`，缺少的必填项报用法错误（退出码 2）；lint 有 error 时报出 Issue，不写任何文件。
+- `--yes` 时不提问，回答全部取自 `--answers`，必须给出 `plugin` 和 `nodes`，缺少必填项报用法错误（退出码 2）；lint 有 error 时报出 Issue，不写任何文件。
 
 `--answers <file|->` 从文件或 stdin 读入回答（D56），供插件开发技能等非交互的调用方使用：
 
@@ -144,10 +144,9 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 - `skills` 为技能名 → 导入目录，`null` 表示不提供；导入规则同 `add skill --from`；
 - `agents` 可选，为 agents 目录的路径，规则同 `add skills --agents`；不写时不创建 `agents/`；
 - `globalHooks` 可选，内容与 `modules/globalHooks.json` 相同，写了即启用插件全局钩子模块（input-config.md §4.6）；向导中对每个钩子逐个询问，默认不启用，选了任何一个才启用模块；
-- `board`、`session`、`knowledge`、`artifactSync`、`globalHooks` 可选，内容与对应的模块配置文件相同；写了 `knowledge`、`artifactSync`、`globalHooks` 即表示启用；
-- 与 `--from` 一起使用时，`plugin` 按字段覆盖样例，其余写了的类别整体替换样例中的对应内容。
+- `board`、`session`、`knowledge`、`artifactSync`、`globalHooks` 可选，内容与对应的模块配置文件相同；写了 `knowledge`、`artifactSync`、`globalHooks` 即表示启用，不写的模块取默认值。
 
-`--from lite` / `--from fullstack` 以 [examples/lite/](../booter/examples/lite/) 或 [examples/fullstack/](../booter/examples/fullstack/) 的核心配置为起点（入口文件、`workflow.json` 和入口文件引用的 `modules/*.json`，不含 `output/`），拷贝时把 `$schema` 改写为 `.scaffold/` 下的路径，向导中的回答覆盖样例中的对应项。脚手架不提供从已有插件的 `board_config.json` 反推核心配置的命令：迁移已有插件时，以对应样例为起点修改核心配置，再用 `add skills --from` 导入技能集合目录；只有单个技能时可用 `add skill --from`。
+脚手架不带样例种子：`new` 只从问答或 `--answers` 生成核心配置，想自己手写时用 `new --skeleton`（§1.4.1）。lite、fullstack 两份样例放在仓库根目录的 [fixtures/](../fixtures/)，只供脚手架自身的测试，不随 booter 和 `autobiz-plugin.pyz` 发布（D67）。脚手架也不提供从已有插件的 `board_config.json` 反推核心配置的命令：迁移已有插件时，用向导、`--answers` 或 `--skeleton` 写出核心配置，再用 `add skills --from` 导入技能集合目录；只有单个技能时可用 `add skill --from`。
 
 #### 1.4.1 只写骨架（new --skeleton，D63）
 

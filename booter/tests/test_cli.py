@@ -4,7 +4,7 @@ import json
 import unittest
 import zipfile
 
-from tests.helpers import SIBLINGS, cli, temp_dir
+from tests.helpers import SIBLINGS, cli, new_from_example, temp_dir
 
 ANSWERS = {
     "plugin": {"id": "doc-review", "name": "Doc-Review-Kanban", "version": "0.1.0", "description": "文档起草与评审"},
@@ -64,19 +64,16 @@ class NewAndPackageTest(unittest.TestCase):
     def test_target_must_be_empty_and_usage_exit_code(self):
         root = temp_dir(self)
         (root / "x").write_text("x")
-        code, payload = cli("new", str(root), "--from", "lite", "--yes")
+        code, payload = cli("new", str(root), "--yes")
         self.assertEqual(code, 2)
         self.assertEqual(codes(payload), ["USAGE"])
 
-    def test_new_from_seeds(self):
-        for template in ("lite", "fullstack"):
-            root = temp_dir(self) / template
-            code, payload = cli("new", str(root), "--from", template, "--yes")
-            self.assertEqual(code, 0, payload)
-            entry = json.loads((root / "plugin.scaffold.json").read_text("utf-8"))
-            self.assertEqual(entry["$schema"], "./.scaffold/plugin-scaffold.schema.json")
-            board = json.loads((root / "modules/board.json").read_text("utf-8"))
-            self.assertEqual(board["$schema"], "../.scaffold/modules/board.schema.json")
+    def test_yes_needs_full_answers(self):
+        root = temp_dir(self) / "p"
+        code, payload = cli("new", str(root), "--yes")
+        self.assertEqual(code, 2)
+        self.assertEqual(codes(payload), ["USAGE"])
+        self.assertFalse(root.exists())
 
 
 class LintTest(unittest.TestCase):
@@ -120,8 +117,7 @@ class LintTest(unittest.TestCase):
 
 class DoctorTest(unittest.TestCase):
     def test_node_removal_drops_state_block(self):
-        root = temp_dir(self) / "lite"
-        self.assertEqual(cli("new", str(root), "--from", "lite", "--yes")[0], 0)
+        root = new_from_example(self, "lite")
         workflow = json.loads((root / "workflow.json").read_text("utf-8"))
         workflow["nodes"]["dev"] = [node for node in workflow["nodes"]["dev"] if node["id"] != "code"]
         (root / "workflow.json").write_text(json.dumps(workflow, ensure_ascii=False), "utf-8")
@@ -143,8 +139,7 @@ class DoctorTest(unittest.TestCase):
         source = SIBLINGS / "autobizdevops_lite" / "skills" / "autodev-plan"
         if not source.is_dir():
             self.skipTest("没有 autobizdevops_lite 参考仓库")
-        root = temp_dir(self) / "lite"
-        self.assertEqual(cli("new", str(root), "--from", "lite", "--yes")[0], 0)
+        root = new_from_example(self, "lite")
         code, payload = cli("-C", str(root), "add", "skill", "autodev-plan", "--from", str(source))
         self.assertEqual(code, 0, payload)
         self.assertIn("LEGACY_ENTRY_REF", codes(payload, "warning"))

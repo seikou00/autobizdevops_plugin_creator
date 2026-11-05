@@ -3,7 +3,7 @@
 import json
 import unittest
 
-from tests.helpers import REPO
+from tests.helpers import FIXTURES, REPO
 from scaffold.lib import derive, fsio, jsonschema, skillmd
 
 
@@ -90,8 +90,10 @@ class SchemaTest(unittest.TestCase):
         self.assertEqual(jsonschema.validate({"artifacts": {}, "allowedFrom": "a"}, schema), [])
 
     def test_examples_pass_schemas(self):
-        for example in ("minimal", "lite", "fullstack"):
-            base = REPO / "examples" / example
+        bases = [REPO / "examples" / "minimal"] + [FIXTURES / name for name in ("lite", "fullstack")
+                                                   if (FIXTURES / name).is_dir()]
+        for base in bases:
+            example = base.name
             self.assertEqual(jsonschema.validate(fsio.read_json(base / "workflow.json"),
                                                  jsonschema.load_schema("workflow.schema.json")), [], example)
 

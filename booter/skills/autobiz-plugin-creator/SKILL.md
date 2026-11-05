@@ -1,6 +1,6 @@
 ---
 name: autobiz-plugin-creator
-description: AutoBiz 看板插件开发助手。通过对话把业务流程梳理成节点和产物，写出核心配置 workflow.json、plugin.scaffold.json 和 modules/*.json，调用 autobiz-plugin 生成、检查、模拟并打包可以导入 DevClaw 的插件。当用户要新建看板插件、给插件加节点或产物、导入已有技能、启用知识模块或产物同步、迁移 lite 或全栈版插件，或想了解插件脚手架怎么用时使用。
+description: AutoBiz 看板插件开发助手。通过对话把业务流程梳理成节点和产物，写出核心配置 workflow.json、plugin.scaffold.json 和 modules/*.json，调用 autobiz-plugin 生成、检查、模拟并打包可以导入 DevClaw 的插件。当用户要新建看板插件、给插件加节点或产物、导入已有技能、启用知识模块或产物同步，或想了解插件脚手架怎么用时使用。
 metadata:
   version: 1.0.0
 ---
@@ -24,7 +24,7 @@ python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz"
 
 | 用途 | 命令 |
 |---|---|
-| 新建 | `new "<插件目录>" --yes --answers -`（回答从 stdin 读入，格式见下文）；迁移时用 `--from lite` 或 `--from fullstack` |
+| 新建 | `new "<插件目录>" --yes --answers -`（回答从 stdin 读入，格式见下文） |
 | 加节点 | `add node <id> --name <名称> --skill <技能> --stage biz\|dev\|ops --seq <n> [--output <路径> …] [--optional-output <路径> …] [--terminal]` |
 | 导入技能 | `add skills --from "<已有技能集合目录>"` 一次导入集合中的全部技能，支持 `<集合>/<分组>/<技能>/` 一层分组，共享资源按原路径拷入；单个技能用 `add skill <技能名> --from "<已有技能目录>"`，不带 `--from` 时生成空白 `SKILL.md` |
 | 模块 | `module list`；`module enable knowledge [--set assembly.assembler=devclaw]`；`module enable artifactSync --set allowedFrom=plan:done`；`module disable <id>` |

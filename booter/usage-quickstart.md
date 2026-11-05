@@ -10,33 +10,57 @@
 cd ~/Documents/GitHub/autobizdevops_plugin_creator/booter
 ```
 
-## 2. 以样例为起点新建插件
+## 2. 用向导新建插件
+
+**先想好流程。** 从你的技能目录里挑出主流程上要依次执行的技能，每个技能对应看板上的一个节点。评审、回滚这类辅助技能不用挑，导入时会一起带上。比如：
+
+| 顺序 | 节点 | 技能（技能目录的名字） | 产出的文件 |
+|---|---|---|---|
+| 1 | 需求 | `my-prd` | `PRD.md` |
+| 2 | 编码 | `my-code` | （无） |
+
+然后运行向导：
 
 ```bash
-python3 -m scaffold new ~/Documents/GitHub/my-plugin --from lite --yes
+python3 -m scaffold new ~/Documents/GitHub/my-plugin
 ```
 
-- `lite`：需求 → 规格 → 计划 → 编码四个节点；要 Biz→Dev→Ops 全流程，换成 `fullstack`；
-- 流程和 lite、fullstack 都不一样，手里只有一个技能目录：见下文[只有技能目录时](#只有技能目录时)；
-- 目标目录必须不存在或为空。
+按下表回答，没提到的问题直接回车，用默认值：
+
+| 向导问题 | 怎么填 |
+|---|---|
+| 插件 ID | 英文字母、数字、短横线和下划线，如 `my-plugin`、`Doc_Review`，发布后不能改 |
+| 插件名、一句话描述 | 随意填写，会显示在 DevClaw 中 |
+| 节点 id、显示名 | 每个节点起一个英文 id（如 `prd`）和一个中文名（如 `需求`） |
+| 所属阶段 | 需求类选 `biz`，开发类选 `dev`，发布、运维类选 `ops`；顺序必须是 biz → dev → ops |
+| 编排顺序 seq | 回车即可，自动递增 |
+| 绑定技能 | 填技能目录的名字，例如 `my-code`，不要带分组 `autodev/` |
+| 产出产物 | 这个技能生成的文件名，多个用逗号分隔，用来判断节点是否完成；不清楚就留空 |
+| 继续添加节点？ | 还有节点就回车，最后一个节点输入 `N` |
+| 最后一个节点是终态节点吗？ | 回车（选 N）；只有最后一步是「归档」这种收尾动作时才选 Y |
+| 已有技能目录的路径 | 留空回车，下一步统一导入 |
+| 启用明文密码检查 / 前端性能检查？ | 需要就输入 `Y`；前端性能检查在编码节点 `code_done` 时检查变动的前端文件 |
+
+- 目标目录必须不存在或为空；
+- 不想回答向导、想自己填配置：见下文[想自己填配置时](#想自己填配置时)。
 
 这一步结束时插件已经可以运行，技能是空白的 `SKILL.md`。
 
 ## 3. 放入技能和 agents
 
-lite：
+导入整个技能目录（可以有分组嵌套，例如 `my-skills/autodev/my-code/SKILL.md`），有 agents 目录就一起导入：
 
 ```bash
-python3 -m scaffold -C ~/Documents/GitHub/my-plugin add skills --from ~/Documents/GitHub/autobizdevops_lite/skills --agents ~/Documents/GitHub/autobizdevops_lite/agents
+python3 -m scaffold -C ~/Documents/GitHub/my-plugin add skills --from ~/Documents/GitHub/my-skills --agents ~/Documents/GitHub/my-agents
 ```
 
-fullstack 的技能按 `autobiz/`、`autodev/`、`autoops/` 分了组，直接导入整个 `skills/` 目录即可，分组结构和共享的 `references/`、`hooks/` 会原样保留：
-
-```bash
-python3 -m scaffold -C ~/Documents/GitHub/my-plugin add skills --from ~/Documents/GitHub/autobiz_kanban/skills --agents ~/Documents/GitHub/autobiz_kanban/agents
-```
+分组结构、共享的 `references/` 和 `hooks/` 会原样保留；向导生成的空白技能会自动被同名的真实技能替换。没有 agents 目录就去掉 `--agents …`。
 
 导入时如果提示 `LEGACY_ENTRY_REF`：打开提示中的 `SKILL.md`，删掉旧的「技能状态维护」小节（调用 `hooks/update_state.py` 的那几行）。脚手架已经在文件开头写好了新的状态维护片段，旧的不删，打包时会报错。
+
+想先确认流程能走通，可以先运行 `python3 -m scaffold -C ~/Documents/GitHub/my-plugin simulate`，它会在临时目录里按 DevClaw 的方式把每个节点走一遍。
+
+> 也可以把插件开发技能 `autobiz-plugin-creator` 装进 agent，用对话描述流程，由 agent 填写配置并执行这些命令。
 
 ## 4. 打包
 
@@ -54,54 +78,9 @@ python3 -m scaffold -C ~/Documents/GitHub/my-plugin package
 python3 -m scaffold -C ~/Documents/GitHub/my-plugin hook enable secrets-check performance-check
 ```
 
-## 只有技能目录时
-
-手里只有一个技能目录，可以有分组嵌套，例如 `my-skills/autodev/autodev-code/SKILL.md`；也完全不了解配置文件。这种情况不用手写任何 JSON：用向导回答几个问题，再导入技能目录。
-
-**先想好流程。** 从技能目录里挑出主流程上要依次执行的技能，每个技能对应看板上的一个节点。评审、回滚这类辅助技能不用挑，导入时会一起带上。比如：
-
-| 顺序 | 节点 | 技能（技能目录的名字） | 产出的文件 |
-|---|---|---|---|
-| 1 | 需求 | `autobiz-requirement-discuss` | `PRD.md` |
-| 2 | 编码 | `autodev-code` | （无） |
-
-**第 2 步换成运行向导**（不加 `--from`）：
-
-```bash
-python3 -m scaffold new ~/Documents/GitHub/my-plugin
-```
-
-按下表回答，没提到的问题直接回车，用默认值：
-
-| 向导问题 | 怎么填 |
-|---|---|
-| 插件 ID | 英文字母、数字、短横线和下划线，如 `my-plugin`、`Doc_Review`，发布后不能改 |
-| 插件名、一句话描述 | 随意填写，会显示在 DevClaw 中 |
-| 节点 id、显示名 | 每个节点起一个英文 id（如 `prd`）和一个中文名（如 `需求`） |
-| 所属阶段 | 需求类选 `biz`，开发类选 `dev`，发布、运维类选 `ops`；顺序必须是 biz → dev → ops |
-| 编排顺序 seq | 回车即可，自动递增 |
-| 绑定技能 | 填技能目录的名字，例如 `autodev-code`，不要带分组 `autodev/` |
-| 产出产物 | 这个技能生成的文件名，多个用逗号分隔，用来判断节点是否完成；不清楚就留空 |
-| 继续添加节点？ | 还有节点就回车，最后一个节点输入 `N` |
-| 最后一个节点是终态节点吗？ | 回车（选 N）；只有最后一步是「归档」这种收尾动作时才选 Y |
-| 已有技能目录的路径 | 留空回车，下一步统一导入 |
-| 启用明文密码检查 / 前端性能检查？ | 需要就输入 `Y`；前端性能检查在编码节点 `code_done` 时检查变动的前端文件 |
-
-**第 3 步导入整个技能目录**，有 agents 目录就一起导入：
-
-```bash
-python3 -m scaffold -C ~/Documents/GitHub/my-plugin add skills --from ~/Documents/GitHub/my-skills --agents ~/Documents/GitHub/my-agents
-```
-
-分组结构、共享的 `references/` 和 `hooks/` 会原样保留；向导生成的空白技能会自动被同名的真实技能替换。没有 agents 目录就去掉 `--agents …`。
-
-第 4 步照常打包。想先确认流程能走通，可以先运行 `python3 -m scaffold -C ~/Documents/GitHub/my-plugin simulate`，它会在临时目录里按 DevClaw 的方式把每个节点走一遍。
-
-> 也可以把插件开发技能 `autobiz-plugin-creator` 装进 agent，用对话描述流程，由 agent 填写配置并执行这些命令。
-
 ## 想自己填配置时
 
-不想回答向导、也不想从样例改起，可以让脚手架只写出配置的骨架，要填的地方都标成 `[TODO: 说明]`：
+不想回答向导，可以让脚手架只写出配置的骨架，要填的地方都标成 `[TODO: 说明]`：
 
 ```bash
 python3 -m scaffold new ~/Documents/GitHub/my-plugin --skeleton --module board

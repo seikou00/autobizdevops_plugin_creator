@@ -1,4 +1,4 @@
-"""pull_knowledge：拉取知识仓库到插件的 sys/（interfaces.md §3.3.9，来自 lite 的 sync_agents.py）。
+"""pull_knowledge：拉取知识仓库到插件的 sys/（interfaces.md §3.3.9）。
 
 先在临时目录克隆并校验清单，成功后再替换 sys/；HTTPS 失败时回退 SSH。只更新知识目录，不回写任何配置文件。
 仓库地址取自 runtime/config/knowledge.json 的 source。始终以 0 退出，用 ok 字段表示结果。

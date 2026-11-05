@@ -1,4 +1,4 @@
-"""P1 功能的测试：初始化向导、add node、module、simulate、版本升级、全栈版 v3 状态接续、插件开发技能的插件包。"""
+"""P1 功能的测试：初始化向导、add node、module、simulate、版本升级、v3 旧状态接续、插件开发技能的插件包。"""
 
 import json
 import sys
@@ -6,7 +6,7 @@ import unittest
 import zipfile
 
 from tests.contract.test_runtime import Workspace
-from tests.helpers import REPO, cli, temp_dir
+from tests.helpers import REPO, cli, new_from_example, temp_dir
 from scaffold.commands.new import new
 from scaffold.lib import jsonedit
 from scaffold.wizard import ScriptedPrompter
@@ -53,9 +53,7 @@ class WizardTest(unittest.TestCase):
 
 class EditCommandsTest(unittest.TestCase):
     def lite(self):
-        root = temp_dir(self) / "lite"
-        self.assertEqual(cli("new", str(root), "--from", "lite", "--yes")[0], 0)
-        return root
+        return new_from_example(self, "lite")
 
     def test_add_node_keeps_formatting(self):
         root = self.lite()
@@ -111,8 +109,7 @@ class EditCommandsTest(unittest.TestCase):
 
 class SimulateTest(unittest.TestCase):
     def test_simulate_stops_and_warns_when_stale(self):
-        root = temp_dir(self) / "full"
-        self.assertEqual(cli("new", str(root), "--from", "fullstack", "--yes")[0], 0)
+        root = new_from_example(self, "fullstack")
         code, payload = cli("-C", str(root), "simulate", "--to", "plan_done")
         self.assertEqual(code, 0, payload)
         self.assertEqual(payload["simulation"]["stoppedAt"], "plan_done")
@@ -127,9 +124,7 @@ class SimulateTest(unittest.TestCase):
 
 class VersionTest(unittest.TestCase):
     def plugin(self):
-        root = temp_dir(self) / "lite"
-        self.assertEqual(cli("new", str(root), "--from", "lite", "--yes")[0], 0)
-        return root
+        return new_from_example(self, "lite")
 
     def test_same_major_upgrade(self):
         root = self.plugin()
