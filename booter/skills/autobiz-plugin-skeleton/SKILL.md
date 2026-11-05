@@ -189,7 +189,7 @@ python "<pyz>" -C "<插件目录>" package --json
 |---|---|
 | `assembly.assembler` | `plugin`：插件自己组装知识；`devclaw`：交给 DevClaw 组装 |
 | `source.url` | 知识仓库的 HTTPS 地址；插件不负责拉取知识仓库就删掉整个 `source` |
-| `source.sshUrl`、`source.ref` | 可选，SSH 地址和分支（默认 `main`） |
+| `source.sshUrl`、`source.ref` | 可选，SSH 地址和分支（默认 `master`） |
 
 ### modules/artifactSync.json
 

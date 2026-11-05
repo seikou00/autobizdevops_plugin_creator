@@ -212,7 +212,7 @@ def ask_modules(prompter: Prompter, nodes: list) -> tuple:
         url = prompter.ask("知识仓库 HTTPS 地址（留空表示插件不拉取知识仓库）", default="")
         if url:
             knowledge["source"] = {"type": "git", "url": url,
-                                   "ref": prompter.ask("分支、标签或 commit", default="main")}
+                                   "ref": prompter.ask("分支、标签或 commit", default="master")}
     if yes(prompter, "启用产物同步模块？", False):
         candidates = [node["id"] for node in nodes if not node.get("terminal")]
         anchor = prompter.ask("从哪个节点完成起允许同步（节点 id）", default=candidates[0] if candidates else "",

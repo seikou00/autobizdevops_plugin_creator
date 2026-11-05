@@ -45,7 +45,7 @@
         "type": { "const": "git", "default": "git" },
         "url": { "type": "string", "minLength": 1 },
         "sshUrl": { "type": "string", "default": "" },
-        "ref": { "type": "string", "default": "main" }
+        "ref": { "type": "string", "default": "master" }
       }
     }
   },

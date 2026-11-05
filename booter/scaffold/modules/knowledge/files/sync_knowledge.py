@@ -176,7 +176,7 @@ def sync() -> dict:
     url = str(source.get("url") or "").strip()
     if not url:
         raise ValueError("runtime/config/knowledge.json 没有声明 source.url")
-    ref = source.get("ref") or "main"
+    ref = source.get("ref") or "master"
     ssh_url = str(source.get("sshUrl") or "").strip()
     destination = ROOT / config.get("root", "sys")
     with file_lock(ROOT / ".knowledge.lock"):

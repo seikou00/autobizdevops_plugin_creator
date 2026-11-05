@@ -390,7 +390,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `source.type` | `git` | v1 只支持 git |
 | `source.url` | 声明 `source` 时必填 | 知识仓库 HTTPS 地址 |
 | `source.sshUrl` | `""` | HTTPS 克隆失败时回退的 SSH 地址 |
-| `source.ref` | `main` | 分支、标签或 commit |
+| `source.ref` | `master` | 分支、标签或 commit |
 
 文件内容可以只有 `$schema`：此时清单解析、组装方都取默认值，用内置组装脚本组装知识，也不拉取知识仓库。
 

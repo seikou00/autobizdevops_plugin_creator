@@ -151,7 +151,7 @@ SKELETON_MODULES = {
     "session": {"policies": {"default": {"agentMode": "multi"}}},
     "knowledge": {"assembly": {"assembler": "plugin"},
                   "source": {"type": "git", "url": "[TODO: 知识仓库 HTTPS 地址；插件不拉取知识仓库就删掉 source]",
-                             "ref": "main"}},
+                             "ref": "master"}},
     "artifactSync": {"allowedFrom": "[TODO: 从哪个节点完成起允许同步，写成 <节点 id>:done]",
                      "artifacts": {"[TODO: 要上传的产物路径，与 workflow.json 中的 outputs 一致]": "[TODO: 简述]"}},
 }
