@@ -4,7 +4,7 @@
 
 ### 1.1 输入分类
 
-插件开发者的输入包括一个入口文件、一份核心流程、按模块拆分的配置文件，以及若干资源目录，都放在插件根目录下。初始化向导（`autobiz-plugin new` 或插件开发技能，interfaces.md §1.4、§1.6）负责收集信息并生成骨架：
+插件开发者的输入包括一个入口文件、一份核心流程、按模块拆分的配置文件，以及若干资源目录，都放在插件根目录下。初始化向导（`autobiz-plugin new` 或骨架引导技能，interfaces.md §1.4、§1.6）负责收集信息并生成骨架：
 
 | 输入类别 | 位置 | 用户需要提供什么 | 哪些由初始化向导完成 | 最终生成什么 |
 |---|---|---|---|---|
@@ -386,7 +386,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `assembly.enabled` | `true` | 是否组装知识上下文 |
 | `assembly.assembler` | `plugin` | 组装方。`plugin`：由插件执行组装脚本 `runtime/knowledge/render_collected_session_context.py`（§4.4），结果并入 `sessionContext`；`devclaw`：由 DevClaw 组装，插件只通过 `inspect_deploy_units.py` 提供清单解析结果，`sessionContext` 中不含知识段 |
 | `assembly.timeoutSec` | `30` | 组装脚本的超时秒数。超时、退出码非 0 或输出不是合法 JSON 时，本次会话不含知识段，并在 `message` 中说明 |
-| `source` | 不声明 | 可选：由插件自己拉取知识仓库。声明后生成 `runtime/knowledge/sync_knowledge.py` 和 `pull_knowledge` 命令（README §9） |
+| `source` | 不声明 | 可选：由插件自己拉取知识仓库。声明后生成 `runtime/knowledge/sync_knowledge.py` 和 `pull_knowledge` 命令（README §9）。`doctor` 写盘后，`sys/` 中还没有清单时执行一次 `sync_knowledge.py`，供 check、simulate 的契约测试读取清单；失败报 `KNOWLEDGE_PULL` warning。`sys/` 不随包带上 |
 | `source.type` | `git` | v1 只支持 git |
 | `source.url` | 声明 `source` 时必填 | 知识仓库 HTTPS 地址 |
 | `source.sshUrl` | `""` | HTTPS 克隆失败时回退的 SSH 地址 |
@@ -565,7 +565,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | 时机 | 怎么触发 | 检查什么 | 发现问题时 |
 |---|---|---|---|
 | 编辑时 | IDE 读取文件头的 `$schema` | 字段名、类型、必填项 | 编辑器里即时标红 |
-| agent 修改后 | 插件开发技能每次改完配置都运行 `autobiz-plugin lint`（interfaces.md §1.6） | §7.2 全部规则 | agent 按 Issue 修正后再继续 |
+| agent 修改后 | 骨架引导技能每次改完配置都运行 `autobiz-plugin lint`（interfaces.md §1.6） | §7.2 全部规则 | agent 按 Issue 修正后再继续 |
 | 重新生成时 | `autobiz-plugin doctor`（以及它调用的 `build`）先执行同样的检查 | §7.2 全部规则（`BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` 除外，过期和可升级正是要重新生成的原因） | 不写任何编译配置和技能文件 |
 | 手动 | 开发者执行 `autobiz-plugin lint` 或 `autobiz-plugin check` | `lint`：§7.2 全部规则，包括编译配置是否过期；`check`：再加 §7.3 全部规则和契约测试 | 按 Issue 修正 |
 | 运行时 | 运行框架加载 `flow.json` | 编译配置自身的不变量（output-spec.md §5.2） | 拒绝执行并报错 |
@@ -626,9 +626,13 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `SKILL_TOO_LONG` | warning | SKILL.md 超过 500 行，应把细节拆到 `references/` |
 | `SKILL_STATE_BLOCK` | error | 节点技能的 `SKILL.md` 缺少状态维护片段，片段内容与推导结果不一致（例如被手改，或改了节点却没有重新生成），或不再绑定节点的技能还留着片段。执行 `doctor` 即可修复（output-spec.md §6.1） |
 | `LEGACY_ENTRY_REF` | error | 技能正文（跳过 frontmatter 和状态维护片段）逐行检查，命中一行报一条，`message` 写明行号和所在小节（D51）：节点技能中出现 `update_state.py`、`update_checkpoint.py`、`route_checkpoint.py`（节点状态只由状态维护片段维护）；所有技能中出现旧入口路径 `hooks/update_state.py`、`hooks/update_checkpoint.py`、`hooks/route_checkpoint.py`、`hooks/skip_node.py`、`hooks/init_workspace.py`、`${pluginPath}/inspect_state.py`（新目录结构中已不存在）。提示：删掉这一行；整节只剩状态命令时连同小节标题一起删；这一行前面有校验等步骤时，改写成“执行完成命令之前先……”。`add skill --from` 导入时同样检查，但只报 warning、照样导入（D56）。旧版的 `scaffold:begin state` 片段由 build 直接替换成新片段，不报 |
+| `SKILL_REF_DANGLING` | warning | 悬空引用（D71）：`skills/` 下全部 `SKILL.md`（集合根目录、分组、技能，以及技能目录里更深层的子技能；模块生成的技能除外）正文逐行检查，跳过 frontmatter 和状态维护片段，引用的文件或目录在插件中不存在时，每个引用报一条，`message` 写明行号、所在小节和找过的路径。检查两类路径：`${pluginPath}/…`（相对插件根目录，不限目录）；以 `templates/`、`references/`、`scripts/`、`hooks/`、`agents/`、`assets/` 开头的相对路径（可带 `./`、`../`），不带 `../` 时依次在技能目录、分组目录、`skills/`、插件根目录下找，任何一处有就算存在，带 `../` 时只按技能目录解析；以 `skills/` 开头的相对路径按插件根目录解析。不检查 URL、含占位符或通配符的路径（`<feature>`、`${var}`、`*`、`...`）、单独一个目录名（`scripts/`），以及 `LEGACY_ENTRY_REF` 负责的旧入口路径。`doctor`（含 `add skill(s)`）、`check`、`package` 都报，doctor 把这次将要生成的文件也算作存在。只报 warning：正文也可能写到用户工程里的同名目录 |
+| `SKILL_REF_ABSOLUTE` | warning | 写死的绝对路径（D71）：与 `SKILL_REF_DANGLING` 检查同一批 `SKILL.md`。正文中的 `/…`、`~/…`、`C:/…`、`C:\…`，路径里含 `skills` 或资源目录（`templates`、`references`、`scripts`、`hooks`、`agents`、`assets`）一段时报出：这是某台机器上的插件或技能位置，换个环境就找不到。提示改成 `${pluginPath}/…` 或相对技能目录的路径；插件的 `skills/`、`hooks/`、`agents/` 下有末两段相同的文件时，在提示中列出（最多 3 个）。不含这些目录的绝对路径（接口路由、斜杠命令等）、URL、含占位符的路径不报 |
 | `TODO_FIELD` | error / warning | 核心配置中还有没填写的 `[TODO: …]` 占位（`new --skeleton` 的骨架、手写的占位），每个占位报一条，`pointer` 指出位置，对象的键也检查。默认是 error，doctor 不生成；`artifactSync` 的 `artifacts`、`extraPaths` 中的简述是 warning，打包前由 `TODO_PLACEHOLDER` 拦下。占位所在位置不再另报 `INPUT_SCHEMA`（D63） |
-| `TODO_PLACEHOLDER` | warning（check）/ error（package） | 空白 `SKILL.md`、骨架文件或清单中还有未填写的 `[TODO: …]`，包括 `module enable artifactSync` 预填在 `modules/artifactSync.json` 的 `artifacts` 中的简述（D56） |
-| `DRIFT_GENERATED` / `DRIFT_MANAGED` | error | 生成或托管的文件被手改过（内置知识组装脚本除外，插件可以替换它，§4.4）。按磁盘内容与 build-manifest 的记录是否一致判断：与记录一致、只是与当前脚手架重放的结果不同时，报 `SCAFFOLD_VERSION_CHANGED`（§7.2），不算漂移（D57） |
+| `TODO_PLACEHOLDER` | warning（check）/ error（package） | 空白 `SKILL.md`、骨架文件或清单中还有未填写的 `[TODO: …]`，包括 `module enable artifactSync` 预填在 `modules/artifactSync.json` 的 `artifacts` 中的简述（D56），以及开发者改过的文字字段（D70）：它们不再跟随技能的 `description` 更新，占位要开发者自己填 |
+| `DRIFT_GENERATED` / `DRIFT_MANAGED` | error | 生成或托管的文件被手改过（内置知识组装脚本除外，插件可以替换它，§4.4）。按磁盘内容与 build-manifest 的记录是否一致判断：与记录一致、只是与当前脚手架重放的结果不同时，报 `SCAFFOLD_VERSION_CHANGED`（§7.2），不算漂移（D57）。`plugin.json`、`board_core/board_config.json`、`runtime/config/board.json` 中列出的文字字段可以改，改动超出这些字段时才报（按 `structure` 记录判断）；doctor 把这类改动按核心配置重写，报同一个 code 的 warning（D70） |
+| `CUSTOMIZED_INVALID` | error | `plugin.json`、`board_core/board_config.json`、`runtime/config/board.json` 被改成了非法的 JSON 或顶层不是对象，doctor 无法合并其中改过的文字。修好它，或删掉文件由 doctor 重新生成（D70） |
+| `CUSTOMIZED_STALE` | warning | 开发者改过的文字字段，这次生成的值也变了（例如默认 `dialog_tips` 含节点链，改了节点名），doctor 保留开发者的值，`message` 列出这些字段，只在发生变化的那次报。要改用生成的文字，删掉文件再执行 doctor（该文件的手改全部恢复为生成内容，D70） |
 | `CONTRACT_TEST` | error | 在临时目录中模拟宿主调用失败，每个失败的步骤报一条；`simulate` 报同一个 code（interfaces.md §1.5）。lint 或漂移检查有 error 时不跑契约测试（D55） |
 
 ## 8. 最小示例

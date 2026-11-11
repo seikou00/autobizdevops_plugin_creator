@@ -1,9 +1,11 @@
-"""P1 功能的测试：初始化向导、add node、module、simulate、版本升级、v3 旧状态接续、插件开发技能的插件包。"""
+"""P1 功能的测试：初始化向导、add node、module、simulate、版本升级、v3 旧状态接续、CLI 的两种运行入口。"""
 
 import json
+import subprocess
 import sys
 import unittest
 import zipfile
+from pathlib import Path
 
 from tests.contract.test_runtime import Workspace
 from tests.helpers import REPO, cli, new_from_example, temp_dir
@@ -189,21 +191,31 @@ class JsonEditTest(unittest.TestCase):
         self.assertEqual(json.loads(jsonedit.set_member(text, "", "e", {"f": [1]}))["e"], {"f": [1]})
 
 
-class CreatorPackageTest(unittest.TestCase):
-    def test_creator_plugin_package(self):
+class EntryTest(unittest.TestCase):
+    """booter 目录本身（根目录 SKILL.md 的调用方式，D69）和 .pyz 都能在任意目录下运行 CLI。"""
+
+    def run_entry(self, entry: Path, cwd: Path) -> dict:
+        result = subprocess.run([sys.executable, str(entry), "hook", "list", "--json"], cwd=cwd,
+                                capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_booter_directory(self):
+        payload = self.run_entry(REPO, temp_dir(self))
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["hooks"])
+
+    def test_pyz(self):
         sys.path.insert(0, str(REPO / "tools"))
         import make_pyz
 
         out = temp_dir(self)
         pyz = make_pyz.make_pyz(out / "autobiz-plugin.pyz")
-        package = make_pyz.make_creator_plugin(pyz, out / "creator.zip")
-        with zipfile.ZipFile(package) as archive:
+        with zipfile.ZipFile(pyz) as archive:
             names = archive.namelist()
-            manifest = json.loads(archive.read("autobiz-plugin-creator/plugin.json"))
-        self.assertEqual(names, sorted(names))
-        self.assertIn("autobiz-plugin-creator/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz", names)
-        self.assertIn("autobiz-plugin-creator/skills/autobiz-plugin-skeleton/SKILL.md", names)
-        self.assertEqual(manifest["skills"], "./skills/")
+        self.assertIn("__main__.py", names)
+        self.assertTrue(any(name.startswith("scaffold/_data/runtime/") for name in names))
+        self.assertEqual(self.run_entry(pyz, out), self.run_entry(REPO, out))
 
 
 if __name__ == "__main__":

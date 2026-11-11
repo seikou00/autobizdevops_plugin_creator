@@ -71,7 +71,7 @@ mods.md 中的 P0/P1/P2 是 mod 能力自己的分档，与本文无关。
 |---|---|---|
 | 初始化向导的交互问答、`new --answers` | interfaces.md §1.4、D56 | 用 `new --skeleton` 写出骨架后手填 |
 | `add node`、`module list`、`module enable`/`disable`、`--set`，以及保留键序和缩进的配置编辑 | D56 | 手改核心配置后执行 doctor |
-| 插件开发技能 `autobiz-plugin-creator` 和它的 DevClaw 插件包；依赖 `new --answers`、doctor 的 `changes`、`simulate` | D9、D58 | 开发者直接用 CLI |
+| 插件开发技能 `autobiz-plugin-creator` 和它的 DevClaw 插件包（D69 起改为骨架引导技能，不再打插件包）；依赖 `new --answers`、doctor 的 `changes`、`simulate` | D9、D58 | 开发者直接用 CLI |
 | `simulate` 命令：复用 check 的契约测试流程 | D55 | `check` 中的契约测试 |
 | doctor 的影响报告：`--dry-run`、`changes`、`CHECKPOINT_REMOVED`、`DOCTOR_BASELINE_MISSING` | D54 | 生成后对比文件 |
 | `.scaffold/` 下的 Schema 拷贝（IDE 补全；插件开发技能也靠它查字段） | D51、D55、D58 | 直接看仓库中的 Schema |
@@ -121,7 +121,7 @@ mods.md 中的 P0/P1/P2 是 mod 能力自己的分档，与本文无关。
 
 ## 6. 实现状态（2026-11-04）
 
-P0、P1 已全部实现。代码都在 `booter/` 下：`scaffold/`（CLI、构建流水线、初始化向导）、`runtime/`（运行框架模板）、`scaffold/modules/`（四个模块）、`skills/autobiz-plugin-creator/`（插件开发技能）、`schemas/host/outputs.schema.json`（命令输出结构）和 `tools/make_pyz.py`（发布 `.pyz` 与插件开发技能的插件包）中。`tests/` 下 51 个测试在 Python 3.9 和 3.14 上通过：
+P0、P1 已全部实现。代码都在 `booter/` 下：`scaffold/`（CLI、构建流水线、初始化向导）、`runtime/`（运行框架模板）、`scaffold/modules/`（四个模块）、根目录的 `SKILL.md`（骨架引导技能，D69）、`schemas/host/outputs.schema.json`（命令输出结构）和 `tools/make_pyz.py`（发布 `.pyz`）中。`tests/` 下 51 个测试在 Python 3.9 和 3.14 上通过：
 
 | 测试 | 内容 |
 |---|---|
@@ -129,12 +129,14 @@ P0、P1 已全部实现。代码都在 `booter/` 下：`scaffold/`（CLI、构�
 | `tests/golden/test_reference.py` | 命令输出的看板数据与 lite、全栈版现有 `board_config.json` 比较；lite 全部一致，全栈版只有文件开头列出的有意差异（参考仓库不在时跳过） |
 | `tests/contract/` | 状态推进、存在且非空检查、重开、终态节点、`pluginId` 隔离、只读命令、保留字段拒绝加载、校验命令；看板事件用模拟的 DevClaw 服务验证 |
 | `tests/test_cli.py` | `new` → `check`（含契约测试）→ `package`，lint 核心规则，改 `plugin.id` 的放行，doctor 删节点，`add skill --from` 导入 lite 技能 |
-| `tests/test_p1.py` | 初始化向导、`add node`、`module list/enable/disable --set`、`simulate`、版本升级、全栈版 v3 状态接续、插件开发技能的插件包 |
+| `tests/test_p1.py` | 初始化向导、`add node`、`module list/enable/disable --set`、`simulate`、版本升级、全栈版 v3 状态接续、CLI 的两种运行入口（booter 目录和 `.pyz`） |
 | `tests/unit/` | 推导规则、SKILL.md 片段（含 CRLF）、Schema 子集与关键字限制、JSON 重复键与 BOM |
 
 P1 中定下的新决策：全栈版已有项目的状态接续（D60，README §9 第 3 条）。
 
 2026-11-05 调整（D67）：`new` 去掉 `--from blank|lite|fullstack`，`autobiz-plugin.pyz` 不再带样例种子。`new` 只从问答或 `--answers` 生成核心配置（`--yes` 时必须给出 `plugin` 和 `nodes`），自己手写时用 `new --skeleton`；骨架引导技能只提供空白骨架。lite、fullstack 样例从 `booter/examples/` 移到仓库根目录的 `fixtures/`，只供测试，不随 booter 分发；用到它们的测试在 `fixtures/` 不在时跳过。
+
+2026-11-06 调整（D69）：对话建模的插件开发技能 `autobiz-plugin-creator` 和它的 DevClaw 插件包不再提供。`booter/` 目录本身就是骨架引导技能（入口是根目录的 `SKILL.md`），用 `python3 <booter 目录> <命令>` 直接从源码运行 CLI，不需要 `.pyz`；`tools/make_pyz.py` 只打 `.pyz`。
 
 与设计文档不同、需要确认的地方：
 

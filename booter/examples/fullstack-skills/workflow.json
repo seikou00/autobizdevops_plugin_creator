@@ -1,0 +1,63 @@
+{
+  "$schema": "../../schemas/workflow.schema.json",
+  "nodes": {
+    "biz": [
+      {
+        "id": "prd",
+        "seq": 1,
+        "name": "需求澄清与 PRD",
+        "skill": "autobiz-requirement-discuss",
+        "outputs": ["PRD.md", "UI_CONTEXT.json"]
+      }
+    ],
+    "dev": [
+      {
+        "id": "specs",
+        "seq": 2,
+        "name": "行为规格",
+        "skill": "autodev-specs",
+        "outputs": ["proposal.md", "specs/**/*.md", "UI_CONTEXT.json"]
+      },
+      {
+        "id": "design",
+        "seq": 3,
+        "name": "技术设计",
+        "skill": "autodev-design",
+        "outputs": ["design.md", ".design-contract.lock.json"]
+      },
+      {
+        "id": "plan",
+        "seq": 4,
+        "name": "执行计划",
+        "skill": "autodev-plan",
+        "outputs": ["PLAN.md", "plan.json"]
+      },
+      {
+        "id": "code",
+        "seq": 5,
+        "name": "代码实现",
+        "skill": "autodev-code",
+        "outputs": ["evidence/EVIDENCE.jsonl"]
+      }
+    ],
+    "ops": [
+      {
+        "id": "cicd",
+        "seq": 6,
+        "name": "CI/CD",
+        "skill": "autoops-cicd",
+        "outputs": [
+          "CICD_CHECKLIST.md",
+          { "path": "PR_BODY.md", "optional": true }
+        ]
+      },
+      {
+        "id": "archive",
+        "seq": 7,
+        "name": "归档",
+        "skill": "autoops-archive",
+        "terminal": true
+      }
+    ]
+  }
+}

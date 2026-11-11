@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from scaffold import resources
+from scaffold.build import customize
 from scaffold.lib import fsio
 from scaffold.lib.issues import Issue, error
 from scaffold.modules import discover
@@ -21,14 +22,25 @@ class PlannedFile:
     recorded: bool = True        # 记入 build-manifest
     region_key: str = "state"    # seeded 文件中脚手架维护的片段：技能是 state，hooks/hooks.json 是 hooks
 
+    @property
+    def customizable(self) -> bool:
+        """有可改文字字段的生成文件（D70）。"""
+        return self.ownership == "generated" and self.path in customize.TEXT_FIELDS
+
 
 @dataclass
 class WritePlan:
     files: dict = field(default_factory=dict)
     keep: set = field(default_factory=set)      # 插件替换过的 replaceable 文件，不覆盖
+    customized: dict = field(default_factory=dict)  # 合并了开发者文字的生成文件：路径 → 要写入的内容（D70）
+    records: dict = field(default_factory=dict)     # 有可改文字字段的文件在 build-manifest 中的附加记录（D70）
 
     def add(self, planned: PlannedFile) -> None:
         self.files[planned.path] = planned
+
+    def data(self, path: str) -> bytes:
+        """要写入的内容：合并了开发者文字的生成文件用合并结果，其余用生成结果。"""
+        return self.customized.get(path, self.files[path].data)
 
 
 def _source_bytes(source: str, spec) -> bytes:
@@ -81,12 +93,27 @@ def check_drift(plan: WritePlan, tree, previous: dict | None, *, force: bool) ->
     return issues
 
 
+def resolve_customized(plan: WritePlan, tree, previous: dict | None) -> list[Issue]:
+    """有可改文字字段的生成文件（D70）：把开发者改过的文字合并进这次的生成结果，其余部分照常重写。"""
+    issues = []
+    recorded = (previous or {}).get("files", {})
+    for path, planned in sorted(plan.files.items()):
+        if not planned.customizable:
+            continue
+        data, extra, found = customize.merge(path, planned.data, tree.read_bytes(path), recorded.get(path))
+        issues += found
+        plan.records[path] = extra
+        if data is not planned.data:
+            plan.customized[path] = data
+    return issues
+
+
 def changed_files(plan: WritePlan, tree) -> list:
     result = []
-    for path, planned in sorted(plan.files.items()):
+    for path in sorted(plan.files):
         if path in plan.keep:
             continue
-        if not fsio.same_content(tree.read_bytes(path), planned.data):
+        if not fsio.same_content(tree.read_bytes(path), plan.data(path)):
             result.append(path)
     return result
 
@@ -95,7 +122,7 @@ def apply(plan: WritePlan, tree, manifest_path: str, manifest_data: bytes) -> li
     """只写内容有变化的文件，逐个原子替换；build-manifest 最后写（D52）。"""
     written = []
     for path in changed_files(plan, tree):
-        fsio.atomic_write(tree.path(path), plan.files[path].data)
+        fsio.atomic_write(tree.path(path), plan.data(path))
         written.append(path)
     if not fsio.same_content(tree.read_bytes(manifest_path), manifest_data):
         fsio.atomic_write(tree.path(manifest_path), manifest_data)

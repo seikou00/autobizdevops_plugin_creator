@@ -1,0 +1,83 @@
+---
+name: autobizdevops
+description: 完成项目研发的全流程，按 biz / dev / ops 三个可独立起步的阶段组织
+metadata:
+  version: v1.1.08311
+---
+
+# 核心工作原则
+
+- 根工作目录总入口，分为 `biz`、`dev`、`ops` 三个阶段。用户请求完整链路时，`biz -> dev -> ops` 按状态自动续跑，不因内部阶段切换反复确认；仅在存在关键歧义、真实方案取舍、外部授权或不可逆操作时暂停。用户明确只请求某个阶段时，完成该阶段后直接汇报，不追问是否继续。
+- Specs、Design、Plan 默认在主会话执行，局部问题定向查证；只有范围明确且有独立检索价值时才使用 `Explore-autodev`。Design 独立审查用于用户要求或高风险变更；Plan 保留一次聚焦的语义回检，修复后按影响范围复核；Code 按固定 Workflow 执行。
+- 所有阶段启动 Python 脚本时统一使用 `python -X utf8 <script.py>`；它等效于设置 `PYTHONUTF8=1`，并兼容 Windows、macOS 与 Linux。不得裸运行 `python <script.py>`，也不得只依赖 `PYTHONIOENCODING`。
+
+## 目录结构与路径约定
+
+### 本仓库目录功能速览
+
+| 目录 | 用途                                                                        |
+|------|---------------------------------------------------------------------------|
+| `autobiz/` | Biz 阶段技能集合。存放需求澄清、PRD 生成等                                                 |
+| `autodev/` | Dev 阶段技能集合。存放计划、编码、单测、评审、验证、E2E 等                                         |
+| `autoops/` | Ops 阶段技能集合。当前含 CI/CD 流水线相关技能和归档技能。                                        |
+| `templates/` | 标准产物模板。当前产物模板分布在各阶段 skill 内，供 Biz / Dev 阶段生成 `PRD.md`、`proposal.md`、`specs/**/*.md`、`design.md`、`PLAN.md` 时读取。 |
+
+
+## 入口约定
+
+### 用户交互协议
+
+任何技能准备使用 `request_user_input` 前，必须先读取并遵循 `${pluginPath}/skills/references/ask-user-question.md`。业务技能中定义的问题和选项继续有效；阶段门只有在符合共享协议的必要提问条件时才生效。工具字段、问题数量、Other 处理、自动继续和文本降级方式以该共享协议为准。
+
+以下三个为 `autobizdevops` 阶段流程的直接入口。所有 Biz / Dev / Ops 阶段工作均应通过这些统一入口进入，各阶段内部子技能由对应入口按 checkpoint 路由，不允许跳过前置准入直接调用子技能。
+
+横切回退使用独立技能 `/autobizdevops-rollback`，其全部状态、产物清理、Code 执行态重置和可选源码恢复逻辑集中在 `${pluginPath}/skills/scripts/flowlib/rollback_stage.py`；不要在其他 workflow stage 中复制回退逻辑。
+
+产物同步使用独立技能 [`/autobizdevops-artifact-sync`](autobizdevops-artifact-sync/SKILL.md)，统一负责 `FEATURE_API_DETAIL.md` 生成、产物上传、增量同步与失败重试。同步脚本位于该技能的 `scripts/`，不作为 Board 节点，不推进 checkpoint；checkpoint 更新后不再自动上传。
+
+### 技能映射
+| 阶段                  | 调用 Skill   | 本工程文件                               |
+|---------------------|------------|-------------------------------------|
+| autobiz             | `/autobiz` | `autobiz/SKILL.md`                  |
+| autodev             | `/autodev` | `autodev/SKILL.md`                  |
+| autoops             | `/autoops` | `autoops/SKILL.md`                  |
+
+
+### Checkpoint 路由映射
+
+完成前置准入后，根入口必须先通过脚本读取当前 State 快照，并调用动态路由脚本解析当前 workflow profile 下的下一步。根入口只负责选择 `/autobiz` / `/autodev` / `/autoops`，不得直接跳入阶段内部子技能；阶段入口会继续按 `resolve_next_skill.py` 的返回结果路由到具体子技能。
+
+### State 快照读取
+
+所有需要当前 FEATURE_ID checkpoint 的判断，第一步必须调用脚本读取 `.autobizdevops/state.json`：已知 Feature 时按 feature 读取当前 checkpoint；未知 Feature 时读取全量 JSON 并记为 `STATE`，仅用于从 `STATE.records` 选择 Feature。不得绕过脚本重新手工读取 `state.json`。
+
+```bash
+# 已知 Feature
+python -X utf8 "${pluginPath}/skills/scripts/flowlib/read_state_json.py" --feature "${feature}"
+
+# 未知 Feature：先读取全部 records，再选择或要求用户选择 Feature
+python -X utf8 "${pluginPath}/skills/scripts/flowlib/read_state_json.py"
+```
+
+- 需要用户从候选 Feature 中选择时，按 `${pluginPath}/skills/references/ask-user-question.md` 提问。候选不超过 3 个时直接列成结构化选项；超过 3 个时先展示完整 slug 清单，再把最多 3 个最相关候选放入结构化选项，其他候选由客户端自动提供的 Other 自由输入承接。若当前模式不支持 `request_user_input`，必须列出完整候选 slug 并显式追问用户回复其一。未拿到明确选择前，不得推进任何 checkpoint。
+
+每次需要当前 checkpoint 时，都重新运行 `read_state_json.py` 读取，不得沿用先前回合的旧值，也不得改从 `hooks.ndjson` 等日志或产物推断——当前 checkpoint 只以 `read_state_json.py` / `state.json` 的输出为准。
+
+### 动态路由读取
+
+所有根路由判断必须以 `${pluginPath}/board_core/board_config.json` 编译后的有效 workflow 为准：
+
+```bash
+python -X utf8 "${pluginPath}/skills/scripts/flowlib/resolve_next_skill.py" --json
+```
+
+- `currentNodeId` 所属 group 为 `Biz` 时，进入 `/autobiz`。
+- `currentNodeId` 所属 group 为 `Dev`，或 `checkpoint` 为 `prd_done` 且脚本返回 Dev profile 选择时，进入 `/autodev`。
+- `currentNodeId` 所属 group 为 `Ops`，或 `checkpoint` 为 `code_done` / `cicd_done` 时，进入 `/autoops`。
+- `ok: false`、checkpoint 为空/未知，或无法唯一确定当前 Feature 时，必须停止并提示用户选择或修复状态。
+
+### Checkpoint 更新命令
+
+checkpoint 只由各节点技能开头的状态维护片段推进（`runtime/workflow/update_state.py`），不得手工修改 `.autobizdevops/state.json`（`hooks/state_write_guard.py` 会拦截）。执行完成命令前，`hooks/artifact_guard.py` 检查必需产物、`hooks/stage_gate_guard.py` 运行节点校验器，不通过时拦截。
+
+静态 checkpoint 表不得作为事实源；如本文与 `resolve_next_skill.py --json` 输出冲突，以脚本输出为准。

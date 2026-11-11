@@ -27,7 +27,7 @@ flowchart LR
 
   subgraph SCF["脚手架（开发期，不随插件发布）"]
     direction TB
-    W["初始化向导<br/>autobiz-plugin-creator"]
+    W["初始化向导<br/>骨架引导技能"]
     L["lint<br/>结构 + 语义检测"]
     B["build / doctor<br/>编译 · 生成 · 托管"]
     W --> L --> B

@@ -12,9 +12,9 @@
 ├── workflow.json                         # developer  核心流程（不随包发布）
 ├── modules/                              # developer  模块配置，按需存在（不随包发布）
 │   └── board.json  session.json  knowledge.json  artifactSync.json  globalHooks.json
-├── plugin.json                           # generated  插件清单（DevClaw 只读这一份）
+├── plugin.json                           # generated  插件清单（DevClaw 只读这一份）；description 可以手改（D70）
 ├── board_core/                           #            DevClaw 读取的全部静态内容（§3）
-│   ├── board_config.json                 # generated  宿主命令 inspectCommands
+│   ├── board_config.json                 # generated  宿主命令 inspectCommands；dialog_tips、system_prompt_inject 可以手改（D70）
 │   └── modules.json                      # generated  已开启的模块与看板入口
 ├── skills/                               #            业务技能、模板、脚本及校验器；节点技能按节点阶段分组（D64）
 │   ├── autobiz|autodev|autoops/          #            biz、dev、ops 节点的技能分别在这三个分组目录下
@@ -52,7 +52,7 @@
 │   │   ├── query.py                      # managed    内部只读查询模块
 │   │   ├── engine.py                     # managed    内部初始化与状态变更模块
 │   │   └── cli.py                        # managed    入口共用：参数解析、单个 JSON 输出、错误与退出码（D59）
-│   ├── config/                           # generated  编译后的内部配置（§5），DevClaw 不读
+│   ├── config/                           # generated  编译后的内部配置（§5），DevClaw 不读；board.json 中的展示文案可以手改（D70）
 │   │   └── runtime.json  flow.json  board.json  session.json  knowledge.json
 │   └── build-manifest.json               # generated  生成文件及构建信息记录（§8）
 └── .scaffold/                            # managed    输入配置的 Schema（IDE 补全），拷贝脚手架 schemas/ 下的这 6 个文件（显式列出，不含 schemas/host/，D55）
@@ -61,6 +61,8 @@
 ```
 
 `runtime/` 各级目录下的 `__init__.py` 省略未列。入口脚本通过 `__file__` 定位插件根目录，把它加入 `sys.path` 后导入 `runtime.common`。`adapters/` 下的 `board_view.py`、`board_events.py` 是供入口导入的库，不是宿主命令。
+
+打包前，`package` 先把入口文件的 `plugin.version` 按 `--bump` 递增一位（默认 `patch`，`none` 不改），重新生成 `plugin.json` 和 build-manifest，所以每打一次包版本号加一（interfaces.md §1.1）。
 
 打包产物（`autobiz-plugin package`）是一个 zip，其中只有一个顶层目录 `<plugin.id>/`，DevClaw 由它得到安装目录名（README §9）。目录下的内容按以下规则收集（D57）：
 
@@ -72,7 +74,7 @@
 | 知识目录 `sys/` | 只在启用知识模块、并且没有声明 `knowledge.source` 时打包（此时视为开发者提供的资源）；声明了 `source` 时它是运行期缓存，不打包 |
 | 不打包 | `plugin.scaffold.json`、`workflow.json`、`modules/`、`.scaffold/`、`dist/`，以及以上规则没有列出的文件 |
 
-zip 条目按路径排序，时间戳固定，路径用 `/` 分隔，同一个插件每次打出的 zip 相同。
+zip 条目按路径排序，时间戳固定，路径用 `/` 分隔，同一份插件内容、同一个版本号（`--bump none`）打出的 zip 相同。
 
 ## 2. 插件清单
 
@@ -370,6 +372,8 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
 
 看板模块的编译结果：`board.display` 填好默认值、按节点展开后的文案。节点的名称、分组、顺序、checkpoint、产物及其显示名、阶段标签已经在 `flow.json` 中，这里不重复。adapter 把 `flow.json`、`board.json`、`session.json` 合起来，拼成 `project_status`、`feature_status`、`dynamic_workflow` 输出的看板数据（interfaces.md §3.3）。
 
+其中 `template.label`、`template.description`、`stateLabels` 和节点的 `description`、`nextAction` 中的 `userMessage`、`dialogTips` 是展示文案，开发者可以在生成后直接修改（D70）：doctor 保留改过的文字，节点增删、改名等核心配置的变化照常写进文件，没改过的文字跟随更新。`slashSkill`、节点 `id` 等其余内容不能改。
+
 ```jsonc
 {
   "schema": "autobiz.board.v1",
@@ -530,7 +534,7 @@ description: [TODO: 做什么；在什么情况下使用]
 | `runtime/knowledge/render_collected_session_context.py` | 全栈版 `render_collected_session_context.py`，去掉流程上下文和运行策略部分 | `assembler = plugin` | 内置组装脚本（interfaces.md §4.5）：调用 `collect-knowledge.js` 按所选发布单元组装知识；collector 不可用或单元未命中时按清单映射加载，最后回退 `<localRepoPath>/AGENTS.md`；始终读取 `<sessionWorkspacePath>/AGENTS.md`。插件可以替换这个文件，被替换后 doctor 保留插件的版本，脚手架更新后替换运行框架时也一样（README §4） |
 | `runtime/knowledge/collect-knowledge.js` | 全栈版 `collect-knowledge.js` | `assembler = plugin` | collector：列出支持的发布单元、按单元恢复知识，依赖 Node 和 `gray-matter` |
 | `runtime/knowledge/package.json` | 脚手架 | `assembler = plugin` | collector 的 Node 依赖清单；doctor 写盘后在同目录执行 `npm install --omit=dev`，失败报 `KNOWLEDGE_NODE_DEPS` warning |
-| `runtime/knowledge/sync_knowledge.py` | lite `sync_agents.py` | 声明 `source` | 按 `runtime/config/knowledge.json` 的 `source` 克隆知识仓库到 `root`：先在临时目录克隆并校验清单，成功后再替换；HTTPS 失败时回退 SSH。不回写任何配置文件 |
+| `runtime/knowledge/sync_knowledge.py` | lite `sync_agents.py` | 声明 `source` | 按 `runtime/config/knowledge.json` 的 `source` 克隆知识仓库到 `root`：先在临时目录克隆并校验清单，成功后再替换；HTTPS 失败时回退 SSH。不回写任何配置文件。doctor 在 `sys/` 还没有清单时也执行一次，供契约测试使用 |
 
 另外会在 `inspectCommands` 中加入 `knowledge_path`、`deploy_units`（声明 `source` 时再加 `pull_knowledge`），在 `modules.json` 中写入知识模块的开启信息，生成 `runtime/config/knowledge.json`，在 `session.json` 中写入 `knowledgeAssembly`（仅 `assembler = plugin`，§5.4）。
 
@@ -619,6 +623,7 @@ skills/<skillName>/
     "runtime/common/engine.py": { "ownership": "managed", "sha256": "sha256:…" },
     "board_core/board_config.json": { "ownership": "generated", "sha256": "sha256:…" },
     "board_core/modules.json": { "ownership": "generated", "sha256": "sha256:…" },
+    "runtime/config/board.json": { "ownership": "generated", "sha256": "sha256:…", "customized": "sha256:…" },
     "skills/autodev-plan/SKILL.md": { "ownership": "seeded", "regions": { "state": "sha256:…" } }
   }
 }
@@ -627,6 +632,8 @@ skills/<skillName>/
 节点技能的 `SKILL.md` 归属为 `seeded`，只记录状态维护片段的摘要（`regions.state`，取两个标记之间去掉首尾换行后的内容）。doctor 和 build 靠这些记录找到上次写过片段的技能：技能不再绑定节点时删掉它的片段（§6.1）。
 
 `inputs` 记录每份核心配置的摘要，以及每个节点技能 SKILL.md 中 `description` 的摘要（键为 SKILL.md 的路径加 `#description`，值按 frontmatter 解析出的 `description` 字符串计算）：节点描述由它编译进 `runtime/config/board.json`，改了它同样要重新生成（D49）。技能还没有 SKILL.md 时不记录这一项。
+
+`plugin.json`、`board_core/board_config.json`、`runtime/config/board.json` 中有开发者可以手改的文字字段（D70，清单见 README §8 D70），这三项另记：`texts` 是每个文字字段这次生成的值的摘要，下次生成时磁盘上的值与它不同即视为开发者改过、保留开发者的值；`structure` 是文字字段的值换成空串后的摘要，check 靠它判断改动是否只在文字字段；`customized` 列出保留了开发者的值的字段及其摘要，没有时不记。字段名按路径写，节点数组按节点 `id` 定位，例如 `nodes.biz[draft].nextAction.done.dialogTips`。`sha256` 仍是写入内容的摘要。
 
 `files` 按路径排序（D52）。模块关闭后，它以前生成的文件保留在插件目录中，build-manifest 继续记录，并加上 `"inactive": true`：build 不再更新它们，`package` 不打包，lint 报 `MODULE_INACTIVE_FILES`；重新启用模块时去掉标记（D52）。
 

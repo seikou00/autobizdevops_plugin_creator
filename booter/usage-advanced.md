@@ -6,7 +6,7 @@
 
 | 方式 | 命令前缀 |
 |---|---|
-| 源码直跑 | 在 `booter/` 下 `python3 -m scaffold` |
+| 源码直跑 | 在 `booter/` 下 `python3 -m scaffold`；任意目录下 `python3 <booter 目录>`（`booter/SKILL.md` 用这种方式） |
 | 单文件 | 在 `booter/` 下 `python3 tools/make_pyz.py`，之后任意目录 `python3 <路径>/dist/autobiz-plugin.pyz` |
 
 下文统一写作 `python3 -m scaffold`，`P` 代表插件目录。
@@ -31,11 +31,27 @@ P/
 ├── hooks/                    # hooks.json（脚手架的条目 + 你的条目）、artifact_guard.py、全局钩子脚本，以及你自己的钩子脚本
 ├── .mcp.json                 # 可选，透传进 plugin.json
 ├── .scaffold/                # Schema，IDE 补全用，脚手架维护
-├── plugin.json、board_core/、runtime/   # 生成，不要手改
+├── plugin.json、board_core/、runtime/   # 生成；其中的对话提示和展示文案可以手改，见下文
 └── dist/                     # package 的输出
 ```
 
-生成文件被手改后 doctor 会拒绝覆盖，确认要覆盖时用 `doctor --force`。
+托管文件（`runtime/` 下的脚本、`hooks/artifact_guard.py` 等）被手改后 doctor 会拒绝覆盖，确认要覆盖时用 `doctor --force`；其余生成文件每次按核心配置重写，手改了 `check`、`package` 会报 `DRIFT_GENERATED`，下面列出的文字字段除外。
+
+**可以手改的文字**：对话提示和展示文案不影响流程，生成后可以直接改：
+
+| 文件 | 可以改的字段 |
+|---|---|
+| `plugin.json` | `description` |
+| `board_core/board_config.json` | 各平台（`darwin`、`linux`、`win32`）的 `dialog_tips`、`system_prompt_inject`，每个平台分别改 |
+| `runtime/config/board.json` | `template.label`、`template.description`，`stateLabels` 中的状态名，节点的 `description`，以及 `nextAction` 各状态下的 `userMessage`、`dialogTips` |
+
+- 改过的文字在 `doctor`、`package` 时保留，build-manifest 的 `customized` 记下这些字段，doctor 的输出在“保留手改的文字”中列出；
+- 文件的其余部分照常按核心配置重写：增删节点、改节点名、启用模块等变化照样生效，你没改过的文字也跟着更新；`plugin.json` 的 `version` 由 `package` 递增；
+- 你改过的字段，如果核心配置的变化也改到了它（例如默认的对话提示含节点链，改了节点名），保留你的版本并报 `CUSTOMIZED_STALE`，确认一下文字是否还合适；
+- 改了这些字段以外的内容（命令、`slashSkill`、节点 `id` 等），`check`、`package` 报 `DRIFT_GENERATED`，`doctor` 会把它们改回生成内容；
+- 文件必须仍是合法的 JSON 对象（否则报 `CUSTOMIZED_INVALID`），改过的文字中的 `[TODO: …]` 要在打包前填完；
+- 想全部恢复成生成内容，删掉文件再执行 `doctor`；文件按标准格式（两格缩进）重写，你的缩进和键顺序不保留，只保留值；
+- 其余生成文件（`board_core/modules.json`、`runtime/config/` 下的其他文件）照旧不能改。
 
 ## 3. 核心配置
 
@@ -279,6 +295,8 @@ python3 -m scaffold -C P add skills --from ../skills --agents ../agents     # �
 - 技能已存在或其他分组下有同名技能时拒绝导入（同一集合重复导入也会被拒绝）；只有 build 生成的空白 `SKILL.md` 可以被导入覆盖；
 - `--agents`：已有同名文件且内容相同时跳过，内容不同时拒绝导入；
 - 正文中的旧状态命令（`LEGACY_ENTRY_REF`）导入时只报 warning，`check`、`package` 时是 error，必须手工删掉。状态维护片段由脚手架写在 `SKILL.md` 开头，不要手改。
+- 正文引用的文件在插件里不存在时报 `SKILL_REF_DANGLING`（warning，`doctor`、`check`、`package` 都报）：检查 `${pluginPath}/…` 路径和以 `templates/`、`references/`、`scripts/`、`hooks/`、`agents/`、`assets/` 开头的相对路径。`add skills` 只搬技能集合目录，原插件根目录 `hooks/` 下由技能调用的脚本要自己拷进插件的 `hooks/`；
+- 正文里写死的绝对路径（含 `skills` 或上述资源目录的 `/…`、`~/…`、`C:\…`）报 `SKILL_REF_ABSOLUTE`（warning），改成 `${pluginPath}/…` 或相对技能目录的路径；
 
 **技能目录**：节点技能按节点所属阶段放进分组目录，与技能名无关：
 
@@ -313,7 +331,7 @@ python3 -m scaffold -C P module disable knowledge
 | 参数 | 作用 |
 |---|---|
 | `--dry-run` | 只列出将要发生的变化，不写文件 |
-| `--force` | 覆盖被手改过的生成文件 |
+| `--force` | 覆盖被手改过的托管文件 |
 | `--allow-id-change` | 确认修改 `plugin.id` |
 | `--allow-layout-change` | 确认修改 `runtime.metaRoot` |
 | `--allow-major-upgrade` | 确认运行框架跨主版本升级 |
@@ -324,11 +342,11 @@ python3 -m scaffold -C P module disable knowledge
 python3 -m scaffold -C P lint                    # 只检查核心配置
 python3 -m scaffold -C P check [--strict]        # 再加技能内容、漂移检查和契约测试；--strict 把 warning 也当 error
 python3 -m scaffold -C P simulate [--feature demo] [--to plan_done] [--platform darwin|linux|win32] [--keep]
-python3 -m scaffold -C P package [-o out/my.zip]
+python3 -m scaffold -C P package [-o out/my.zip] [--bump patch|minor|major|none]
 ```
 
-- `simulate` 在临时目录中按宿主的方式走一遍流程：`--to` 停在某个 checkpoint，`--platform` 模拟其他平台的宿主命令，`--keep` 保留临时目录便于排查。知识仓库没有同步时会报 `KNOWLEDGE_MANIFEST_MISSING` warning，不影响流程；
-- `package` 先做 check，技能里还有 `[TODO: …]` 占位时拒绝打包；默认输出 `P/dist/<plugin.id>-<plugin.version>.zip`。
+- `simulate` 在临时目录中按宿主的方式走一遍流程：`--to` 停在某个 checkpoint，`--platform` 模拟其他平台的宿主命令，`--keep` 保留临时目录便于排查。知识目录中没有清单时会报 `KNOWLEDGE_MANIFEST_MISSING` warning，不影响流程。声明了 `knowledge.source` 时，`doctor` 会在 `sys/` 还没有清单时自动拉取知识仓库，拉取失败报 `KNOWLEDGE_PULL` warning；
+- `package` 先做 check，技能里还有 `[TODO: …]` 占位时拒绝打包；通过后把 `plugin.scaffold.json` 的 `plugin.version` 递增一位并重新生成 `plugin.json`（默认 `--bump patch`：0.1.0 → 0.1.1；`minor`、`major` 递增对应位、低位归零；`none` 不改版本），默认输出 `P/dist/<plugin.id>-<新版本>.zip`。
 
 CI 示例：
 
@@ -342,7 +360,7 @@ python3 -m scaffold -C P check --strict --json > check.json && python3 -m scaffo
 cd booter     # 仓库根目录下；已在 booter/ 中可省略
 python3 -m unittest discover -s tests -t .   # 金样、参考插件基线、契约、CLI 端到端和单元测试
 python3 tests/check_schema_defaults.py       # input-config.md 的默认值与 Schema 是否一致
-python3 tools/make_pyz.py                    # 发布 dist/autobiz-plugin.pyz 和插件开发技能包
+python3 tools/make_pyz.py                    # 发布 dist/autobiz-plugin.pyz
 ```
 
 改了 `booter/examples/` 的输入后，要重新生成对应的 `output/` 金样（见 [examples/README.md](examples/README.md)）。

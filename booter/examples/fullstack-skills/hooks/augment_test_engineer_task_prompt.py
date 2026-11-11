@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""PreToolUse(task) hook: constrain post-implementation UTest assignments."""
+
+from __future__ import print_function
+
+import json
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+if str(ROOT / "skills" / "scripts") not in sys.path:
+    sys.path.insert(0, str(ROOT / "skills" / "scripts"))
+
+from flowlib.utest_assignment_router import (  # noqa: E402
+    UTestAssignmentError,
+    validate_assignment_prompt_payload,
+)
+
+
+PREFIX = "[utest-task-prompt-augment]"
+TARGET_SUBAGENT_TYPE = "test-engineer-autodev"
+APPEND_MARKER = "autodev-utest-assignment"
+ASSIGNMENT_MARKER = "<UTEST_ASSIGNMENT>"
+APPEND_INSTRUCTION = """
+
+<{marker}>
+Use the validated UTEST_ASSIGNMENT unchanged. This is post-implementation testing:
+post_implementation=true, tdd_rebuild=false. Preserve production implementation.
+Follow the test-engineer-autodev role and Runtime-returned binding/policy/operations;
+read only the selected domain reference. Reuse valid engineeringContext before
+bounded discovery. Current executed assertions and Evidence are required for PASS.
+</{marker}>""".format(marker=APPEND_MARKER)
+
+
+def read_stdin_text():
+    raw = sys.stdin.buffer.read()
+    if not raw:
+        return ""
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return raw.decode(sys.stdin.encoding or "utf-8", errors="replace")
+
+
+def as_dict(value):
+    return value if isinstance(value, dict) else {}
+
+
+def get_tool_input(payload):
+    return as_dict(payload.get("tool_input") or payload.get("input"))
+
+
+def is_target_subagent(tool_input):
+    subagent_type = tool_input.get("subagent_type")
+    if not isinstance(subagent_type, str):
+        return False
+    return subagent_type.strip().lower() == TARGET_SUBAGENT_TYPE.lower()
+
+
+def validate_assignment_block(description, stream):
+    start = description.find(ASSIGNMENT_MARKER)
+    close_marker = "</UTEST_ASSIGNMENT>"
+    end = description.find(close_marker, start + len(ASSIGNMENT_MARKER))
+    if start < 0 or end < 0:
+        print(
+            "{} incomplete UTEST_ASSIGNMENT block. 修复：使用 router 输出的 promptContent 原文。".format(
+                PREFIX
+            ),
+            file=stream,
+        )
+        return False
+    raw_payload = description[start + len(ASSIGNMENT_MARKER) : end].strip()
+    try:
+        payload = json.loads(raw_payload)
+    except (TypeError, ValueError) as exc:
+        print(
+            "{} invalid UTEST_ASSIGNMENT JSON: {}. 修复：不要改写 router promptContent。".format(
+                PREFIX, exc
+            ),
+            file=stream,
+        )
+        return False
+    try:
+        validate_assignment_prompt_payload(payload)
+    except (UTestAssignmentError, TypeError, ValueError, OSError) as exc:
+        print(
+            "{} invalid UTEST_ASSIGNMENT: {}".format(PREFIX, exc),
+            file=stream,
+        )
+        return False
+    return True
+
+
+def build_updated_input(payload, stream):
+    tool_input = get_tool_input(payload)
+    if not is_target_subagent(tool_input):
+        print(
+            "{} skipped; subagent_type must be {}".format(
+                PREFIX, TARGET_SUBAGENT_TYPE
+            ),
+            file=stream,
+        )
+        return None
+
+    description = tool_input.get("description")
+    if not isinstance(description, str) or not description.strip():
+        print(
+            "{} description missing; pass the UTest assignment in "
+            "tool_input.description. 修复：传入 router 生成的最小 promptContent。".format(PREFIX),
+            file=stream,
+        )
+        return None
+
+    if ASSIGNMENT_MARKER not in description:
+        print(
+            "{} description missing {}; refusing an unbound summary. "
+            "修复：运行 utest_assignment_router.py，并把 assignment.promptContent 原样放入 description。".format(
+                PREFIX, ASSIGNMENT_MARKER
+            ),
+            file=stream,
+        )
+        return None
+
+    if not validate_assignment_block(description, stream):
+        return None
+
+    if APPEND_MARKER in description:
+        print(
+            "{} skipped; UTest assignment contract already present".format(PREFIX),
+            file=stream,
+        )
+        return None
+
+    updated_description = description + APPEND_INSTRUCTION
+    print(
+        "{} appended {} to {} description".format(
+            PREFIX, APPEND_MARKER, TARGET_SUBAGENT_TYPE
+        ),
+        file=stream,
+    )
+    return {"updatedInput": {"description": updated_description}}
+
+
+def emit_updated_input(payload, output_stream, error_stream):
+    result = build_updated_input(payload, error_stream)
+    if result is None:
+        return False
+    json.dump(result, output_stream, ensure_ascii=False, separators=(",", ":"))
+    output_stream.write("\n")
+    return True
+
+
+def main():
+    raw_input = read_stdin_text()
+    if not raw_input.strip():
+        print(
+            "{} empty stdin; verify CMBDevClaw passes the PreToolUse task "
+            "payload to command hooks. 修复：把 task payload 作为 JSON 写入 stdin。".format(PREFIX),
+            file=sys.stderr,
+        )
+        return 0
+
+    try:
+        payload = json.loads(raw_input)
+    except (TypeError, ValueError) as error:
+        print(
+            "{} invalid JSON: {}. 修复：捕获原始 PreToolUse payload 并修正 JSON。".format(
+                PREFIX, error
+            ),
+            file=sys.stderr,
+        )
+        return 0
+
+    if not isinstance(payload, dict):
+        print(
+            "{} payload is not an object. 修复：从 PreToolUse 传入单个 JSON object。".format(
+                PREFIX
+            ),
+            file=sys.stderr,
+        )
+        return 0
+
+    emit_updated_input(payload, sys.stdout, sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

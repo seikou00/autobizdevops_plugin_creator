@@ -179,7 +179,10 @@ class Contract:
                 self.issues.append(warning("KNOWLEDGE_MANIFEST_MISSING", "知识目录中没有清单，deploy_units 返回失败："
                                            + "；".join(payload.get("errors", [])),
                                            file="board_core/board_config.json",
-                                           pointer=f"/inspectCommands/{self.platform}/deploy_units"))
+                                           pointer=f"/inspectCommands/{self.platform}/deploy_units",
+                                           hint=("doctor 拉取知识仓库失败时会报 KNOWLEDGE_PULL：按它的提示处理后重新执行 doctor"
+                                                 if "pull_knowledge" in self.host.commands
+                                                 else "把知识目录放到插件的 sys/ 下，并带上清单文件")))
         for index, node in enumerate(self.flow["nodes"]):
             if not self.advance(index, node, feature_dir):
                 return

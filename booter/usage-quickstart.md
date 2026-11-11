@@ -60,7 +60,7 @@ python3 -m scaffold -C ~/Documents/GitHub/my-plugin add skills --from ~/Document
 
 想先确认流程能走通，可以先运行 `python3 -m scaffold -C ~/Documents/GitHub/my-plugin simulate`，它会在临时目录里按 DevClaw 的方式把每个节点走一遍。
 
-> 也可以把插件开发技能 `autobiz-plugin-creator` 装进 agent，用对话描述流程，由 agent 填写配置并执行这些命令。
+> 也可以把整个 `booter/` 目录作为技能装进 agent（入口是根目录的 `SKILL.md`），由 agent 用选择题引导你生成骨架、填写配置并执行这些命令。
 
 ## 4. 打包
 

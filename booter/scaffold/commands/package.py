@@ -1,14 +1,19 @@
-"""package：check（只把 TODO_PLACEHOLDER 升为 error）后按打包规则写 zip（output-spec.md §1，D57）。"""
+"""package：check（只把 TODO_PLACEHOLDER 升为 error），递增 plugin.version 并重新生成，再按打包规则写 zip（output-spec.md §1，D57）。"""
 
 from __future__ import annotations
 
+import re
 import zipfile
 from pathlib import Path
 
+from scaffold.build import emit
 from scaffold.build.manifest import MANIFEST, read_manifest
 from scaffold.commands import CommandResult
-from scaffold.lib import fsio
+from scaffold.lib import fsio, jsonedit
 from scaffold.lib.tree import Tree
+
+ENTRY = "plugin.scaffold.json"
+BUMPS = ("patch", "minor", "major", "none")
 
 RECORDED_ROOTS = ("plugin.json", "board_core/", "runtime/")
 WHOLE_DIRS = ("skills", "hooks", "agents")
@@ -60,6 +65,36 @@ def collect(root: Path, entry: dict, manifest: dict | None, *, knowledge_enabled
     return sorted(files), sorted(set(skipped) - files)
 
 
+def next_version(version: str, bump: str) -> str:
+    """按 bump 递增 x.y.z；预发布后缀（-beta 等）一并去掉。"""
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)", version)
+    major, minor, patch = (int(part) for part in match.groups())
+    if bump == "major":
+        return f"{major + 1}.0.0"
+    if bump == "minor":
+        return f"{major}.{minor + 1}.0"
+    return f"{major}.{minor}.{patch + 1}"
+
+
+def bump_version(root: Path, bump: str):
+    """改写入口文件的 plugin.version（保留原有格式），重新生成 plugin.json 和 build-manifest。
+
+    返回 (旧版本, 新版本, 写入的文件, report)；report 有 error 时不写任何文件。
+    """
+    from scaffold.build.pipeline import build
+
+    text = Tree(root).read_bytes(ENTRY).decode("utf-8")
+    old = fsio.parse_json(text.encode("utf-8"))["plugin"]["version"]
+    new = next_version(old, bump)
+    data = jsonedit.set_member(text, "/plugin", "version", new).encode("utf-8")
+    result = build(Tree(root, {ENTRY: data}), dry_run=True)
+    if result.report.failed():
+        return old, new, [], result.report
+    fsio.atomic_write(root / ENTRY, data)
+    written = [ENTRY] + emit.apply(result.plan, Tree(root), MANIFEST, fsio.dump_json(result.manifest))
+    return old, new, written, result.report
+
+
 def write_zip(root: Path, plugin_id: str, files: list, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_name(output.name + ".tmp")
@@ -72,14 +107,22 @@ def write_zip(root: Path, plugin_id: str, files: list, output: Path) -> None:
     temporary.replace(output)
 
 
-def package(root: Path, *, output: Path | None = None) -> CommandResult:
+def package(root: Path, *, output: Path | None = None, bump: str = "patch") -> CommandResult:
     from scaffold.commands.check import check
 
     result = check(root, package_mode=True)
     if result.report.failed():
         return CommandResult(result.report)
+    written = []
+    version = None
+    if bump != "none":
+        old, new, written, report = bump_version(root, bump)
+        result.report.extend([issue for issue in report.issues if issue not in result.report.issues])
+        if report.failed():
+            return CommandResult(result.report)
+        version = {"from": old, "to": new}
     tree = Tree(root)
-    entry = fsio.parse_json(tree.read_bytes("plugin.scaffold.json"))
+    entry = fsio.parse_json(tree.read_bytes(ENTRY))
     manifest = read_manifest(tree)
     modules = (entry.get("modules") or {})
     knowledge_source = False
@@ -96,6 +139,8 @@ def package(root: Path, *, output: Path | None = None) -> CommandResult:
         shown = target.relative_to(root).as_posix()
     except ValueError:
         shown = target.as_posix()
-    return CommandResult(result.report, extra={"package": {"path": shown, "skipped": skipped}}, written=[shown],
-                         text=f"已打包 {len(files)} 个文件：{shown}")
+    lines = [f"版本 {version['from']} → {version['to']}"] if version else []
+    lines.append(f"已打包 {len(files)} 个文件：{shown}")
+    return CommandResult(result.report, extra={"package": {"path": shown, "skipped": skipped, "version": version}},
+                         written=written + [shown], text="\n".join(lines))
 

@@ -51,8 +51,15 @@ class NewAndPackageTest(unittest.TestCase):
         self.assertEqual(cli("-C", str(root), "doctor")[0], 0)
         code, payload = cli("-C", str(root), "package")
         self.assertEqual(code, 0, payload)
+        self.assertEqual(payload["package"]["version"], {"from": "0.1.0", "to": "0.1.1"})
+        self.assertTrue(payload["package"]["path"].endswith("doc-review-0.1.1.zip"))
         with zipfile.ZipFile(root / payload["package"]["path"]) as archive:
             names = archive.namelist()
+            packed = json.loads(archive.read("doc-review/plugin.json"))
+        self.assertEqual(packed["version"], "0.1.1")
+        entry = json.loads((root / "plugin.scaffold.json").read_text("utf-8"))
+        self.assertEqual(entry["plugin"]["version"], "0.1.1")
+        self.assertEqual(cli("-C", str(root), "check")[0], 0)
         self.assertTrue(all(name.startswith("doc-review/") for name in names))
         self.assertIn("doc-review/runtime/build-manifest.json", names)
         self.assertNotIn("doc-review/workflow.json", names)
@@ -60,6 +67,21 @@ class NewAndPackageTest(unittest.TestCase):
         self.assertEqual(names, sorted(names))
         board = json.loads((root / "runtime/config/board.json").read_text("utf-8"))
         self.assertEqual(board["nodes"]["biz"][0]["description"], "起草或评审文档时使用")
+
+    def test_package_bump_options(self):
+        root = self.new_plugin()
+        fill_descriptions(root)
+        self.assertEqual(cli("-C", str(root), "doctor")[0], 0)
+        code, payload = cli("-C", str(root), "package", "--bump", "none")
+        self.assertEqual(code, 0, payload)
+        self.assertIsNone(payload["package"]["version"])
+        self.assertTrue(payload["package"]["path"].endswith("doc-review-0.1.0.zip"))
+        code, payload = cli("-C", str(root), "package", "--bump", "minor")
+        self.assertEqual(payload["package"]["version"], {"from": "0.1.0", "to": "0.2.0"})
+        code, payload = cli("-C", str(root), "package", "--bump", "major")
+        self.assertEqual(payload["package"]["version"], {"from": "0.2.0", "to": "1.0.0"})
+        plugin = json.loads((root / "plugin.json").read_text("utf-8"))
+        self.assertEqual(plugin["version"], "1.0.0")
 
     def test_target_must_be_empty_and_usage_exit_code(self):
         root = temp_dir(self)

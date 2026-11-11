@@ -18,3 +18,4 @@
 | 示例 | 用到的能力 |
 |---|---|
 | [minimal/](minimal/) | 两个节点（都在 `biz` 组，`seq` 为 1、2）；不写模块配置 |
+| [fullstack-skills/](fullstack-skills/) | 全栈版的核心配置和技能（产物同步技能由模块生成，不收录），以及按新目录结构重构后的流程脚本：`hooks/` 只放 `hooks.json` 注册的宿主钩子（新增 `state_write_guard.py`、`stage_gate_guard.py` 取代原 `state_checkpoint.py`）；原插件根目录 `hooks/` 下由技能调用的流程脚本和共用库放在 `skills/scripts/flowlib/`，原 `board_core` 由其中的 `contracts.py`、`state_store.py` 取代（节点、产物、checkpoint 读运行框架的 `flow.json`，校验器清单等读 `node_contracts.json`，状态变更只走运行框架）；已被运行框架、知识模块、globalHooks 取代的脚本删除。v1 运行框架只有 standard 流程，阶段回退只保留 `target_in_progress`。用来验证搬入已有技能后的悬空引用和绝对路径检查（`SKILL_REF_DANGLING`、`SKILL_REF_ABSOLUTE`，D71），以及流程脚本能在新结构下运行（`tests/test_fullstack_skills.py`）。没有 `output/` 金样 |

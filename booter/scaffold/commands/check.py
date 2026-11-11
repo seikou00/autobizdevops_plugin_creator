@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from scaffold.build import customize
+from scaffold.build.dangling import LEGACY_PATHS, dangling_refs
 from scaffold.build.framework import skill_dir
 from scaffold.build.manifest import MANIFEST
 from scaffold.build.pipeline import analyze, build
@@ -14,8 +16,6 @@ from scaffold.lib.issues import Issue, Report, error, warning
 from scaffold.lib.tree import Tree
 
 NODE_STATE_COMMANDS = ("update_state.py", "update_checkpoint.py", "route_checkpoint.py")
-LEGACY_PATHS = ("hooks/update_state.py", "hooks/update_checkpoint.py", "hooks/route_checkpoint.py", "hooks/skip_node.py",
-                "hooks/init_workspace.py", "${pluginPath}/inspect_state.py")
 LEGACY_HINT = ("状态由开头的状态维护片段维护，删掉这一行；整节只剩状态命令时连同小节标题一起删；"
                "这一行前面有校验等步骤时，改写成“执行完成命令之前先……”")
 MAX_LINES = 500
@@ -126,11 +126,23 @@ def resource_rules(result, tree: Tree, *, package_mode: bool = False) -> list:
         elif skillmd.has_state(text):
             issues.append(error("SKILL_STATE_BLOCK", "技能不再绑定任何节点，但还留着状态维护片段", file=path,
                                 hint="执行 autobiz-plugin doctor，或手动删掉这个片段"))
+    issues += dangling_refs(tree, skip=module_skills)
     for key, rel in result.normalized.inputs.files.items():
         data = tree.read_bytes(rel)
         if data is not None and TODO.encode() in data:
             make = error if package_mode else warning
             issues.append(make("TODO_PLACEHOLDER", "还有未填写的 [TODO: …] 占位", file=rel))
+    recorded = (result.previous or {}).get("files", {})
+    for path in customize.TEXT_FIELDS:
+        # 开发者改过的文字不再跟随核心配置和技能的 description 更新，里面的占位要开发者自己填（D70）
+        data, record = tree.read_bytes(path), recorded.get(path) or {}
+        if data is None or TODO.encode() not in data or customize.problem_of(data):
+            continue
+        names = [name for name, text in customize.edited(path, fsio.parse_json(data), record).items() if TODO in text]
+        if names:
+            make = error if package_mode else warning
+            issues.append(make("TODO_PLACEHOLDER", "手改过的文字中还有未填写的 [TODO: …] 占位：" + "、".join(names),
+                               file=path, hint="填写后再打包"))
     return issues
 
 
@@ -141,6 +153,17 @@ def drift_issues(tree: Tree, previous: dict | None, replaceable: set) -> list:
         if record.get("inactive") or ownership not in ("generated", "managed", "module") or path in replaceable:
             continue
         data = tree.read_bytes(path)
+        if data is not None and record.get("structure") and fsio.digest(data) != record.get("sha256"):
+            # 有可改文字字段的生成文件（D70）：只改了文字字段不算漂移
+            problem = customize.problem_of(data)
+            if problem:
+                issues.append(error("CUSTOMIZED_INVALID", f"{path} 手改过，但{problem}", file=path,
+                                    hint="修好这个文件；要恢复生成内容就删掉它再执行 autobiz-plugin doctor"))
+            elif customize.structure(path, fsio.parse_json(data)) != record["structure"]:
+                issues.append(error("DRIFT_GENERATED", f"{path} 的改动超出了可以手改的文字字段", file=path,
+                                    hint=f"这个文件只能改：{customize.EDITABLE_HINT[path]}；"
+                                         "其余部分由核心配置生成，执行 autobiz-plugin doctor 会按核心配置重写"))
+            continue
         code = "DRIFT_GENERATED" if ownership == "generated" else "DRIFT_MANAGED"
         if data is None:
             issues.append(error(code, f"{path} 被删除了", file=path, hint="执行 autobiz-plugin doctor 重新生成"))

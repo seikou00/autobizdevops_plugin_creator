@@ -1,0 +1,151 @@
+{
+  "PreToolUse": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/utest_deadline_guard.py",
+          "timeout": 30,
+          "persistAfterInterrupt": true
+        }
+      ]
+    },
+    {
+      "matcher": "task|Task",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/augment_test_engineer_task_prompt.py",
+          "timeout": 30,
+          "persistAfterInterrupt": true
+        }
+      ]
+    },
+    {
+      "matcher": "write_file|edit_file|apply_patch",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/state_write_guard.py",
+          "timeout": 30,
+          "onBlock": {
+            "reason": "state检查不通过",
+            "systemMessage": "非法的路径转移",
+            "additionalContext": "停止任务，询问用户行为"
+          },
+          "persistAfterInterrupt": true
+        },
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/frontend_route_write_guard.py",
+          "timeout": 10,
+          "onBlock": {
+            "reason": "代码写入闸门检查不通过",
+            "systemMessage": "业务代码写入必须由完整的 v2 task run 和当前探索证明授权；前端任务还必须完成 FRONTEND_ROUTE 协议。",
+            "additionalContext": "不要手工修改 .task-runs。先运行 code_task_context 并完成只读探索，再由 task_runner start；start 成功后才能运行 prepare_html_analysis.py、生成 .frontend 产物、复制项目 assets 或写业务代码。absolute-html/standard-html 还需完整读取 route SKILL、创建 route todos 并由 route SKILL 转交 parser；Route 清单完成不是 start 的前置条件。"
+          },
+          "persistAfterInterrupt": true
+        }
+      ]
+    },
+    {
+      "matcher": "read_file",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/check_state_read.py",
+          "timeout": 300,
+          "persistAfterInterrupt": true
+        }
+      ]
+    },
+    {
+      "matcher": "execute",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/code_execution_guard.py",
+          "timeout": 30,
+          "onBlock": {
+            "reason": "命令不符合当前 Batch 阶段的验证权限",
+            "systemMessage": "环境版本/帮助查询允许执行；当前 Batch 绑定的活动 Code/修复 task 允许生产纯编译；Review 禁止验证；其余构建、测试、typecheck、lint、E2E 仅由 Review 通过后的运行中 UTest 阶段执行。",
+            "additionalContext": "guard 按真实命令和目标判断，支持 export/环境赋值、cd、多行、tee 和退出码记录，不要求固定命令字符串。被拦截时必须展示 GUARD_DIAGNOSTICS.failures 中每项 code、reason、line、statement，连同 executionCwd、taskRuns、guardVersion 和 guardPath；不能只说 guard rejected，更不能盲目删除 -o 重试。相对 cwd 需要工具真实的 workspaceRoot；执行工具自身的 cwd 限制另行报告。后端按 prepare-compile → 直接 Bash 编译并立即保存 PIPESTATUS → record-compile → finish-implementation 完成；记录成功不代表编译通过，检查 passed/exitCode/logExitCode，登记失败保留日志只重试登记。TASK/Batch/run 绑定和阶段规则仍然生效；不得附加 test/package/verify、额外验证、动态执行或后台进程，不得切换中立目录绕过 guard 或手改 Runtime。"
+          },
+          "persistAfterInterrupt": true
+        },
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/runtime_artifact_guard.py",
+          "timeout": 30,
+          "onBlock": {
+            "reason": "Runtime-owned 产物禁止通过 shell 修改",
+            "systemMessage": "请使用对应 Runtime writer 或 runner",
+            "additionalContext": "不要绕过产物 writer"
+          },
+          "persistAfterInterrupt": true
+        },
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/check_state_read.py",
+          "timeout": 300,
+          "persistAfterInterrupt": true
+        },
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/stage_gate_guard.py",
+          "timeout": 300,
+          "if": "execute(*update_state.py*)",
+          "onBlock": {
+            "reason": "产物检查不通过",
+            "systemMessage": "节点校验未通过",
+            "additionalContext": "停止任务，按提示补充或修正产物"
+          },
+          "persistAfterInterrupt": true
+        },
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/human_gate_design_done.py",
+          "timeout": 30,
+          "if": "execute(*update_state.py*)",
+          "persistAfterInterrupt": true
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "matcher": "task|Task",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/critic_review_log_writer.py",
+          "timeout": 30,
+          "persistAfterInterrupt": true
+        }
+      ]
+    },
+    {
+      "matcher": "write_file|edit_file|apply_patch",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/verified_digest_guard.py",
+          "timeout": 300,
+          "persistAfterInterrupt": true
+        }
+      ]
+    },
+    {
+      "matcher": "execute",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python -X utf8 hooks/verified_digest_guard.py",
+          "timeout": 300,
+          "persistAfterInterrupt": true
+        }
+      ]
+    }
+  ]
+}

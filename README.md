@@ -14,7 +14,7 @@ AutoBiz 看板插件脚手架。三方分工如下：
 
 ```bash
 cd booter
-python3 tools/make_pyz.py                               # 打出 dist/autobiz-plugin.pyz 和插件开发技能的插件包
+python3 tools/make_pyz.py                               # 打出单文件的 dist/autobiz-plugin.pyz
 python3 dist/autobiz-plugin.pyz new my-plugin           # 初始化向导；--yes --answers a.json 跳过问答
 python3 -m unittest discover -s tests -t .              # 脚手架自身的测试
 ```
@@ -32,7 +32,7 @@ python3 -m unittest discover -s tests -t .              # 脚手架自身的测�
 | [docs/mods.md](docs/mods.md) | 草案：mods 机制下的插件初始化与热更新 |
 | [docs/rpc.md](docs/rpc.md) | 草案：DevClaw 与插件的 JSON-RPC 双向通信 |
 | [docs/priorities.md](docs/priorities.md) | 草案：v1 功能分期（P0 / P1） |
-| [booter/](booter/README.md) | 脚手架本身：CLI 与构建流水线 `scaffold/`、运行框架模板 `runtime/`、插件开发技能、发布脚本和测试 |
+| [booter/](booter/README.md) | 脚手架本身：CLI 与构建流水线 `scaffold/`、运行框架模板 `runtime/`、发布脚本和测试；整个目录也是骨架引导技能（入口 `booter/SKILL.md`） |
 | [booter/schemas/](booter/schemas/) | `workflow.schema.json`、`plugin-scaffold.schema.json`、`modules/*.schema.json`、`host/outputs.schema.json` |
 | [booter/examples/](booter/examples/) | `minimal/`；`output/` 是 build 应生成的内容 |
 | [fixtures/](fixtures/) | 只供测试、不随 booter 分发的样例：`lite/`（复刻 autobizdevops_lite）、`fullstack/`（全栈版），结构同 `booter/examples/` |
@@ -44,4 +44,4 @@ python3 -m unittest discover -s tests -t .              # 脚手架自身的测�
 
 ## 仓库结构
 
-见 [docs/README.md §3.1](docs/README.md)：根目录放设计文档 `docs/`，脚手架本身（`scaffold/`、`runtime/`、`schemas/`、`examples/`、`skills/autobiz-plugin-creator/`、`tools/`、`tests/`）都在 `booter/` 下；测试用的 lite、fullstack 样例在 `fixtures/`。
+见 [docs/README.md §3.1](docs/README.md)：根目录放设计文档 `docs/`，脚手架本身（`scaffold/`、`runtime/`、`schemas/`、`examples/`、`tools/`、`tests/`，以及技能入口 `SKILL.md`）都在 `booter/` 下；测试用的 lite、fullstack 样例在 `fixtures/`。

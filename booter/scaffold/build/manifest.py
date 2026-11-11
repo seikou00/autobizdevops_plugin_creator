@@ -69,7 +69,9 @@ def make_manifest(ir, normalized, plan, modules: dict, descriptions: dict, previ
         if planned.ownership == "seeded":
             files[path] = {"ownership": "seeded", "regions": {planned.region_key: planned.region}}
         else:
-            files[path] = {"ownership": planned.ownership, "sha256": fsio.digest(planned.data)}
+            # sha256 是写入内容的摘要；有可改文字字段的文件另记 structure、texts、customized（D70）
+            files[path] = {"ownership": planned.ownership, "sha256": fsio.digest(plan.data(path)),
+                           **plan.records.get(path, {})}
     tree = normalized.inputs.tree
     for path, record in (previous or {}).get("files", {}).items():
         if path in files or record.get("ownership") not in ("generated", "managed", "module"):

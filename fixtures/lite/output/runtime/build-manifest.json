@@ -53,7 +53,16 @@
     },
     "board_core/board_config.json": {
       "ownership": "generated",
-      "sha256": "sha256:26850a42ae93956a4078926b35fad6c33e3b1bba742d0605ce8f2a34e500115e"
+      "sha256": "sha256:26850a42ae93956a4078926b35fad6c33e3b1bba742d0605ce8f2a34e500115e",
+      "structure": "sha256:19f21e58d89322afa75d1e04967c6843dcf9403bfadb979b51d9888d9e298162",
+      "texts": {
+        "inspectCommands.darwin.dialog_tips": "sha256:3ffd14d4f3573fe9a0e8155fda62dc3ddcdc781ffa33835a60e49b6b5473f4eb",
+        "inspectCommands.darwin.system_prompt_inject": "sha256:d8cc6bd89455dbf0881461415f3a8f32fc6a42bbde2da760b796fbcad6675c1c",
+        "inspectCommands.linux.dialog_tips": "sha256:3ffd14d4f3573fe9a0e8155fda62dc3ddcdc781ffa33835a60e49b6b5473f4eb",
+        "inspectCommands.linux.system_prompt_inject": "sha256:d8cc6bd89455dbf0881461415f3a8f32fc6a42bbde2da760b796fbcad6675c1c",
+        "inspectCommands.win32.dialog_tips": "sha256:3ffd14d4f3573fe9a0e8155fda62dc3ddcdc781ffa33835a60e49b6b5473f4eb",
+        "inspectCommands.win32.system_prompt_inject": "sha256:d8cc6bd89455dbf0881461415f3a8f32fc6a42bbde2da760b796fbcad6675c1c"
+      }
     },
     "board_core/modules.json": {
       "ownership": "generated",
@@ -71,7 +80,11 @@
     },
     "plugin.json": {
       "ownership": "generated",
-      "sha256": "sha256:f039c5f27960e4adca37ad654f65a4b98f946caf911d2af5b79b2c6cfdc4fcc1"
+      "sha256": "sha256:f039c5f27960e4adca37ad654f65a4b98f946caf911d2af5b79b2c6cfdc4fcc1",
+      "structure": "sha256:f7451a0c7fe3c41ca31cd57550e70ab79dd9c93b9fc5d0993600ad0ef5dc2b1d",
+      "texts": {
+        "description": "sha256:7f6a36c6b2fd1d7bcc5b330b5b6b00354a3e55e3a0148cd68a1e7dd58b9fff70"
+      }
     },
     "runtime/__init__.py": {
       "ownership": "managed",
@@ -123,7 +136,43 @@
     },
     "runtime/config/board.json": {
       "ownership": "generated",
-      "sha256": "sha256:9cb561bf72dfb74de3f642cf825c66eb534866ccebcaf61c17d3d54b6d77192b"
+      "sha256": "sha256:9cb561bf72dfb74de3f642cf825c66eb534866ccebcaf61c17d3d54b6d77192b",
+      "structure": "sha256:f9b873e0b6c3b56f2698727839b333bf7a5228ab352f5c22d013f7ea9de535db",
+      "texts": {
+        "nodes.biz[prd].description": "sha256:0502cc895610bddbeacf74dcb16c2f8922a546509cf18d9a687a159b8dcee213",
+        "nodes.biz[prd].nextAction.done.dialogTips": "sha256:3e56df96fc57a486291acbae0bd69d7a08ec160a78bfac9e84478554d8b64acc",
+        "nodes.biz[prd].nextAction.done.userMessage": "sha256:95faf6dabc243497002d8bc5fbfe4fc9e4ca24631cd02ba731d5d6ad10b78aed",
+        "nodes.biz[prd].nextAction.in_progress.dialogTips": "sha256:a234815b47c8e8bcaf06e08067b6f1b45fb27961f8e35a8b87caac5664594b99",
+        "nodes.biz[prd].nextAction.in_progress.userMessage": "sha256:2b3ee980b8da57278e81c9c5e388e288b1bda5022330985286bdc264423f3c3d",
+        "nodes.biz[prd].nextAction.not_started.dialogTips": "sha256:a234815b47c8e8bcaf06e08067b6f1b45fb27961f8e35a8b87caac5664594b99",
+        "nodes.biz[prd].nextAction.not_started.userMessage": "sha256:2b3ee980b8da57278e81c9c5e388e288b1bda5022330985286bdc264423f3c3d",
+        "nodes.dev[code].description": "sha256:5b48e0a1b039a4a0d1330a07f3e4d540790fa8d95605654ab55776ac4ef2adba",
+        "nodes.dev[code].nextAction.done.dialogTips": "sha256:3613e5879cab2923d87dd4f2d2044e3507fbe5cfbe995fc1251b7d42508ee483",
+        "nodes.dev[code].nextAction.done.userMessage": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "nodes.dev[code].nextAction.in_progress.dialogTips": "sha256:e11f589dc78c096120543e6c4c0ba3e86997441a2b8cf5d5e6742e6c7128b178",
+        "nodes.dev[code].nextAction.in_progress.userMessage": "sha256:a3945fbe8b08fe700d02f3cfbe33ef6d992e4b4189184f0ad28f4b5e9002390c",
+        "nodes.dev[code].nextAction.not_started.dialogTips": "sha256:e11f589dc78c096120543e6c4c0ba3e86997441a2b8cf5d5e6742e6c7128b178",
+        "nodes.dev[code].nextAction.not_started.userMessage": "sha256:a3945fbe8b08fe700d02f3cfbe33ef6d992e4b4189184f0ad28f4b5e9002390c",
+        "nodes.dev[plan].description": "sha256:c7cf82dae20cb58ca61d14abab5c908f2416eea787303c4e0321b6030f16bc7f",
+        "nodes.dev[plan].nextAction.done.dialogTips": "sha256:5604874fe86dbfe1be81ae9260aff6db184dc6d321fd87302945e513c4823413",
+        "nodes.dev[plan].nextAction.done.userMessage": "sha256:a3945fbe8b08fe700d02f3cfbe33ef6d992e4b4189184f0ad28f4b5e9002390c",
+        "nodes.dev[plan].nextAction.in_progress.dialogTips": "sha256:44490d520ad9683fef3863f33a78fbd1a842d71be5cc4be133af0e9202738302",
+        "nodes.dev[plan].nextAction.in_progress.userMessage": "sha256:68e3f0e9885cb39bea58d0c006b00bf254f7530485b5d6872312978c89a79375",
+        "nodes.dev[plan].nextAction.not_started.dialogTips": "sha256:44490d520ad9683fef3863f33a78fbd1a842d71be5cc4be133af0e9202738302",
+        "nodes.dev[plan].nextAction.not_started.userMessage": "sha256:68e3f0e9885cb39bea58d0c006b00bf254f7530485b5d6872312978c89a79375",
+        "nodes.dev[specs].description": "sha256:c4463aa4b3c0452f5d2702d8be0c20d7924c72e3845b4c379dca8cb12d1569f5",
+        "nodes.dev[specs].nextAction.done.dialogTips": "sha256:260590295d039b2707b3d0d40a4b0f99bcb75db94c39a16d7d8d654560e41ba7",
+        "nodes.dev[specs].nextAction.done.userMessage": "sha256:68e3f0e9885cb39bea58d0c006b00bf254f7530485b5d6872312978c89a79375",
+        "nodes.dev[specs].nextAction.in_progress.dialogTips": "sha256:7328752cd43f03bfd46e695d1b143615563ca45f18b9c98c5bc8e48a00edd88b",
+        "nodes.dev[specs].nextAction.in_progress.userMessage": "sha256:95faf6dabc243497002d8bc5fbfe4fc9e4ca24631cd02ba731d5d6ad10b78aed",
+        "nodes.dev[specs].nextAction.not_started.dialogTips": "sha256:7328752cd43f03bfd46e695d1b143615563ca45f18b9c98c5bc8e48a00edd88b",
+        "nodes.dev[specs].nextAction.not_started.userMessage": "sha256:95faf6dabc243497002d8bc5fbfe4fc9e4ca24631cd02ba731d5d6ad10b78aed",
+        "stateLabels.done": "sha256:f28461bb49c8564716309d575f90f72cf15b5c4667e40c2d037434bedb54a01a",
+        "stateLabels.in_progress": "sha256:dc9591e56d502b436c29bdd2819998a8460b951a7baff457484a930492c1a9d7",
+        "stateLabels.not_started": "sha256:f6e0d6919f8e55ded60f6a37848bd30272d06879e3fc805eb8d80b09fba82b3a",
+        "template.description": "sha256:f62bcce3312014857fa1a3dba748ae70e9045b61524e9d074d3c65dd9633f380",
+        "template.label": "sha256:4879890b13791954dd1c7557e12f1831676c3d7ae601376f260076d5a96c376e"
+      }
     },
     "runtime/config/flow.json": {
       "ownership": "generated",

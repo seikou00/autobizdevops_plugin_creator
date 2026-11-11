@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from scaffold.build.contribute import CommandSpec, Contribution, FileSpec
 from scaffold.modules import Module
-from scaffold.modules.knowledge import node_deps
+from scaffold.modules.knowledge import node_deps, pull
 
 ROOT = "sys"
 ASSEMBLER = "runtime/knowledge/render_collected_session_context.py"
@@ -55,7 +55,9 @@ class KnowledgeModule(Module):
                             knowledge_assembly=knowledge_assembly)
 
     def prepare(self, root, options, *, install):
-        """内置组装脚本的 collector 依赖 Node 包：doctor 时安装缺少的，check 时只提醒（README §9 第 7 条）。"""
-        if options.get("assembly", {}).get("assembler") != "plugin":
-            return []
-        return node_deps.prepare(root, install_missing=install)
+        """doctor 时准备运行环境，check 时只提醒（README §9 第 7 条）：
+        内置组装脚本的 collector 依赖 Node 包；声明 source 时把知识仓库拉到 sys/，供契约测试读取清单。"""
+        issues = pull.prepare(root, options, install=install)
+        if options.get("assembly", {}).get("assembler") == "plugin":
+            issues += node_deps.prepare(root, install_missing=install)
+        return issues

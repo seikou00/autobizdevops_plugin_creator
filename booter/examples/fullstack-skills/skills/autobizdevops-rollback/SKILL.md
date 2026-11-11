@@ -1,0 +1,127 @@
+---
+name: autobizdevops-rollback
+description: 安全回退 Feature 到指定 Biz、Dev 或 Ops 阶段，清理后续产物并重置 Code 执行态；在需要主动回退、清理运行时数据或恢复 Code Session 源码时使用。
+metadata:
+  version: v1.0.08311
+---
+
+# /autobizdevops-rollback - Feature 阶段回退
+
+独立执行 Feature 的阶段回退、产物清理、Code 执行态重置和可选源码恢复。用户明确要求回退到某个 Biz/Dev/Ops 阶段、清理后续产物、或重置 Code 实现时使用；不要把它作为正常 workflow 路由的替代入口。
+
+## 执行协议
+
+始终先读取当前状态，不得从 `STATE.md`、hooks 日志或产物推断 checkpoint：
+
+```bash
+python -X utf8 "${pluginPath}/skills/scripts/flowlib/read_state_json.py" --feature "${feature}"
+```
+
+用户未提供 Feature 时先读取全量状态并要求明确选择。确认目标阶段后，必须先运行 dry-run：
+
+```bash
+python -X utf8 "${pluginPath}/skills/scripts/flowlib/rollback_stage.py" \
+  --feature "${feature}" \
+  --to-stage "<node-id-or-stage-alias>" \
+  --code-source keep \
+  --dry-run --json
+```
+
+首次 dry-run 不传 `--state-mode`。脚本会返回 `stateOptions`、`plannedArtifacts`，并标记 `confirmationRequired=true`；此时不会选定新 checkpoint。必须把可用状态选项和清理清单展示给用户，并明确询问：
+
+- `target_in_progress`：回退到用户指定目标阶段的 `in_progress` 状态。
+
+这是唯一的状态模式：运行框架只允许把 Feature 重开到当前或之前节点的 `_in_progress`（由脚本调用 `update_state` 的重开完成），不支持回退到前一阶段的 `done`；归档节点没有 `_in_progress`，不能作为回退目标。清理范围是目标阶段及其后续阶段的产物。用户必须明确确认这个模式。
+
+收到用户选择后，使用相同模式重跑 dry-run，展示已选的当前/目标 checkpoint、清理产物、Code task 重置清单、源码影响和阻断错误。未获得对该状态选择和回退执行的明确确认前不得调用 `--apply`：
+
+```bash
+python -X utf8 "${pluginPath}/skills/scripts/flowlib/rollback_stage.py" \
+  --feature "${feature}" \
+  --to-stage "<node-id-or-stage-alias>" \
+  --state-mode target_in_progress \
+  --code-source keep \
+  --dry-run --json
+```
+
+确认后以相同的 `--state-mode` 执行：
+
+```bash
+python -X utf8 "${pluginPath}/skills/scripts/flowlib/rollback_stage.py" \
+  --feature "${feature}" \
+  --to-stage "<node-id-or-stage-alias>" \
+  --state-mode target_in_progress \
+  --code-source keep \
+  --apply --json
+```
+
+执行结束后重新运行 `read_state_json.py` 和 `resolve_next_skill.py --json`，只报告脚本返回的状态和路由结果。
+
+## 产物清理范围
+
+回退脚本按当前有效 workflow 的 `artifacts.outputs` 与 `rollback.archive`，清理目标阶段及其后续阶段的产物；Feature 内匹配实现约定的临时草稿和中断写入文件也会一并归档。以 dry-run 的 `plannedArtifacts` 为准，不要自行补写 `rm` 命令。
+
+展示清理清单和复核结果时，读取 [产物归属与清理范围](references/cleanup-scope.md)。其中包括工程缓存、批次交接与修复包、UTest 执行状态、前端分析副本，以及各阶段的派生索引和旧产物；目录整体归档会覆盖其内部新增的文件和锁，不依赖逐个列出哈希文件名。
+
+锁文件按该参考的“锁文件清理”表复核：Feature 内的 run、lease、event、缓存、候选、TASK、证据与 E2E 锁随所属目录归档，只有锁文件的目录也要清理；`.plan.lock` 在 Code task 重置后不得重新残留。`.design-contract.lock.json` 按 Design 契约产物处理；项目级并发控制锁和业务仓库锁不做后缀批量删除。
+
+## History 清理
+
+回退 history 默认不会自动删除。需要维护磁盘空间时，先预览每个 Feature 超出最近 10 次的记录：
+
+```bash
+python -X utf8 "${pluginPath}/skills/scripts/flowlib/rollback_stage.py" \
+  --prune-history \
+  --keep-history 10 \
+  --dry-run --json
+```
+
+确认后显式执行 `--apply`。也可以传 `--feature "${feature}"` 只清理一个 Feature；未知或损坏的 history manifest 永远不会被自动删除。
+
+## Code 阶段规则
+
+Code 回退不支持批次级目标。只要清理范围包含 `dev.code`，就一次性回退整个 Code Session 到 Code 开始前：
+
+- 清理 Code 及其后续阶段产物、完整 `evidence/`、`.task-runs/`、`.parallel-runs/`、`.runtime/` 和 `.engineering/`，以及 Feature 内 `.frontend/html-analysis/`、`.frontend/html-input/` 的派生副本。这些运行时数据会归档到 rollback history，不能只删除索引而遗留证据流、缓存或 claim。
+- `.engineering/` 包括事实及依赖指纹、依赖解析、测试环境、命令诊断、部署契约、命令目录、观测统计和各自的 claim/lock。`.parallel-runs/` 内的工程 context、usage、handoff/snapshot、repair、UTest 脚本/输出/预算、派发记录和 Merge Train 上下文随整个 run 一并归档；根目录旧版 `UTEST_ENVIRONMENT.json`、`UTEST_EXECUTION.json` 也要清除。
+- `.parallel-runs/` 下的调度 manifest、lease、错误 run 目录（例如只有 `.lock` 没有 `manifest.json` 的目录）都属于同一 Code Session 的运行态，回退后不得继续保留或被下一次 `ensure` 复用。
+- 回退会归档产物工作区中 Feature 专属的 `.cmbdevclaw/workflows/<feature>/`，包括 launcher 拷贝的固定脚本及其 journal、state、toolstream 和锁文件。回退成功后仍须检查业务仓库的 `.cmbdevclaw/workflows/`、平台动态 worktree 注册和孤立 worktree 记录；没有活动 Workflow 时，才可清理以明确 runId/path 识别的失败 journal/toolstream、执行 `git worktree prune`，并移除已确认不再注册的孤立 Batch worktree。不得删除仍被活动 Workflow、其他 Feature 或 Git worktree registry 引用的目录。
+- 重置全部 Code task、implementation/completion evidence 引用和 active batch；保留任务契约、依赖和验收标准。
+- 默认 `--code-source keep`，不修改业务 Git 仓库，只报告源码变化。
+- 只有用户明确确认且存在基线时才使用 `--code-source restore`。源码恢复前会校验当前 hash 是否仍等于该 Feature 的最终 Code 快照；不一致时阻断，不覆盖外部修改。
+
+Code 回退后的运行态复核至少应确认：
+
+```bash
+test ! -e "${FEATURE_DIR}/.parallel-runs"
+test ! -e "${FEATURE_DIR}/.task-runs"
+test ! -e "${FEATURE_DIR}/evidence"
+test ! -e "${FEATURE_DIR}/.engineering"
+test ! -e "${FEATURE_DIR}/.runtime"
+test ! -e "${FEATURE_DIR}/.frontend/html-analysis"
+test ! -e "${FEATURE_DIR}/.frontend/html-input"
+git -C "<business-repository>" worktree list --porcelain
+```
+
+平台 Workflow 目录位于业务仓库的 `.cmbdevclaw/workflows/`，不属于 Feature 产物归档范围。只有确认没有活动 Workflow 后才可删除其中失败 run 的 journal、JSON、toolstream 和 `.bak` 文件；清理动作必须使用显式 runId/path，不能递归删除业务仓库或整个 worktree 根目录。
+
+Code 开始前必须用同一个独立脚本捕获一次整个 Session 基线：
+
+```bash
+python -X utf8 "${pluginPath}/skills/scripts/flowlib/rollback_stage.py" \
+  --capture-code-session \
+  --feature "${feature}" \
+  --code-workspace "<business-repository>" \
+  --json
+```
+
+没有基线时，`--code-source restore` 必须失败并提示改用 `keep` 或先捕获基线。不要使用 `git stash`、`git reset --hard` 或静默创建提交/tag。
+
+## 安全边界
+
+- `--dry-run` 和 `--apply` 必须二选一；脚本默认不写入。`--apply` 必须显式传入 `--state-mode`，不能沿用隐式默认状态。
+- 目标阶段必须已到达，跳过节点不能作为目标；首个有效阶段可以回退到自身的 `in_progress`，但不能回退到不存在的前置 `done`。
+- 同一 Feature 的 Code Session 基线捕获和回退由 Feature 锁串行化，不允许并发写入 `active.json`。
+- 执行清理前应先结束本 Feature 的活动 Workflow、TASK 和 UTest 进程，避免旧进程在归档后重新写入缓存或执行状态；不要停止其他 Feature 的任务。
+- 状态只能由 `rollback_stage.py` 写入；不得手工编辑 `state.json` 或 `plan.json`。
+- 回退事务、失败恢复和归档记录位于 `.autobizdevops/rollback/`；不要删除 history 以外的业务仓库文件。

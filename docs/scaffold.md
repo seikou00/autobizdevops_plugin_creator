@@ -39,9 +39,9 @@ autobizdevops_plugin_creator/
     │       └── board/  session/  knowledge/  artifact_sync/
     │           └── module.json  module.py  files/
     ├── runtime/                         # 单元 15：运行框架模板（随插件发布）
-    ├── skills/autobiz-plugin-creator/   # 单元 14：插件开发技能
+    ├── SKILL.md  __main__.py            # 单元 14：骨架引导技能，整个 booter/ 目录就是技能（D69）
     ├── schemas/  examples/
-    ├── tools/make_pyz.py                # 单元 13、14：把脚手架打成 autobiz-plugin.pyz，再组装插件开发技能的插件包
+    ├── tools/make_pyz.py                # 单元 13：把脚手架打成 autobiz-plugin.pyz
     └── tests/  golden/  contract/  unit/
 ```
 
@@ -93,7 +93,7 @@ README §3.1 原来把 `cli wizard normalize validate compile emit manifest simu
 | 11 | simulate | `host.py` `shapes.py` `commands/simulate.py` | 扮演 DevClaw 执行命令、校验输出结构 | demo_simulate.py `Simulation` |
 | 12 | 配置编辑与向导 | `commands/{edit,new}.py` `wizard.py` | `add`、`module`、`new` | demo_skills.py |
 | 13 | 打包、升级 | `commands/package.py` `build/versions.py` `tools/make_pyz.py` | 插件 zip、版本比较（升级由 doctor 完成）、脚手架发布 | demo_package.py |
-| 14 | 插件开发技能 | `skills/autobiz-plugin-creator/` | 对话建模并调用 CLI | demo 版 SKILL.md |
+| 14 | 骨架引导技能（D69 前为插件开发技能） | `SKILL.md` `__main__.py` | 引导开发者填写配置骨架并调用 CLI | demo 版 SKILL.md |
 | 15 | 运行框架模板 | `runtime/` | query、engine、adapters、session、board_events 的内部拆分 | demo `assets/runtime/`、lite `board_core` |
 
 ---
@@ -1001,6 +1001,8 @@ CLI 不提供 `upgrade`：脚手架更新后，由 doctor 替换 managed、modul
 - **Q13.6 Node 依赖（已定，2026-11-05 修订）。** 本单元评审时 README §9 第 7 条待定，package 不执行 `npm install`、不带 `node_modules/`。现已定为 doctor 写盘后由知识模块安装（`Module.prepare`），package 本身仍不执行 `npm install`；`node_modules/` 不登记进 build-manifest（逐个记录第三方文件的摘要会让漂移检查失去意义），打包时按目录整个带上。
 
 ## 14. 插件开发技能
+
+> 2026-11-06 调整（D69）：对话建模的插件开发技能 `autobiz-plugin-creator` 不再提供，也不再打成 DevClaw 插件包。`booter/` 目录本身就是骨架引导技能，入口是根目录的 `SKILL.md`；CLI 由根目录的 `__main__.py` 用 `python3 <booter 目录> <命令>` 直接从源码运行，不需要 `.pyz`。Q14.1（不带 `input-config.md` 副本）仍然有效；下文的发布方式（`make_creator_plugin`、Q14.2、Q14.4）只作为历史记录保留。
 
 结构和对话流程见 interfaces.md §1.6。技能本身没有代码接口，评审的是它与 CLI 的关系和发布方式：
 

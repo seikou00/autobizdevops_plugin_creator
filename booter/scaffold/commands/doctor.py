@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from scaffold.build import emit, layout
+from scaffold.build.dangling import dangling_refs
 from scaffold.build.framework import skill_dir
 from scaffold.build.manifest import MANIFEST
 from scaffold.build.pipeline import analyze, build
@@ -95,8 +96,14 @@ def doctor(root, *, dry_run: bool = False, force: bool = False, allow: frozenset
     report.extend(issue for issue in result.report.issues if issue not in report.issues)
     if result.report.failed():
         return CommandResult(report)
+    # 悬空引用（D71）：技能正文引用的资源和脚本要在插件里，这次将要生成的文件也算存在
+    report.extend(dangling_refs(tree, planned=result.plan.files,
+                                skip={path for path, planned in result.plan.files.items()
+                                      if planned.ownership in ("module", "generated")}))
     changes["skills"] = {**result.skills.to_json(), "moved": [{"from": old, "to": new} for old, new in moves]}
     changes["versions"] = analysis.versions.to_json()
+    changes["customized"] = {path: sorted(record["customized"]) for path, record in sorted(result.plan.records.items())
+                             if record.get("customized")}
     extra = {"changes": changes}
     if dry_run:
         pending = emit.changed_files(result.plan, tree)
@@ -137,6 +144,9 @@ def _summary(changes: dict, files: list, *, dry_run: bool = False) -> str:
     moved += [f"模块 {key} {value['from']} → {value['to']}" for key, value in (versions.get("modules") or {}).items()]
     if moved:
         lines.append("版本变化：" + "、".join(moved))
+    if changes.get("customized"):
+        lines.append("保留手改的文字：" + "、".join(f"{path}（{len(names)} 处）"
+                                             for path, names in changes["customized"].items()))
     if changes["skills"].get("moved"):
         lines.append("技能挪进分组目录：" + "、".join(f"{item['from']} → {item['to']}" for item in changes["skills"]["moved"]))
     for key, label in (("created", "生成空白 SKILL.md"), ("stateInserted", "插入状态维护片段"),

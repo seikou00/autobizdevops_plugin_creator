@@ -1,0 +1,9 @@
+{
+  "$schema": "../../../schemas/modules/board.schema.json",
+  "display": {
+    "workflowLabel": "标准",
+    "workflowDescription": "完整主干流程（Biz→Dev→Ops）。",
+    "dialogTips": "**您正在开发${projectCode} 项目**\n请描述要新增或修改的特性，并说明验收标准。当前产物目录：`${pluginWorkspace}/${projectDir}`",
+    "systemPromptInject": "\n- FEATURE_DIR：`${pluginWorkspace}/${projectDir}/.autobizdevops/features/${feature}`，这是当前 Feature 产物目录，不得自行定义特性/feature/slug 名称。\n- 调用 `${pluginPath}` 下的脚本时，execute/shell 工具请求省略 `cwd` 字段；状态和产物路径由环境变量或显式参数定位。"
+  }
+}

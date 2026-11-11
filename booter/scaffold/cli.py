@@ -97,6 +97,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     package = commands.add_parser("package", parents=[common], help="检查后打包成 zip")
     package.add_argument("-o", dest="output", help="zip 路径，默认为 dist/<plugin.id>-<plugin.version>.zip")
+    package.add_argument("--bump", choices=("patch", "minor", "major", "none"), default="patch",
+                         help="打包前递增 plugin.version 的哪一位，默认 patch；none 不改版本")
     return parser
 
 
@@ -165,7 +167,7 @@ def run(args) -> object:
     if args.command == "package":
         from scaffold.commands.package import package
 
-        return package(root, output=Path(args.output) if args.output else None)
+        return package(root, output=Path(args.output) if args.output else None, bump=args.bump)
     raise UsageError("缺少子命令：new、add、module、hook、doctor、lint、check、simulate、package")
 
 

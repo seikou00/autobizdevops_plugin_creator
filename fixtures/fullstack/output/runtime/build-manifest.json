@@ -56,7 +56,16 @@
     },
     "board_core/board_config.json": {
       "ownership": "generated",
-      "sha256": "sha256:e97eb2d8b41c05726c276d61a5e3d7c760d73c11fbc85b0322137471c8ae817e"
+      "sha256": "sha256:e97eb2d8b41c05726c276d61a5e3d7c760d73c11fbc85b0322137471c8ae817e",
+      "structure": "sha256:19f21e58d89322afa75d1e04967c6843dcf9403bfadb979b51d9888d9e298162",
+      "texts": {
+        "inspectCommands.darwin.dialog_tips": "sha256:aab7ca9958a2f2b4d5033f9a4b84318367266f75d43c885d055636ca0aff564c",
+        "inspectCommands.darwin.system_prompt_inject": "sha256:d29fefec46b57314c11e28c206a7a6ef8a0c28c958c4590c4acb00881977cbf5",
+        "inspectCommands.linux.dialog_tips": "sha256:aab7ca9958a2f2b4d5033f9a4b84318367266f75d43c885d055636ca0aff564c",
+        "inspectCommands.linux.system_prompt_inject": "sha256:d29fefec46b57314c11e28c206a7a6ef8a0c28c958c4590c4acb00881977cbf5",
+        "inspectCommands.win32.dialog_tips": "sha256:aab7ca9958a2f2b4d5033f9a4b84318367266f75d43c885d055636ca0aff564c",
+        "inspectCommands.win32.system_prompt_inject": "sha256:d29fefec46b57314c11e28c206a7a6ef8a0c28c958c4590c4acb00881977cbf5"
+      }
     },
     "board_core/modules.json": {
       "ownership": "generated",
@@ -74,7 +83,11 @@
     },
     "plugin.json": {
       "ownership": "generated",
-      "sha256": "sha256:178ad796bb2a8cfe8f6f0ce3450fa1e736e6b369281740d76c9f57a1527c01ca"
+      "sha256": "sha256:178ad796bb2a8cfe8f6f0ce3450fa1e736e6b369281740d76c9f57a1527c01ca",
+      "structure": "sha256:64057b0e486ea9e3961987ef5867a9035e820ee7ad5de3c3a7eb9346dd3e05e8",
+      "texts": {
+        "description": "sha256:d7fb3696262c1a2bf1d3cb01d4318d88824dbeacf4640f9e0774b79d436dc40a"
+      }
     },
     "runtime/__init__.py": {
       "ownership": "managed",
@@ -126,7 +139,63 @@
     },
     "runtime/config/board.json": {
       "ownership": "generated",
-      "sha256": "sha256:1e561670dffea2c84fb9e1ffd40b6c48905f354386c4bc88d9821185e1f67f31"
+      "sha256": "sha256:1e561670dffea2c84fb9e1ffd40b6c48905f354386c4bc88d9821185e1f67f31",
+      "structure": "sha256:1e1590ab0828c3c2d9016f8d2d4e5dc315f6d0a93fbcbb57ea3f16ff262d7b21",
+      "texts": {
+        "nodes.biz[prd].description": "sha256:1d4ec42866fa2c23cdc80ddcd8aa2440b585b490a7a0ebf60af38aae65778894",
+        "nodes.biz[prd].nextAction.done.dialogTips": "sha256:4c04eabbd0d6de3e835bee9b66dbc2a78cd35c8e7bf4503fb58aa36407965e1d",
+        "nodes.biz[prd].nextAction.done.userMessage": "sha256:2c253ff86379f545d69a115860d076a730ee8170ecda2353c6fe46a4770f5008",
+        "nodes.biz[prd].nextAction.in_progress.dialogTips": "sha256:4c8a44d7ae364576dbd7faa4f2ca9f7f963dff7cf54cbe15a6d0a07c2e17bed4",
+        "nodes.biz[prd].nextAction.in_progress.userMessage": "sha256:c8d1e427a2d2b855aa9d24ae2cc47afdbfcb0fa3117123d230e1cde9fc31d71c",
+        "nodes.biz[prd].nextAction.not_started.dialogTips": "sha256:4c8a44d7ae364576dbd7faa4f2ca9f7f963dff7cf54cbe15a6d0a07c2e17bed4",
+        "nodes.biz[prd].nextAction.not_started.userMessage": "sha256:c8d1e427a2d2b855aa9d24ae2cc47afdbfcb0fa3117123d230e1cde9fc31d71c",
+        "nodes.dev[code].description": "sha256:a396273a33a0eab43f5245efd99282c5287c5e2e9cf05c463627fab1165de44f",
+        "nodes.dev[code].nextAction.done.dialogTips": "sha256:dc8c7c1dbc177dbea6d9e482b637213b0d148436f92f0a4b77f73ba36e45cd4c",
+        "nodes.dev[code].nextAction.done.userMessage": "sha256:8757aab725ff68d2034c141782d3bf9720fe38dd13b83ee106c9de054a21ce73",
+        "nodes.dev[code].nextAction.in_progress.dialogTips": "sha256:afab20e77fb4f7f506f6d8e0e1f2988c09c2bf29c203ed13deea09a44829d989",
+        "nodes.dev[code].nextAction.in_progress.userMessage": "sha256:a3945fbe8b08fe700d02f3cfbe33ef6d992e4b4189184f0ad28f4b5e9002390c",
+        "nodes.dev[code].nextAction.not_started.dialogTips": "sha256:afab20e77fb4f7f506f6d8e0e1f2988c09c2bf29c203ed13deea09a44829d989",
+        "nodes.dev[code].nextAction.not_started.userMessage": "sha256:a3945fbe8b08fe700d02f3cfbe33ef6d992e4b4189184f0ad28f4b5e9002390c",
+        "nodes.dev[design].description": "sha256:1c00cac3acd51743b433b883573c315d777362cf4eda16fbcc7719a0fd781cc7",
+        "nodes.dev[design].nextAction.done.dialogTips": "sha256:42d8dbc39a4470434d779d5ee08c29f90fffe76409aeb246d95be5b7f2b30c90",
+        "nodes.dev[design].nextAction.done.userMessage": "sha256:68e3f0e9885cb39bea58d0c006b00bf254f7530485b5d6872312978c89a79375",
+        "nodes.dev[design].nextAction.in_progress.dialogTips": "sha256:4d2752addcf12991af0378be5a449c944831f2b23b7b133d7392719e160324ed",
+        "nodes.dev[design].nextAction.in_progress.userMessage": "sha256:464299747762fa9601ccfaaac9231e1afa0f4743aee64accbc519bac42c6f240",
+        "nodes.dev[design].nextAction.not_started.dialogTips": "sha256:4d2752addcf12991af0378be5a449c944831f2b23b7b133d7392719e160324ed",
+        "nodes.dev[design].nextAction.not_started.userMessage": "sha256:464299747762fa9601ccfaaac9231e1afa0f4743aee64accbc519bac42c6f240",
+        "nodes.dev[plan].description": "sha256:0c9c06d817921be61f6963ba82fc2b35c00185e17a241c65f1d320fa46bd361f",
+        "nodes.dev[plan].nextAction.done.dialogTips": "sha256:569c6aa9a25f0e5af7a531e489ba4d5889455e9ac1db8a8a93f01a96a330ada3",
+        "nodes.dev[plan].nextAction.done.userMessage": "sha256:a3945fbe8b08fe700d02f3cfbe33ef6d992e4b4189184f0ad28f4b5e9002390c",
+        "nodes.dev[plan].nextAction.in_progress.dialogTips": "sha256:224c9c6f230c62f72dff85aa5b4e53a80fb0e7852b9727ae3e764cd216e576b0",
+        "nodes.dev[plan].nextAction.in_progress.userMessage": "sha256:68e3f0e9885cb39bea58d0c006b00bf254f7530485b5d6872312978c89a79375",
+        "nodes.dev[plan].nextAction.not_started.dialogTips": "sha256:224c9c6f230c62f72dff85aa5b4e53a80fb0e7852b9727ae3e764cd216e576b0",
+        "nodes.dev[plan].nextAction.not_started.userMessage": "sha256:68e3f0e9885cb39bea58d0c006b00bf254f7530485b5d6872312978c89a79375",
+        "nodes.dev[specs].description": "sha256:3226af0ffcce41c6de401e808ecbe7f41db95f79c53ea90be9e00225129c7a5f",
+        "nodes.dev[specs].nextAction.done.dialogTips": "sha256:761e9535fac954d920a618a2ce523b97e38cd85b415249503170c5014f8d8877",
+        "nodes.dev[specs].nextAction.done.userMessage": "sha256:464299747762fa9601ccfaaac9231e1afa0f4743aee64accbc519bac42c6f240",
+        "nodes.dev[specs].nextAction.in_progress.dialogTips": "sha256:8d63e16b1dd20f7e63355ffa0228988aedc724d3da9eacb326be91063bba8a4c",
+        "nodes.dev[specs].nextAction.in_progress.userMessage": "sha256:2c253ff86379f545d69a115860d076a730ee8170ecda2353c6fe46a4770f5008",
+        "nodes.dev[specs].nextAction.not_started.dialogTips": "sha256:8d63e16b1dd20f7e63355ffa0228988aedc724d3da9eacb326be91063bba8a4c",
+        "nodes.dev[specs].nextAction.not_started.userMessage": "sha256:2c253ff86379f545d69a115860d076a730ee8170ecda2353c6fe46a4770f5008",
+        "nodes.ops[archive].description": "sha256:5292ab1a36c56a6bc8980b3d2d2571d49fe9e4adb7a961ec4b6417fa9cc90d6c",
+        "nodes.ops[archive].nextAction.archived.dialogTips": "sha256:919d389e6dbe83d79e1a85eb05a442af0ad6eeff2855d415115642f6a656645c",
+        "nodes.ops[archive].nextAction.archived.userMessage": "sha256:248d8e51e459c6acd2c6e466fd82bc2c0f051252aea3680d4da7839cf904f323",
+        "nodes.ops[archive].nextAction.not_started.dialogTips": "sha256:75f215c6dd94bf40aae45aba40a70d8d75fc566c68c68c5a0cc5a6cf16499fc0",
+        "nodes.ops[archive].nextAction.not_started.userMessage": "sha256:4252c5dafc9c80229dc17b9bddd3a0d0b71b2e0d089bab0dd49f0be82ff905bd",
+        "nodes.ops[cicd].description": "sha256:7063424a9f4ed5143bb7efa2fe5c94ffb83235c38465d7900751918404d3193e",
+        "nodes.ops[cicd].nextAction.done.dialogTips": "sha256:6a1e9bbc2fe7cbd05a6883c1051c84e78b235e86e56120534d78d4cd9dc0af42",
+        "nodes.ops[cicd].nextAction.done.userMessage": "sha256:4252c5dafc9c80229dc17b9bddd3a0d0b71b2e0d089bab0dd49f0be82ff905bd",
+        "nodes.ops[cicd].nextAction.in_progress.dialogTips": "sha256:de160b406320c9f54f3e2f4863821e0574f3334189471778c6a6474b28dfc812",
+        "nodes.ops[cicd].nextAction.in_progress.userMessage": "sha256:8757aab725ff68d2034c141782d3bf9720fe38dd13b83ee106c9de054a21ce73",
+        "nodes.ops[cicd].nextAction.not_started.dialogTips": "sha256:de160b406320c9f54f3e2f4863821e0574f3334189471778c6a6474b28dfc812",
+        "nodes.ops[cicd].nextAction.not_started.userMessage": "sha256:8757aab725ff68d2034c141782d3bf9720fe38dd13b83ee106c9de054a21ce73",
+        "stateLabels.archived": "sha256:82395d423099a07ae94b5d220ca6cf86468b3754bc153aaad5a1ec273c13a92e",
+        "stateLabels.done": "sha256:f28461bb49c8564716309d575f90f72cf15b5c4667e40c2d037434bedb54a01a",
+        "stateLabels.in_progress": "sha256:dc9591e56d502b436c29bdd2819998a8460b951a7baff457484a930492c1a9d7",
+        "stateLabels.not_started": "sha256:f6e0d6919f8e55ded60f6a37848bd30272d06879e3fc805eb8d80b09fba82b3a",
+        "template.description": "sha256:20833b46ef310427cd0af38806bee4a9cb5968480eb0ba7345c8a2553b2a0f54",
+        "template.label": "sha256:6bea77acefb364ac3d4024c2fd7d82b1426d931cf25274abdc9e2d77969e24d9"
+      }
     },
     "runtime/config/flow.json": {
       "ownership": "generated",

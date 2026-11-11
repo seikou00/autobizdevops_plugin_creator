@@ -4,7 +4,7 @@
 
 | § | 调用方 → 被调用方 | 接口 |
 |---|---|---|
-| 1 | 插件开发者 → 脚手架 | `autobiz-plugin` CLI、初始化向导、插件开发技能 |
+| 1 | 插件开发者 → 脚手架 | `autobiz-plugin` CLI、初始化向导、骨架引导技能 |
 | 2 | 脚手架 → 模块；运行框架 → 模块 | 模块契约（构建期 `Module`、运行期知识组装） |
 | 3 | DevClaw ↔ 插件 | `inspectCommands` 命令协议（DevClaw → 插件）；看板事件推送（插件 → DevClaw） |
 | 4 | 模型 → 插件；运行框架 → 开发者命令；框架入口 → 内部库 | `update_state.py`（技能的状态维护片段调用）、校验命令、知识组装脚本、`query.py` / `engine.py` |
@@ -31,11 +31,11 @@
 | `autobiz-plugin lint [--strict]` | 只检查核心配置（`workflow.json`、入口文件、`modules/*.json`）的结构和语义规则，以及编译配置是否过期（input-config.md §7.2）。只读、不联网，通常在 1 秒内完成 |
 | `autobiz-plugin check [--strict]` | `lint` 加上技能内容、生成文件漂移检查，并运行契约测试，只读（input-config.md §7.3） |
 | `autobiz-plugin simulate [--feature demo] [--to <checkpoint>] [--platform <p>] [--keep]` | 把已生成的插件拷到临时目录，按宿主的方式调用一遍（§1.5） |
-| `autobiz-plugin package [-o <zip>]` | check（只把 `TODO_PLACEHOLDER` 升为 error），然后按 output-spec.md §1 的打包规则写 zip，默认为 `dist/<plugin.id>-<plugin.version>.zip` |
+| `autobiz-plugin package [-o <zip>] [--bump patch\|minor\|major\|none]` | check（只把 `TODO_PLACEHOLDER` 升为 error）；通过后把入口文件的 `plugin.version` 按 `--bump` 递增一位（默认 `patch`，低位归零，预发布后缀去掉；`none` 不改版本），在原文上改写并重新生成 `plugin.json` 和 build-manifest，然后按 output-spec.md §1 的打包规则写 zip，默认为 `dist/<plugin.id>-<新版本>.zip` |
 
 所有命令都支持 `-C <plugin-dir>`（默认为当前目录）和 `--json`（机器可读输出）。
 
-脚手架以单个文件 `autobiz-plugin.pyz` 发布（标准库 zipapp），执行方式为 `python3 autobiz-plugin.pyz <命令>`，Windows 上为 `python …` 或 `py -3 …`；本文的 `autobiz-plugin` 即指它。插件开发技能在自己的 `scripts/` 下带同一个文件（D57）。
+脚手架以单个文件 `autobiz-plugin.pyz` 发布（标准库 zipapp），执行方式为 `python3 autobiz-plugin.pyz <命令>`，Windows 上为 `python …` 或 `py -3 …`；本文的 `autobiz-plugin` 即指它。`booter/` 目录本身也能这样运行：`python3 <booter 目录> <命令>` 直接从源码执行，与 `.pyz` 等价，骨架引导技能就这样调用（D69）。
 
 CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 doctor 调用，`new` 写好核心配置后执行 doctor；第一次生成时没有 build-manifest，doctor 把全部节点列为新增（D54、D56）。也不提供 `upgrade`：脚手架更新后执行 doctor，由它替换 managed、module 文件并报告版本变化（§1.7，D57）。
 
@@ -43,7 +43,7 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 
 `add node` 和 `module` 是修改配置文件的便捷入口：前者写 `workflow.json`，后者写入口文件的 `modules` 引用和对应的 `modules/*.json`。`add skill` 和 `add skills` 则导入技能资源。这些命令写完都自动执行 doctor；批量导入只执行一次。配置修改在原文上插入或替换片段，原有的键序、缩进和换行不变；修改先在内存中完成，与 doctor 的生成结果一起写盘，任何一步有 error（包括 lint 的 `SEQ_DUP` 等）都不写文件（D56）。
 
-同一套命令还以技能形式提供：`autobiz-plugin-creator`（借鉴 Codex plugin-creator，见 README §2.3；规格见 §1.6）。技能负责与开发者对话、梳理流程、编写配置文件、生成技能展示文案；生成和校验仍然只通过上面的 CLI 完成。技能每次修改核心配置后运行 `lint`，一组修改完成后运行 `doctor` 重新生成插件，再运行 `check`，并把 Issue 原样转述给开发者，不能自己修改 generated 或 managed 文件来绕过问题（D58）。
+同一套命令还以技能形式提供：`booter/` 目录本身就是骨架引导技能（借鉴 Codex plugin-creator，见 README §2.3；规格见 §1.6，D69）。技能用选择题确定插件目录和模块，生成配置骨架，讲清每个字段后引导开发者填写；生成和校验仍然只通过上面的 CLI 完成。配置改完后运行 `lint`，重新生成用 `doctor`，并把 Issue 原样转述给开发者，不能自己修改 generated 或 managed 文件来绕过问题。
 
 ### 1.2 通用约定
 
@@ -81,9 +81,9 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 ```
 
 - `file` 标明问题所在的文件（`workflow.json`、`plugin.scaffold.json`、`modules/board.json`，或 `skills/autodev-plan/SKILL.md` 这类资源文件）；`pointer` 是该文件内的 JSON Pointer，问题出在文件层面时为空；
-- `code` 的取值见 input-config.md §7.2、§7.3，此外还有 `MODULE_CONFLICT`（§2.3）、doctor 的 `CHECKPOINT_REMOVED` 和 `DOCTOR_BASELINE_MISSING`（§1.7）、知识模块 collector 的 Node 依赖没有装上时 doctor、check 报的 warning `KNOWLEDGE_NODE_DEPS`（§4.5）、simulate 的 `INTERPRETER_MISSING` 和 `KNOWLEDGE_MANIFEST_MISSING`（§1.5）、用法错误的 `USAGE`（§1.2）；
+- `code` 的取值见 input-config.md §7.2、§7.3，此外还有 `MODULE_CONFLICT`（§2.3）、doctor 的 `CHECKPOINT_REMOVED` 和 `DOCTOR_BASELINE_MISSING`（§1.7）、知识模块 collector 的 Node 依赖没有装上时 doctor、check 报的 warning `KNOWLEDGE_NODE_DEPS`（§4.5）、doctor 拉取知识仓库失败时报的 warning `KNOWLEDGE_PULL`（§1.5）、simulate 的 `INTERPRETER_MISSING` 和 `KNOWLEDGE_MANIFEST_MISSING`（§1.5）、用法错误的 `USAGE`（§1.2）；
 - `issues` 按文件、位置、code 稳定排序（D43）：文件依次为入口文件、`workflow.json`、`modules/` 下的 board、session、knowledge、artifactSync，其余按路径；同一文件内按 `pointer` 逐段比较，数字段按数值比较；最后按 `code`；
-- 各命令在通用结构之外的附加字段（D54）：`doctor` 加 `changes`（§1.7），`check` 加 `contract`（契约测试的结果），`simulate` 加 `simulation`（§1.5），`module list` 加 `modules`（各模块的版本和启用状态），`package` 加 `package`（`{"path": 生成的 zip, "skipped": [没有打包的文件]}`，output-spec.md §1，D57）；`add skills` 成功时加 `importedSkills`（已导入的技能名数组）；`lint`、其他 `add`、`module enable`/`disable`、`new` 没有附加字段；
+- 各命令在通用结构之外的附加字段（D54）：`doctor` 加 `changes`（§1.7），`check` 加 `contract`（契约测试的结果），`simulate` 加 `simulation`（§1.5），`module list` 加 `modules`（各模块的版本和启用状态），`package` 加 `package`（`{"path": 生成的 zip, "skipped": [没有打包的文件], "version": {"from", "to"} 或 null}`，`--bump none` 时 `version` 为 null，output-spec.md §1，D57）；`add skills` 成功时加 `importedSkills`（已导入的技能名数组）；`lint`、其他 `add`、`module enable`/`disable`、`new` 没有附加字段；
 - 不加 `--json` 时输出同样内容的可读文本，按文件和位置分组。
 
 ### 1.4 初始化向导（new）
@@ -126,7 +126,7 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 - 第 4–6 类的回答分别写入 `modules/board.json`、`modules/session.json`、`modules/knowledge.json` 和 `modules/artifactSync.json`，并在入口文件的 `modules` 中引用。全部取默认值的类别不生成文件，所以入口文件只有基础信息和真正用到的引用。启用产物同步时追问从哪个节点起允许同步，`artifacts` 的预填与 `module enable artifactSync` 相同（§1.1）；
 - `--yes` 时不提问，回答全部取自 `--answers`，必须给出 `plugin` 和 `nodes`，缺少必填项报用法错误（退出码 2）；lint 有 error 时报出 Issue，不写任何文件。
 
-`--answers <file|->` 从文件或 stdin 读入回答（D56），供插件开发技能等非交互的调用方使用：
+`--answers <file|->` 从文件或 stdin 读入回答（D56），供脚本等非交互的调用方使用：
 
 ```json
 {
@@ -178,7 +178,7 @@ simulate 在临时目录中扮演 DevClaw，调用一遍已经生成的插件，
 
 1. 准备：按 output-spec.md §1 的打包清单把插件拷到 `<tmp>/plugin`（`sys/` 存在时一并拷贝），创建工作区 `<tmp>/ws/<project>`。`--platform` 缺省为当前平台，`board_config.json` 中没有该平台的命令时报用法错误；`--to` 不是 `flow.json` 中的 checkpoint 时同样报用法错误。核心配置或节点技能 `description` 的摘要与 build-manifest 中的记录不一致时报 warning `BUILD_STALE`，照常执行；
 2. 建项目和 Feature：`create_project`、`create_feature`（`--selected-deployUnit` 传 `[]`）各执行两次，第二次应返回 `created: false`，checkpoint 不变。`create_feature` 返回的 checkpoint 应为 `checkpoints.initial`，桩内容写到它返回的 `featureDir` 下；
-3. 读流程：`dynamic_workflow`、`project_status`。节点列表取 `project_status` 输出的 `workflow.nodes`，与 `dynamic_workflow` 的 checkpoint 链对照。启用知识模块时执行 `deploy_units`；知识目录中没有清单时（例如声明了 `knowledge.source` 但还没有执行 `pull_knowledge`）报 warning `KNOWLEDGE_MANIFEST_MISSING`，不算失败；
+3. 读流程：`dynamic_workflow`、`project_status`。节点列表取 `project_status` 输出的 `workflow.nodes`，与 `dynamic_workflow` 的 checkpoint 链对照。启用知识模块时执行 `deploy_units`；知识目录中没有清单时报 warning `KNOWLEDGE_MANIFEST_MISSING`，不算失败。声明了 `knowledge.source` 时，doctor 写盘后会在 `sys/` 还没有清单时执行一次 `sync_knowledge.py`，所以只有拉取失败（doctor 报 `KNOWLEDGE_PULL`）时才会出现这个 warning；
 4. 逐个节点：`session_context_inject`（策略目标节点应为本节点）→ 执行该技能 SKILL.md 状态维护片段中的开始命令 → 为必需输出写入桩内容（glob 中的 `*`、`**` 换成 `demo`，`?` 换成 `x`；可选输出不写）→ 执行片段中的完成命令 → `feature_status`（本节点及之前的节点为 `done`，之后的为 `not_started`）。终态节点只有完成命令，推进到 `archived` 后它的状态为 `archived`；
 5. 只读命令（§3.1）执行前后比较临时工作区，有文件被创建或修改即失败；
 6. 每次输出都按 §3.3 的结构校验（Schema 在脚手架的 `schemas/host/outputs.schema.json`），最后打印节点状态表和失败原因。
@@ -210,42 +210,33 @@ simulate 在临时目录中扮演 DevClaw，调用一遍已经生成的插件，
 
 `check` 中的契约测试走同样的流程，结果放在附加字段 `contract` 中，结构与 `simulation` 相同。lint 或漂移检查有 error 时不跑契约测试，`contract` 为 `{"ran": false, "reason": "…"}`：磁盘上的插件已经不对应当前配置。
 
-### 1.6 插件开发技能 autobiz-plugin-creator（v1，D9）
+### 1.6 骨架引导技能（v1，D69）
 
-源码位于脚手架仓库的 `skills/autobiz-plugin-creator/`，不随生成的插件发布。它是初始化向导的对话形式，以只含这个技能的 DevClaw 插件发布（与 demo 的 `autobiz-plugin-creator-demo` 相同，D58）：
+整个 `booter/` 目录就是这个技能，入口是 booter 根目录的 `SKILL.md`（frontmatter 的 `name` 为 `autobiz-plugin-skeleton`）。它不随生成的插件发布，也不打成 DevClaw 插件包，把 `booter/` 目录装进开发者自己的 agent 即可。原先的对话建模技能 `autobiz-plugin-creator` 和它的插件包不再提供（D69，取代 D9、D58）：
 
 ```text
-autobiz-plugin-creator/               # 插件包的顶层目录（D57 ④）
-├── plugin.json                       # 发布时生成：name、version（取脚手架版本）、description、"skills": "./skills/"
-└── skills/autobiz-plugin-creator/
-    ├── SKILL.md                      # 对话流程与规则（见下）
-    ├── references/
-    │   └── modeling-guide.md         # 如何把业务流程拆成阶段、节点和产物，更严格的完成条件怎么写进技能正文（含正反例）
-    └── scripts/autobiz-plugin.pyz    # 发布时放入，与脚手架是同一个文件（D57），不提交进仓库
+booter/
+├── SKILL.md                  # 流程、选择题和填写指南（见下）
+├── __main__.py               # CLI 入口：python3 <booter 目录> <命令>，直接从源码运行，与 autobiz-plugin.pyz 等价
+└── scaffold/  runtime/  schemas/  …   # CLI 运行时读取的源码和资源
 ```
 
-插件包由 `tools/make_pyz.py` 在打出 `.pyz` 之后组装。技能不带 `input-config.md` 副本：SKILL.md 只写建模和配置的要点（节点的 6 个字段与 `seq` 规则、产物 id 的推导、四个模块配置各管什么、`new --answers` 的格式），细节以 CLI 的 Issue（`code`、`pointer`、`hint`）和插件目录 `.scaffold/` 下的 Schema 为准（D58）。
-
-SKILL.md 中的命令写作 `python3 "${pluginPath}/skills/autobiz-plugin-creator/scripts/autobiz-plugin.pyz" <命令>`，Windows 上把 `python3` 换成 `python`。装在 DevClaw 中时 `${pluginPath}` 由 DevClaw 替换（§3.2）；装在其他 agent 中、`${pluginPath}` 没有被替换时，按 SKILL.md 所在目录定位 `scripts/autobiz-plugin.pyz`。
-
-frontmatter 中的 `description` 要写明触发场景，例如“新建看板插件”“给插件加节点或产物”“导入已有技能”“启用知识模块或产物同步”。v1 不能配置节点校验命令（input-config.md §2.5），所以不写“给节点加校验”。
+SKILL.md 中的命令写作 `python "<booter>" <命令> --json`，`<booter>` 是 SKILL.md 所在目录的绝对路径；不需要 `.pyz`，也不需要先切换到这个目录。技能不带 `input-config.md` 副本：SKILL.md 内置 workflow 与各模块配置的填写指南，细节以 CLI 的 Issue（`code`、`pointer`、`hint`）和插件目录 `.scaffold/` 下的 Schema 为准。需要用户决定时用 `request_user_input` 出选择题（D65）。
 
 流程（SKILL.md 正文）：
 
 | 步骤 | agent 做什么 | 调用 |
 |---|---|---|
-| 1. 定位 | 确认是新建还是修改；新建时确认插件放在哪个目录、插件 ID（提示发布后不可修改）、插件名 | —（新建时到第 2 步确认后再调用 `new`） |
-| 2. 建模 | 让开发者用自然语言描述流程，整理成“seq → 阶段（biz/dev/ops）→ 节点 → 技能 → 输出产物”表格回显，开发者确认后才写入；每个节点一个技能 | 新建：`new --yes --answers`（§1.4，D56）；修改：编辑 `workflow.json` 或调用 `add node`，写完运行 `lint` |
-| 3. 技能资源 | 对每个节点确认是导入已有技能，还是先不提供（由 build 生成空白 `SKILL.md`）；同一来源有多个技能时批量导入 | `add skills --from` 或 `add skill` |
-| 4. 模块 | 询问目标平台、节点运行策略、是否需要知识模块（组装方由谁担任）、是否需要产物同步模块（从哪个节点起允许同步、上传哪些产物）；知识沉淀入口固定开启，不用问（D33） | 编辑 `modules/*.json` 和入口文件的引用，或 `module enable` |
-| 5. 生成 | 生成插件；对新生成的空白 `SKILL.md`，与开发者确认触发场景后填写 `description`，再执行一次 doctor：节点描述取自 `description`，改了不重新生成会报 `BUILD_STALE`（D49） | `doctor`（填写 `description` 后再执行一次） |
-| 6. 校验 | 执行完整校验，把 Issue 按原文转述给开发者，修改输入后重试 | `check` |
-| 7. 演示 | 在临时工作区走一遍完整流程，展示每个节点的状态和产物路径 | `simulate` |
+| 1. 目录和模块 | 用选择题确定插件目录，以及是否启用产物同步、知识、全局钩子、session 模块；`board` 总是带上 | `hook list`，`new --skeleton --module …` |
+| 2. 讲解后停下 | 逐个文件说明要填什么，然后停下来由开发者自己填；开发者也可以只描述流程，由 agent 整理成表格回显，确认后再写入 | — |
+| 3. 检查配置 | 转述 `TODO_FIELD` 和其他 error 的位置与 `hint`，开发者改完后再检查，直到没有 error | `lint` |
+| 4. 技能 | 导入已有技能集合；没有技能时生成空白 `SKILL.md`，引导开发者填写 `description` 和正文 | `add skills --from`，或 `doctor` |
+| 5. 打包 | 重新生成后打包；报 `TODO_PLACEHOLDER`、`LEGACY_ENTRY_REF` 时转述位置，改完从 `doctor` 重来 | `doctor`、`package` |
 
 规则：
 
 - 只修改 `workflow.json`、`plugin.scaffold.json`、`modules/*.json` 和 seeded/developer 文件，不得修改 generated、managed、module 文件来绕过校验，也不得直接修改编译配置 `runtime/config/*`；
-- 每次修改核心配置后都运行 `lint`，没有 error 才继续下一步；一组修改完成后运行 `doctor` 重新生成插件，再运行 `check`，不能只改配置不重新生成；
+- 每次修改核心配置后都运行 `lint`，没有 error 才继续下一步；一组修改完成后运行 `doctor` 重新生成插件，不能只改配置不重新生成；`package` 打包前会先做完整检查；
 - 不修改 `SKILL.md` 中 `<!-- plugin workflow: begin state -->` 到 `<!-- plugin workflow: end state -->` 之间的内容，节点或 checkpoint 变了就运行 `doctor`；
 - 插件已经发布后，不得修改 `plugin.id` 和 `runtime.metaRoot`；
 - `--force`、`--allow-id-change`、`--allow-layout-change`、`--allow-major-upgrade` 只在开发者看过对应的 Issue 并明确同意后才加，执行后把放行时的 warning 原样转述（D58）；
@@ -264,7 +255,8 @@ autobiz-plugin doctor [-C <plugin-dir>] [--dry-run] [--force] [--allow-id-change
 |---|---|---|
 | 1. 检查 | 执行 lint（input-config.md §7.2；`BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` 不报，过期和可升级正是要重新生成的原因） | 有 error 时退出码 1，不写任何文件 |
 | 2. 比较 | 按 build-manifest 的 `inputs` 找出改过的核心配置；在内存中编译新流程，与当前的 `runtime/config/flow.json` 和 build-manifest 记录的技能片段比较，列出影响（下表） | 从未生成过（没有 build-manifest）时，全部节点列为新增，不报 warning（D56）。有 build-manifest 但 `runtime/config/flow.json` 不存在或无法解析时不做比较：报 warning `DOCTOR_BASELINE_MISSING`，说明本次没有影响报告，直接进入第 3 步重新生成，重新生成即修复了 flow.json（D54） |
-| 3. 生成 | 执行 build：重写编译配置和 `board_core/`；同步技能：缺失的技能生成空白 `SKILL.md`，已有技能插入或更新状态维护片段，不再绑定节点的技能删掉片段（output-spec.md §6.1） | managed 文件被手改时报 `DRIFT_MANAGED`，确认要覆盖时加 `--force` |
+| 3. 生成 | 执行 build：重写编译配置和 `board_core/`（`plugin.json`、`board_core/board_config.json`、`runtime/config/board.json` 中开发者改过的文字字段换回开发者的值，其余部分照常重写，D70）；同步技能：缺失的技能生成空白 `SKILL.md`，已有技能插入或更新状态维护片段，不再绑定节点的技能删掉片段（output-spec.md §6.1） | managed 文件被手改时报 `DRIFT_MANAGED`，确认要覆盖时加 `--force` |
+| 3a. 悬空引用 | 在生成结果上检查各 `SKILL.md` 正文引用的 `templates/`、`references/`、`scripts/`、`hooks/` 等文件和 `${pluginPath}/…` 路径是否存在（`SKILL_REF_DANGLING`），以及有没有写死的绝对路径（`SKILL_REF_ABSOLUTE`；input-config.md §7.3，D71） | 只报 warning，照常生成 |
 | 4. 复查 | 重新 lint（不应再有 `BUILD_STALE`），并检查每个节点技能的片段与推导结果一致（`SKILL_STATE_BLOCK`） | 报出问题，退出码 1 |
 
 `--dry-run` 只执行前两步，打印将要发生的变化，不写文件。核心配置与记录一致、技能片段也都正确时，doctor 不写任何文件，报告插件已是最新。核心配置没改、只是有人手改或删掉了技能中的片段时，doctor 同样会把片段修好。
@@ -298,15 +290,18 @@ autobiz-plugin doctor [-C <plugin-dir>] [--dry-run] [--force] [--allow-id-change
     "skills": { "created": ["skills/autodev/autodev-design/SKILL.md"], "stateInserted": [], "stateUpdated": [],
                 "stateRemoved": ["skills/autodev/autodev-detail-design/SKILL.md"],
                 "moved": [ { "from": "skills/autodev-plan", "to": "skills/autodev/autodev-plan" } ] },
-    "versions": { "scaffold": null, "core": null, "modules": {} }
+    "versions": { "scaffold": null, "core": null, "modules": {} },
+    "customized": { "runtime/config/board.json": ["nodes.biz[prd].nextAction.not_started.dialogTips"] }
   },
   "written": ["runtime/config/flow.json", "runtime/config/board.json", "skills/autodev/autodev-design/SKILL.md", "…"]
 }
 ```
 
-触发方式：开发者手动执行；插件开发技能完成一组修改后执行（§1.6）；`add`、`module` 写完配置后自动执行。`lint`、`check` 只检查不生成，发现 `BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` 或 `SKILL_STATE_BLOCK` 时提示执行 doctor。
+触发方式：开发者手动执行；骨架引导技能在导入技能、打包前执行（§1.6）；`add`、`module` 写完配置后自动执行。`lint`、`check` 只检查不生成，发现 `BUILD_STALE`、`SCAFFOLD_VERSION_CHANGED` 或 `SKILL_STATE_BLOCK` 时提示执行 doctor。
 
 `changes.skills.moved` 列出 doctor 挪进分组目录的节点技能（input-config.md §5，D64）：挪动在 lint 之后、生成之前进行，与生成结果一起写盘。
+
+`changes.customized` 按文件列出保留了开发者的值的文字字段（D70），没有时为 `{}`；开发者改过、这次生成的值也变了的字段另报 `CUSTOMIZED_STALE`（input-config.md §7.1）。
 
 `changes.versions` 中有变化的项写成 `{"from": 记录的版本, "to": 当前版本}`，例如 `"core": {"from": "1.0.0", "to": "1.1.0"}`；`modules` 只列版本有变化的模块。
 

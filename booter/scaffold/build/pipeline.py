@@ -86,6 +86,7 @@ def build(tree: Tree, *, dry_run: bool = False, force: bool = False, allow: froz
     result.plan.add(emit.PlannedFile(hooks_path, "seeded", hooks_data, "framework", region=hooks_region,
                                      region_key="hooks"))
     result.report.extend(emit.check_drift(result.plan, tree, result.previous, force=force))
+    result.report.extend(emit.resolve_customized(result.plan, tree, result.previous))
     if result.report.failed():
         return result
     result.manifest = make_manifest(ir, normalized, result.plan, result.modules, descriptions, result.previous)
