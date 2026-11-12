@@ -1,4 +1,4 @@
-"""插件全局钩子模块 globalHooks（D62）：钩子目录完整性、new 的回答、hook 命令、合并顺序和校验。"""
+"""插件全局钩子模块 globalHooks（D62）：钩子目录完整性、旧配置兼容、合并顺序和校验。"""
 
 from __future__ import annotations
 
@@ -48,16 +48,21 @@ ANSWERS = {"plugin": {"id": "hooks-demo", "name": "全局钩子", "version": "0.
 class GlobalHooksModuleTest(unittest.TestCase):
     def new(self, hooks=None) -> Path:
         root = temp_dir(self) / "plugin"
-        answers = dict(ANSWERS)
-        if hooks is not None:
-            answers["globalHooks"] = {"hooks": hooks}
-        path = temp_dir(self) / "answers.json"
-        path.write_text(json.dumps(answers, ensure_ascii=False), "utf-8")
+        path = root.parent / "answers.json"
+        path.write_text(json.dumps(ANSWERS, ensure_ascii=False), "utf-8")
         code, payload = cli("new", str(root), "--yes", "--answers", str(path))
         self.assertEqual(code, 0, payload)
+        if hooks is not None:
+            entry = entry_of(root)
+            entry["modules"] = {"globalHooks": "./modules/globalHooks.json"}
+            (root / "plugin.scaffold.json").write_text(json.dumps(entry), "utf-8")
+            (root / "modules").mkdir(exist_ok=True)
+            (root / "modules/globalHooks.json").write_text(json.dumps({"hooks": hooks}), "utf-8")
+            code, payload = cli("-C", str(root), "doctor")
+            self.assertEqual(code, 0, payload)
         return root
 
-    def test_new_answers_enable_the_module_in_modules_dir(self):
+    def test_existing_module_config_builds(self):
         root = self.new(["secrets-check", "performance-check"])
 
         self.assertEqual(entry_of(root)["modules"]["globalHooks"], "./modules/globalHooks.json")
@@ -90,24 +95,9 @@ class GlobalHooksModuleTest(unittest.TestCase):
         self.assertEqual(code, 0, payload)
         self.assertEqual(commands(root), [GUARD, SECRETS, "python hooks/mine.py"])
 
-    def test_hook_commands_edit_the_module_file(self):
-        root = self.new()
-        code, payload = cli("-C", str(root), "hook", "enable", "performance-check")
-        self.assertEqual(code, 0, payload)
-        self.assertEqual(json.loads((root / "modules/globalHooks.json").read_text("utf-8"))["hooks"],
-                         ["performance-check"])
-        self.assertEqual(entry_of(root)["modules"]["globalHooks"], "./modules/globalHooks.json")
-
-        code, payload = cli("-C", str(root), "hook", "enable", "secrets-check")
-        self.assertEqual(code, 0, payload)
-        self.assertEqual(commands(root), [GUARD, PERFORMANCE, SECRETS])
-
-        code, payload = cli("-C", str(root), "hook", "list")
-        self.assertEqual({hook["id"]: hook["enabled"] for hook in payload["hooks"]},
-                         {"performance-check": True, "secrets-check": True})
-
-        cli("-C", str(root), "hook", "disable", "secrets-check")
-        code, payload = cli("-C", str(root), "hook", "disable", "performance-check")
+    def test_existing_module_can_be_disabled(self):
+        root = self.new(["performance-check"])
+        code, payload = cli("-C", str(root), "module", "disable", "globalHooks")
         self.assertEqual(code, 0, payload)
         # 去光后关闭模块：只去掉引用，配置文件保留，旧脚本标为 inactive
         self.assertNotIn("globalHooks", entry_of(root)["modules"])
@@ -116,14 +106,22 @@ class GlobalHooksModuleTest(unittest.TestCase):
         manifest = json.loads((root / "runtime/build-manifest.json").read_text("utf-8"))
         self.assertTrue(manifest["files"]["hooks/performance-check/performance_checker.py"]["inactive"])
 
-        code, payload = cli("-C", str(root), "hook", "enable", "no-such-hook")
-        self.assertEqual(code, 2, payload)
-
-    def test_module_enable_works_like_other_modules(self):
+    def test_module_is_unavailable_from_creation_commands(self):
         root = self.new()
-        code, payload = cli("-C", str(root), "module", "enable", "globalHooks", "--set", 'hooks=["secrets-check"]')
+        target = root.parent / "other"
+        path = root.parent / "answers.json"
+        path.write_text(json.dumps({**ANSWERS, "globalHooks": {"hooks": ["secrets-check"]}}), "utf-8")
+        for args in (("hook", "list"), ("module", "enable", "globalHooks", "--set", 'hooks=["secrets-check"]'),
+                     ("new", str(target), "--skeleton", "--module", "globalHooks"),
+                     ("new", str(target), "--yes", "--answers", str(path))):
+            with self.subTest(args=args):
+                code, payload = cli("-C", str(root), *args)
+                self.assertEqual(code, 2, payload)
+        code, payload = cli("-C", str(root), "module", "list")
         self.assertEqual(code, 0, payload)
-        self.assertEqual(commands(root), [GUARD, SECRETS])
+        self.assertNotIn("globalHooks", [module["id"] for module in payload["modules"]])
+        self.assertFalse(target.exists())
+        self.assertEqual(commands(root), [GUARD])
 
     def test_unknown_or_duplicate_hooks_are_rejected(self):
         root = self.new(["secrets-check"])

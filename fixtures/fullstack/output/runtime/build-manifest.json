@@ -84,9 +84,10 @@
     "plugin.json": {
       "ownership": "generated",
       "sha256": "sha256:178ad796bb2a8cfe8f6f0ce3450fa1e736e6b369281740d76c9f57a1527c01ca",
-      "structure": "sha256:64057b0e486ea9e3961987ef5867a9035e820ee7ad5de3c3a7eb9346dd3e05e8",
+      "structure": "sha256:0ca60ffaf8f4d9861301fd22e6670bb77a4b62d174096be93e2780ebb1109be1",
       "texts": {
-        "description": "sha256:d7fb3696262c1a2bf1d3cb01d4318d88824dbeacf4640f9e0774b79d436dc40a"
+        "description": "sha256:d7fb3696262c1a2bf1d3cb01d4318d88824dbeacf4640f9e0774b79d436dc40a",
+        "name": "sha256:9e112ae9e1c04e0386b28023ee702a8d3c0a950ac4b9e750056694f8cf779393"
       }
     },
     "runtime/__init__.py": {

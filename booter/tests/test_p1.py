@@ -13,11 +13,11 @@ from scaffold.commands.new import new
 from scaffold.lib import jsonedit
 from scaffold.wizard import ScriptedPrompter
 
-WIZARD = ["Doc Review", "Doc-Review-Kanban", None, "文档起草与评审",
-          "draft", "起草", "biz", None, "doc-draft", "DRAFT.md", "Y",
-          "review", "评审", "biz", None, "doc-review", "REVIEW.md", "N",
-          None, None, None, "multi", "N", "N", "N",
-          "N", "Y"]                                    # 全局钩子：performance-check 不启用，secrets-check 启用
+WIZARD_BASE = ["Doc Review", "Doc-Review-Kanban", None, "文档起草与评审",
+               "draft", "起草", "biz", None, "doc-draft", "DRAFT.md", "Y",
+               "review", "评审", "biz", None, "doc-review", "REVIEW.md", "N",
+               None, None, None]
+WIZARD = WIZARD_BASE + ["N", "N", "N"]  # 知识、产物同步、自定义运行策略
 
 
 def codes(payload, level=None):
@@ -37,13 +37,39 @@ class WizardTest(unittest.TestCase):
         prompter = ScriptedPrompter(WIZARD)
         result = new(root, prompter=prompter)
         self.assertFalse(result.report.failed(), result.report.to_text())
-        self.assertIn("  已规范化为 Doc-Review", prompter.lines)
+        self.assertIn("  已规范化为 AutoBizDevOps_Doc-Review", prompter.lines)
         workflow = json.loads((root / "workflow.json").read_text("utf-8"))
         self.assertEqual([node["id"] for node in workflow["nodes"]["biz"]], ["draft", "review"])
         self.assertIn('"outputs": ["DRAFT.md"]', (root / "workflow.json").read_text("utf-8"))
         self.assertTrue((root / "skills/autobiz/doc-draft/SKILL.md").is_file())
-        self.assertEqual(json.loads((root / "modules/globalHooks.json").read_text("utf-8"))["hooks"], ["secrets-check"])
-        self.assertTrue((root / "hooks/secrets-check/check_secrets.py").is_file())
+        self.assertFalse((root / "modules/globalHooks.json").exists())
+        manifest = json.loads((root / "plugin.json").read_text("utf-8"))
+        self.assertEqual(manifest["name"], "AutoBizDevOps_Doc-Review-Kanban")
+        self.assertFalse((root / "modules/session.json").exists())
+        self.assertFalse(prompter.answers)
+
+    def test_knowledge_and_custom_policy_choices_are_written(self):
+        url = "https://example.com/knowledge.git"
+        cases = [("Git 仓库", "plugin", ["", url, None], {"type": "git", "url": url, "ref": "master"}),
+                 ("随插件打包", "plugin", [], None),
+                 ("DevClaw 提供", "devclaw", [], None)]
+        for source, assembler, extra_answers, expected_source in cases:
+            with self.subTest(source=source):
+                root = temp_dir(self) / "p"
+                prompter = ScriptedPrompter(WIZARD_BASE + ["Y", "N", source, assembler] + extra_answers
+                                            + ["Y", "solo", "Y", None, "agent_team"])
+                result = new(root, prompter=prompter)
+                self.assertFalse(result.report.failed(), result.report.to_text())
+                self.assertFalse(prompter.answers)
+                knowledge = json.loads((root / "modules/knowledge.json").read_text("utf-8"))
+                self.assertEqual(knowledge["assembly"]["assembler"], assembler)
+                if expected_source is None:
+                    self.assertNotIn("source", knowledge)
+                else:
+                    self.assertEqual(knowledge["source"], expected_source)
+                session = json.loads((root / "modules/session.json").read_text("utf-8"))
+                self.assertEqual(session["policies"], {"default": {"agentMode": "solo"},
+                                                      "nodes": {"biz": [{"id": "review", "agentMode": "agent_team"}]}})
 
     def test_conflicting_answers_are_asked_again(self):
         answers = list(WIZARD)
@@ -77,7 +103,7 @@ class EditCommandsTest(unittest.TestCase):
     def test_module_disable_enable_and_set(self):
         root = self.lite()
         code, payload = cli("-C", str(root), "module", "list")
-        self.assertEqual([item["enabled"] for item in payload["modules"]], [True, True, True, True, False])  # globalHooks 默认不启用
+        self.assertEqual([item["enabled"] for item in payload["modules"]], [True, True, True, True])
         self.assertEqual(cli("-C", str(root), "module", "disable", "artifactSync")[0], 0)
         manifest = json.loads((root / "runtime/build-manifest.json").read_text("utf-8"))
         self.assertTrue(manifest["files"]["skills/autobizdevops-artifact-sync/SKILL.md"]["inactive"])
@@ -195,15 +221,25 @@ class EntryTest(unittest.TestCase):
     """booter 目录本身（根目录 SKILL.md 的调用方式，D69）和 .pyz 都能在任意目录下运行 CLI。"""
 
     def run_entry(self, entry: Path, cwd: Path) -> dict:
-        result = subprocess.run([sys.executable, str(entry), "hook", "list", "--json"], cwd=cwd,
+        result = subprocess.run([sys.executable, str(entry), "module", "list", "--json"], cwd=cwd,
                                 capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
     def test_booter_directory(self):
-        payload = self.run_entry(REPO, temp_dir(self))
-        self.assertTrue(payload["ok"])
-        self.assertTrue(payload["hooks"])
+        cwd = temp_dir(self)
+        modules = self.run_entry(REPO, cwd)
+        self.assertTrue(modules["ok"])
+        self.assertEqual(modules["written"], [])
+        self.assertTrue(modules["modules"])
+        for item in modules["modules"]:
+            self.assertEqual(item["enabled"], item["core"])
+            self.assertIsNone(item["file"])
+            guide = REPO / item["guide"]
+            self.assertTrue(guide.is_file())
+            metadata = json.loads(guide.with_name("module.json").read_text("utf-8"))
+            self.assertEqual(item["description"], metadata["description"])
+        self.assertEqual(list(cwd.iterdir()), [])
 
     def test_pyz(self):
         sys.path.insert(0, str(REPO / "tools"))
@@ -215,7 +251,10 @@ class EntryTest(unittest.TestCase):
             names = archive.namelist()
         self.assertIn("__main__.py", names)
         self.assertTrue(any(name.startswith("scaffold/_data/runtime/") for name in names))
-        self.assertEqual(self.run_entry(pyz, out), self.run_entry(REPO, out))
+        modules = self.run_entry(pyz, out)
+        self.assertEqual(modules, self.run_entry(REPO, out))
+        for item in modules["modules"]:
+            self.assertIn(item["guide"], names)
 
 
 if __name__ == "__main__":

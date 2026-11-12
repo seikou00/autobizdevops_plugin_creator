@@ -1,7 +1,7 @@
 {
   "id": "board",
-  "title": "看板接入",
-  "description": "DevClaw 看板的宿主命令、看板文案与知识沉淀入口",
+  "title": "看板",
+  "description": "看板上的流程名称、节点文案和对话提示",
   "schema": "modules/board.schema.json",
   "core": true,
   "entry": "module:BoardModule"

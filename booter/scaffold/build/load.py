@@ -10,7 +10,9 @@ from scaffold.lib.issues import Issue, UsageError, error, warning
 from scaffold.lib.tree import Tree
 
 ENTRY = "plugin.scaffold.json"
-MODULE_KEYS = ("board", "session", "knowledge", "artifactSync", "globalHooks")
+PUBLIC_MODULE_KEYS = ("board", "session", "knowledge", "artifactSync")
+# 保留旧插件的全局钩子配置，以便继续构建。
+MODULE_KEYS = (*PUBLIC_MODULE_KEYS, "globalHooks")
 SCHEMAS = {"entry": "plugin-scaffold.schema.json", "workflow": "workflow.schema.json",
            **{key: f"modules/{key}.schema.json" for key in MODULE_KEYS}}
 

@@ -40,35 +40,47 @@ python "<booter>" <命令> --json
 
 ### 1. 选目录和模块
 
-先运行 `python "<booter>" hook list --json`（不需要插件目录），拿到全部全局钩子和说明，问钩子时要用。
+先单独问 `plugin_dir`（插件放在哪个目录）。目录需要为空或尚未创建。推荐当前工作区下的 `my-plugin`，也可以给上一级目录下的 `my-plugin`，或让用户在 Other 中填写路径。
 
-需要用户决定下面几件事。分两轮问比较自然：第一轮问目录和产物同步，第二轮问其余三项。
-
-| id | 要决定什么 | 推荐 | 其他选项 |
-|---|---|---|---|
-| `plugin_dir` | 插件放在哪个目录，目录必须不存在或为空 | 当前工作区下的 `my-plugin` | 上一级目录下的 `my-plugin`；Other 中填路径 |
-| `artifact_sync` | 要不要把节点产物上传到外部服务 | 不需要：多数插件用不上，以后随时可以 `module enable artifactSync` | 需要，启用产物同步模块 |
-| `knowledge` | 要不要按所选发布单元加载知识 | 不需要 | 需要，由插件拉取知识仓库；需要，由 DevClaw 组装 |
-| `global_hooks` | 启用哪些全局钩子（先在消息里列出 `hook list` 的全部钩子和说明） | 全部启用：骨架里会列全，用户删掉不要的，比自己记 id 省事 | 都不要 |
-| `session_policy` | 节点的运行策略 | 全部用默认的 `multi` | 个别节点要单独配置，生成 session 模块 |
-
-按回答生成骨架：
+运行模块列表。它在新建插件前就可以用：
 
 ```bash
-python "<booter>" new "<插件目录>" --skeleton --module board [--module artifactSync] [--module knowledge] [--module globalHooks] [--module session] --json
+python "<booter>" module list --json
 ```
 
-`board` 总要带上，因为看板上的流程名称 `display.workflowLabel` 至少得填。
+逐个介绍 `core` 为 `false` 的模块，原样展示 `title` 和 `description`，再为每个模块问一道“要／不要”的题。按用户的场景推荐，缺少线索时推荐“不要”。
+
+- 选了知识，按列表中的 `guide` 路径读取知识指南。用「要定的两件事」提问 `knowledge_source`（知识从哪来）和 `knowledge_assembler`（谁把知识放进会话上下文）。选项说明取自表里的「怎么写」，在来源问题下附上表后的知识目录优先顺序。来源根据已有的知识目录、Git 仓库或 DevClaw 绑定情况推荐，组装方默认选插件。用户选 Git 时可以当场提供 HTTPS 地址，也可以留到第 2 步填写。
+
+单独问 `custom_policy`（要不要自定义运行策略）。推荐“沿用默认”，各节点使用 `multi`。选“自定义”就生成 `modules/session.json`，可以设置全局默认策略，也可以覆盖单个节点。
+
+生成骨架，在命令里为每个选中的可选模块追加一次 `--module <id>`：
+
+```bash
+python "<booter>" new "<插件目录>" --skeleton --json
+```
+
+自定义运行策略时加 `--module session`。用户想自定义看板名称、文案或目标平台时加 `--module board`。看板的流程名称默认取插件名。
+
+生成后按选择写入配置，并告诉用户改了哪些字段：
+
+- `knowledge_source` 选了 Git 仓库并给了地址：填进 `modules/knowledge.json` 的 `source.url`；没给地址就留着占位，等用户填；
+- `knowledge_source` 选了随插件打包或由 DevClaw 提供：删掉 `modules/knowledge.json` 中的整个 `source`；
+- `knowledge_assembler` 选了插件或 DevClaw：`assembly.assembler` 分别写 `plugin` 或 `devclaw`；
 
 ### 2. 讲清怎么填，交给用户
 
-按下文「填写指南」逐个文件讲要填什么，只讲用户选中的模块。讲完问一道选择题：
+先按下文「填写指南」讲 `plugin.scaffold.json` 和 `workflow.json`。根据入口文件 `modules` 中的引用，用 `module list` 返回的 `guide` 路径（相对 `<booter>`）读取对应指南。
+
+每个选中的可选模块展示一张卡片，标题用 `title` 加上配置文件名。四栏依次为「启用后多出什么」「什么时候需要」「要先准备什么」「最少要填哪些字段」。首栏直接用 `description`，其余三栏取自指南开头。已生成配置的看板和运行策略按各自指南讲解。需要填写的字段逐项讲清，告警等实际出现时再解释。
+
+讲完问一道选择题：
 
 | id | 要决定什么 | 推荐 | 其他选项 |
 |---|---|---|---|
 | `fill_mode` | 配置由谁来填 | 用户自己填，填好告诉你 | 用户描述流程，你起草，确认后再写入 |
 
-- **用户自己填**：这时就等用户填完。用户正在编辑这些文件，你同时去改很容易覆盖对方的内容。用户问到哪个字段，就按填写指南解释，必要时举个例子，最后怎么写由用户定；
+- **用户自己填**：这时就等用户填完。用户正在编辑这些文件，你同时去改很容易覆盖对方的内容。用户问到哪个字段，就按填写指南或模块说明文件解释，必要时举个例子，最后怎么写由用户定；
 - **你来起草**：先读同目录下的 `modeling-guide.md`，里面有节点拆分原则、产物写法和常见错误。请用户用一两句话描述流程，整理成“seq → 阶段 → 节点 id → 显示名 → 技能 → 产出文件”的表格给用户看，确认后再写进文件。
 
 ### 3. 检查配置
@@ -129,7 +141,7 @@ python "<booter>" -C "<插件目录>" package --json
 
 | 文件 | 可以改的字段 |
 |---|---|
-| `plugin.json` | `description` |
+| `plugin.json` | `name`、`description` |
 | `board_core/board_config.json` | 各平台（`darwin`、`linux`、`win32`）的 `dialog_tips`、`system_prompt_inject`，每个平台要分别改 |
 | `runtime/config/board.json` | `template.label`、`template.description`，`stateLabels` 中的状态名，节点的 `description`，`nextAction` 各状态下的 `userMessage`、`dialogTips` |
 
@@ -141,8 +153,8 @@ python "<booter>" -C "<插件目录>" package --json
 
 | 字段 | 怎么填 |
 |---|---|
-| `plugin.id` | 只含英文字母、数字、短横线和下划线，不超过 64 字符，例如 `my-plugin`、`Doc_Review`。它同时是安装目录名和状态文件里的 `pluginId`，发布后再改，已有项目的状态就对不上了 |
-| `plugin.name` | 插件名，显示在 DevClaw 中 |
+| `plugin.id` | 保留 `AutoBizDevOps_` 前缀，填写后缀，例如 `AutoBizDevOps_Doc_Review`。ID 只含英文字母、数字、短横线和下划线，含前缀共不超过 64 字符。它同时是安装目录名和状态文件里的 `pluginId`，发布后再改，已有项目的状态就对不上了 |
+| `plugin.name` | 保留 `AutoBizDevOps_` 前缀，填写在 DevClaw 中显示的插件名，例如 `AutoBizDevOps_文档评审` |
 | `plugin.description` | 一句话说明插件做什么 |
 | `plugin.version` | 版本号，默认 `0.1.0`。之后由 `package` 自动递增，一般不用手改 |
 
@@ -182,58 +194,13 @@ python "<booter>" -C "<插件目录>" package --json
 }
 ```
 
-### modules/board.json
+### modules/*.json
 
-| 字段 | 怎么填 |
-|---|---|
-| `display.workflowLabel` | 看板上的流程名称，例如“需求开发” |
-| `display.workflowDescription` | 可选，流程的一句话说明 |
-| `display.dialogTips` | 可选，用户发起对话时的提示语，可以用 `${projectCode}`、`${pluginWorkspace}`、`${projectDir}` |
-| `display.systemPromptInject` | 可选，注入系统提示的内容。默认值已经包含 Feature 产物目录，一般不用写 |
-
-后三项拿不准时可以先空着，看过生成结果后再按「之后微调文案」直接改。
-
-### modules/session.json
-
-| 字段 | 怎么填 |
-|---|---|
-| `policies.default.agentMode` | 默认运行策略：`multi`（默认）、`solo`、`agent_team`、`workflow` |
-| `policies.nodes.<阶段>[]` | 给个别节点单独配置：`{"id": "<节点 id>", "agentMode": "agent_team"}`；还可以加 `toolCustomConfig`、`subagentConfig`（`disabledBuiltinSubagents` 是要禁用的内置子代理，`customSubagentFiles` 是自带的子代理文件，如 `agents/explore.md`） |
-
-`customSubagentFiles` 引用的文件要放在插件的 `agents/` 下，导入技能时用 `--agents` 一起拷进来。
-
-### modules/knowledge.json
-
-| 字段 | 怎么填 |
-|---|---|
-| `assembly.assembler` | `plugin`：插件自己组装知识；`devclaw`：交给 DevClaw 组装 |
-| `source.url` | 知识仓库的 HTTPS 地址。插件不负责拉取知识仓库时，删掉整个 `source` |
-| `source.sshUrl`、`source.ref` | 可选，SSH 地址和分支（默认 `master`） |
-
-### modules/artifactSync.json
-
-| 字段 | 怎么填 |
-|---|---|
-| `allowedFrom` | 从哪个节点完成之后才允许同步，写成 `<节点 id>:done`，例如 `plan:done` |
-| `artifacts` | 要上传的产物：键是产物路径，要与 `workflow.json` 某个节点 `outputs` 中的写法完全一致（脚手架按字面匹配），值是简述 |
-| `excludeCheckpoints`、`extraPaths` | 可选：不允许同步的 checkpoint；产物之外要一起上传的路径（glob → 简述） |
-
-同步技能每次同步前会按实际代码生成接口交付文档 `FEATURE_API_DETAIL.md`，并自动加进同步范围。它不是节点产出，写进 `artifacts` 反而会报 `ARTIFACT_REF_UNKNOWN`。只想改它的简述时，在 `extraPaths` 里写 `"FEATURE_API_DETAIL.md": "<简述>"`。
-
-### modules/globalHooks.json
-
-骨架里已经列出全部可用的全局钩子，删掉不需要的就行，不用自己写 id。每个钩子做什么以 `hook list` 的说明为准，目前有：
-
-| id | 做什么 |
-|---|---|
-| `secrets-check` | 写入 `.yaml`、`.yml`、`.properties` 时发现明文的密码、密钥、token 就拦截，提示先加密 |
-| `performance-check` | 编码节点（`code`）完成前，按 7 条前端性能规则检查工作区 `git diff` 中改动的前端文件，发现问题就拦截 |
-
-一个都不要时，把入口文件 `modules` 中的 `globalHooks` 引用也删掉。产物检查钩子始终启用，不在这里列。
+各模块怎么填，见第 2 步读取的模块指南。
 
 ## 边界
 
-- 配置和技能内容归用户。只有用户选了“起草”，或者明确请你代写某一处时才动手；写之前先让用户看要写什么，写完说明改了哪里；
+- 配置和技能内容归用户。只有用户选了“起草”、明确请你代写某一处，或者是把第 1 步选择题的回答落进骨架时才动手；写之前先让用户看要写什么，写完说明改了哪里；
 - `plugin.json`、`board_core/`、`runtime/`、`.scaffold/`、`hooks/artifact_guard.py` 由脚手架生成和维护：手改的内容会在下次生成时被覆盖，或者被检查当作漂移拦下。用户想改行为，就改核心配置；只是调文案，按「之后微调文案」改那几个字段；
 - 技能开头的状态维护片段是技能和运行框架之间的约定，改坏了节点就推进不了，不要改，也不要用别的办法绕过检查；
 - `doctor` 的 `--force`、`--allow-id-change`、`--allow-layout-change`、`--allow-major-upgrade` 是放行开关：会覆盖被改过的托管文件，或改掉发布后不该改的标识。只在用户看过对应的 issue、明确同意后才加。

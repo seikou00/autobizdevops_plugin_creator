@@ -22,7 +22,7 @@ def edit(root: Path, rel: str, change) -> None:
 
 
 def fill(root: Path) -> None:
-    edit(root, "plugin.scaffold.json", lambda d: d["plugin"].update(id="my-plugin", name="我的插件", description="示例"))
+    edit(root, "plugin.scaffold.json", lambda d: d["plugin"].update(id="AutoBizDevOps_my-plugin", name="AutoBizDevOps_我的插件", description="示例"))
 
     def nodes(d):
         d["nodes"]["biz"][0].update(id="prd", name="需求", skill="my-prd", outputs=["PRD.md"])
@@ -42,22 +42,19 @@ class SkeletonTest(unittest.TestCase):
         return root
 
     def test_writes_only_core_config_with_placeholders(self):
-        root = self.skeleton("board", "globalHooks")
+        root = self.skeleton("board")
 
         files = sorted(path.relative_to(root).as_posix() for path in root.rglob("*")
                        if path.is_file() and ".scaffold" not in path.parts)
-        self.assertEqual(files, ["modules/board.json", "modules/globalHooks.json", "plugin.scaffold.json",
-                                 "workflow.json"])
+        self.assertEqual(files, ["modules/board.json", "plugin.scaffold.json", "workflow.json"])
         self.assertTrue((root / ".scaffold/workflow.schema.json").is_file())
         entry = json.loads((root / "plugin.scaffold.json").read_text("utf-8"))
-        self.assertEqual(entry["modules"], {"board": "./modules/board.json", "globalHooks": "./modules/globalHooks.json"})
-        self.assertIn("[TODO:", entry["plugin"]["id"])
+        self.assertEqual(entry["modules"], {"board": "./modules/board.json"})
+        for field in ("id", "name"):
+            self.assertTrue(entry["plugin"][field].startswith("AutoBizDevOps_[TODO:"))
         workflow = json.loads((root / "workflow.json").read_text("utf-8"))
         self.assertEqual(list(workflow["nodes"]), ["biz", "dev"])
         self.assertEqual(list(workflow["nodes"]["biz"][0]), ["id", "seq", "name", "skill", "outputs"])
-        # 全局钩子直接列出全部可选项，用户删掉不需要的
-        hooks = json.loads((root / "modules/globalHooks.json").read_text("utf-8"))
-        self.assertEqual(hooks["hooks"], ["performance-check", "secrets-check"])
 
     def test_lint_lists_every_unfilled_field_and_doctor_writes_nothing(self):
         root = self.skeleton("artifactSync")

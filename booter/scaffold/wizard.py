@@ -1,7 +1,7 @@
 """初始化向导：按七类输入问答（interfaces.md §1.4，scaffold.md 单元 12）。
 
 问答与写配置分开：ask() 只收集回答，返回与 --answers 相同结构的字典，由 commands/new.py 写成核心配置。
-每个问题都可以直接回车取默认值；节点的 id、seq 和产物 id 冲突当场追问。
+有默认值的问题可以直接回车。节点的 id、seq 和产物 id 冲突时当场追问。
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import sys
 from typing import Protocol
 
 from scaffold.lib import derive
+from scaffold.modules import discover
 
 PLUGIN_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 SKILL = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -81,14 +82,14 @@ def yes(prompter: Prompter, question: str, default: bool) -> bool:
 def ask_plugin(prompter: Prompter) -> dict:
     prompter.say("── 1 插件基础信息 ──")
     while True:
-        raw = prompter.ask("插件 ID（slug，发布后不可修改）")
-        plugin_id = normalize_id(raw)
-        if plugin_id and PLUGIN_ID.match(plugin_id) and len(plugin_id) <= 64:
+        raw = prompter.ask("插件 ID（自动加 AutoBizDevOps_ 前缀，发布后不可修改）")
+        plugin_id = derive.prefixed_plugin_field(normalize_id(raw))
+        if plugin_id != derive.PLUGIN_PREFIX and PLUGIN_ID.fullmatch(plugin_id) and len(plugin_id) <= 64:
             if plugin_id != raw:
                 prompter.say(f"  已规范化为 {plugin_id}")
             break
-        prompter.say("  插件 ID 只能含英文字母、数字、短横线和下划线，不超过 64 字符")
-    name = prompter.ask("插件名", default=plugin_id)
+        prompter.say("  插件 ID 只能含英文字母、数字、短横线和下划线，含前缀共不超过 64 字符")
+    name = derive.prefixed_plugin_field(prompter.ask("插件名（自动加 AutoBizDevOps_ 前缀）", default=plugin_id))
     version = prompter.ask("版本", default="0.1.0")
     description = prompter.ask("一句话描述", default=name)
     return {"id": plugin_id, "name": name, "version": version, "description": description}
@@ -187,11 +188,14 @@ def ask_board(prompter: Prompter) -> dict | None:
 
 
 def ask_session(prompter: Prompter, nodes: list) -> dict | None:
-    prompter.say("── 5 会话与 Agent ──")
-    mode = prompter.ask("默认运行策略", default="multi", choices=AGENT_MODES)
-    policies = {}
-    if mode != "multi":
-        policies["default"] = {"agentMode": mode}
+    prompter.say("── 6 会话与运行策略 ──")
+    spec = discover()["session"]
+    prompter.say(f"  {spec.title}：{spec.description}")
+    prompter.say("  沿用默认时各节点使用 multi。自定义时写入 modules/session.json，可以设置全局默认策略或覆盖单个节点。")
+    if not yes(prompter, "要不要自定义运行策略？", False):
+        return None
+    mode = prompter.ask("默认运行方式（policies.default.agentMode）", default="multi", choices=AGENT_MODES)
+    policies = {"default": {"agentMode": mode}}
     if yes(prompter, "为节点单独配置策略？", False):
         groups = {}
         for node in nodes:
@@ -200,43 +204,56 @@ def ask_session(prompter: Prompter, nodes: list) -> dict | None:
                 groups.setdefault(node["stage"], []).append({"id": node["id"], "agentMode": node_mode})
         if groups:
             policies["nodes"] = groups
-    return {"policies": policies} if policies else None
+    return {"policies": policies}
 
 
-def ask_modules(prompter: Prompter, nodes: list) -> tuple:
-    prompter.say("── 6 知识与产物同步 ──")
-    knowledge = artifact_sync = None
-    if yes(prompter, "启用知识模块？", False):
-        assembler = prompter.ask("知识由谁组装", default="plugin", choices=("plugin", "devclaw"))
-        knowledge = {} if assembler == "plugin" else {"assembly": {"assembler": "devclaw"}}
-        url = prompter.ask("知识仓库 HTTPS 地址（留空表示插件不拉取知识仓库）", default="")
-        if url:
-            knowledge["source"] = {"type": "git", "url": url,
-                                   "ref": prompter.ask("分支、标签或 commit", default="master")}
-    if yes(prompter, "启用产物同步模块？", False):
-        candidates = [node["id"] for node in nodes if not node.get("terminal")]
-        anchor = prompter.ask("从哪个节点完成起允许同步（节点 id）", default=candidates[0] if candidates else "",
-                              choices=candidates or None)
-        paths = []
-        for node in nodes:
-            for path in node.get("outputs", []):
-                if not path.lower().endswith(".json") and path not in paths:
-                    paths.append(path)
-        artifact_sync = {"allowedFrom": f"{anchor}:done", "artifacts": {path: "[TODO: 简述]" for path in paths}}
-        prompter.say("  已预填要上传的产物，简述写成 [TODO: 简述]，请在 modules/artifactSync.json 中补上")
-    return knowledge, artifact_sync
+def ask_knowledge(prompter: Prompter) -> dict:
+    prompter.say("  Git 仓库：填 source.url。\n"
+                 "  随插件打包：省略 source，把带清单的知识目录放进 sys/。\n"
+                 "  DevClaw 提供：省略 source，在 DevClaw 中给项目绑定知识库。\n"
+                 "  运行时优先使用项目绑定的知识库。")
+    source = prompter.ask("知识从哪来？", choices=("Git 仓库", "随插件打包", "DevClaw 提供"))
+    prompter.say("  插件组装时 assembly.assembler 写 plugin，DevClaw 组装时写 devclaw。")
+    assembler = prompter.ask("谁把知识放进会话上下文？", default="plugin", choices=("plugin", "devclaw"))
+    knowledge = {"assembly": {"assembler": assembler}}
+    if source == "Git 仓库":
+        url = prompter.ask("知识仓库 HTTPS 地址（source.url）")
+        while not url:
+            prompter.say("  从 Git 仓库拉取时需要填写 source.url")
+            url = prompter.ask("知识仓库 HTTPS 地址（source.url）")
+        knowledge["source"] = {"type": "git", "url": url,
+                               "ref": prompter.ask("分支、标签或 commit（source.ref）", default="master")}
+    return knowledge
 
 
-def ask_hooks(prompter: Prompter) -> list:
-    """逐个询问插件全局钩子（globalHooks 模块 hooks/ 下的目录），默认都不启用。"""
-    from scaffold.modules.global_hooks.catalog import catalog
+def ask_artifact_sync(prompter: Prompter, nodes: list) -> dict:
+    candidates = [node["id"] for node in nodes if not node.get("terminal")]
+    anchor = prompter.ask("从哪个节点完成起允许同步（节点 id）", default=candidates[0] if candidates else "",
+                          choices=candidates or None)
+    paths = []
+    for node in nodes:
+        for path in node.get("outputs", []):
+            if not path.lower().endswith(".json") and path not in paths:
+                paths.append(path)
+    prompter.say("  已预填要上传的产物，请在 modules/artifactSync.json 中补上 [TODO: 简述]")
+    return {"allowedFrom": f"{anchor}:done", "artifacts": {path: "[TODO: 简述]" for path in paths}}
 
-    available = catalog()
-    if not available:
-        return []
-    prompter.say("── 插件全局钩子 ──\n  产物检查钩子始终启用；以下公共钩子按需选择")
-    return [hook_id for hook_id, spec in available.items()
-            if yes(prompter, f"启用 {spec.title}（{hook_id}）：{spec.description}？", False)]
+
+def ask_modules(prompter: Prompter, nodes: list) -> dict:
+    prompter.say("── 5 可选模块 ──\n  产物检查钩子始终启用。")
+    selected = set()
+    for module_id in ("knowledge", "artifactSync"):
+        spec = discover()[module_id]
+        prompter.say(f"  {spec.title}：{spec.description}")
+        if yes(prompter, f"启用{spec.title}模块？", False):
+            selected.add(module_id)
+
+    answers = {}
+    if "knowledge" in selected:
+        answers["knowledge"] = ask_knowledge(prompter)
+    if "artifactSync" in selected:
+        answers["artifactSync"] = ask_artifact_sync(prompter, nodes)
+    return answers
 
 
 def ask(prompter: Prompter, *, existing_skills: list | None = None) -> dict:
@@ -245,16 +262,12 @@ def ask(prompter: Prompter, *, existing_skills: list | None = None) -> dict:
     answers = {"plugin": ask_plugin(prompter)}
     answers["nodes"] = ask_nodes(prompter, existing_skills)
     answers["skills"] = ask_skills(prompter, answers["nodes"], existing_skills)
-    for key, value in (("board", ask_board(prompter)), ("session", ask_session(prompter, answers["nodes"]))):
-        if value is not None:
-            answers[key] = value
-    knowledge, artifact_sync = ask_modules(prompter, answers["nodes"])
-    if knowledge is not None:
-        answers["knowledge"] = knowledge
-    if artifact_sync is not None:
-        answers["artifactSync"] = artifact_sync
-    hooks = ask_hooks(prompter)
-    if hooks:
-        answers["globalHooks"] = {"hooks": hooks}
+    board = ask_board(prompter)
+    if board is not None:
+        answers["board"] = board
+    answers.update(ask_modules(prompter, answers["nodes"]))
+    session = ask_session(prompter, answers["nodes"])
+    if session is not None:
+        answers["session"] = session
     prompter.say("── 7 自定义扩展 ──\n  将创建 hooks/（agents/ 可选，需要外挂子代理时再创建）")
     return answers

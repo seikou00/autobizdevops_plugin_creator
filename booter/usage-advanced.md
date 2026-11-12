@@ -23,12 +23,12 @@ P/
 ├── workflow.json             # 流程节点
 ├── modules/
 │   ├── board.json            # 看板展示
-│   ├── session.json          # 会话与 Agent 策略
+│   ├── session.json          # 会话与运行策略
 │   ├── knowledge.json        # 知识模块（可选）
-│   └── artifactSync.json     # 产物同步（可选）
+│   └── artifactSync.json     # 产物同步模块（可选）
 ├── skills/autobiz|autodev|autoops/<skill>/   # 节点技能按节点阶段分组；辅助技能可以直接放 skills/<skill>/
 ├── agents/                   # 子代理文件，由 session.json 引用（可选）
-├── hooks/                    # hooks.json（脚手架的条目 + 你的条目）、artifact_guard.py、全局钩子脚本，以及你自己的钩子脚本
+├── hooks/                    # hooks.json（脚手架的条目 + 你的条目）、artifact_guard.py，以及你自己的钩子脚本
 ├── .mcp.json                 # 可选，透传进 plugin.json
 ├── .scaffold/                # Schema，IDE 补全用，脚手架维护
 ├── plugin.json、board_core/、runtime/   # 生成；其中的对话提示和展示文案可以手改，见下文
@@ -41,7 +41,7 @@ P/
 
 | 文件 | 可以改的字段 |
 |---|---|
-| `plugin.json` | `description` |
+| `plugin.json` | `name`、`description` |
 | `board_core/board_config.json` | 各平台（`darwin`、`linux`、`win32`）的 `dialog_tips`、`system_prompt_inject`，每个平台分别改 |
 | `runtime/config/board.json` | `template.label`、`template.description`，`stateLabels` 中的状态名，节点的 `description`，以及 `nextAction` 各状态下的 `userMessage`、`dialogTips` |
 
@@ -54,6 +54,17 @@ P/
 - 其余生成文件（`board_core/modules.json`、`runtime/config/` 下的其他文件）照旧不能改。
 
 ## 3. 核心配置
+
+用 `module list` 查看模块简介，新建插件前也能运行。`--json` 输出的 `guide` 是填写指南相对 `booter/` 的路径：
+
+| 模块 | 填写说明 |
+|---|---|
+| `board` | [scaffold/modules/board/guide.md](scaffold/modules/board/guide.md) |
+| `session` | [scaffold/modules/session/guide.md](scaffold/modules/session/guide.md) |
+| `knowledge` | [scaffold/modules/knowledge/guide.md](scaffold/modules/knowledge/guide.md) |
+| `artifactSync` | [scaffold/modules/artifact_sync/guide.md](scaffold/modules/artifact_sync/guide.md) |
+
+下面只补充说明文件里没有的细节。
 
 ### 3.1 `plugin.scaffold.json`
 
@@ -120,29 +131,20 @@ P/
 
 ### 3.5 `modules/knowledge.json`（可选）
 
-- `assembly.assembler`：`plugin`（插件内置的组装脚本，可以直接替换）或 `devclaw`；
-- `source`：`type: "git"`、`url`、`sshUrl`、`ref`。
+启用前要定两件事：知识目录从哪来（Git 仓库、随插件打包放在 `sys/`、由 DevClaw 提供），以及由插件还是 DevClaw 把知识拼进上下文。每个选项怎么写见 [guide.md](scaffold/modules/knowledge/guide.md)。
+
+- 由插件组装时，组装脚本是 `runtime/knowledge/render_collected_session_context.py`，可以整个替换成自己的实现，doctor 不会覆盖；
+- 项目在 DevClaw 中绑定了知识库时，总是优先用绑定的知识库，插件的 `sys/` 只在没有绑定时使用。
 
 ### 3.6 `modules/artifactSync.json`（可选）
 
-| 字段 | 说明 |
-|---|---|
-| `allowedFrom` 或 `allowedCheckpoints` | 从哪个 checkpoint 起允许同步（如 `plan:done`），或显式列出允许的 checkpoint，二选一必填 |
-| `artifacts` | 要同步的产物路径 → 简述 |
-| `excludeCheckpoints` | 排除的 checkpoint |
-| `extraPaths` | 产物之外要同步的路径 glob → 简述 |
-
-启用后会生成同步技能 `skills/autobizdevops-artifact-sync/`（技能名可用 `skillName` 修改），看板上带出“发起产物同步”入口。技能每次执行时：
+字段见 [guide.md](scaffold/modules/artifact_sync/guide.md)。启用后会生成同步技能 `skills/autobizdevops-artifact-sync/`（技能名可用 `skillName` 修改），看板上带出“发起产物同步”入口。技能每次执行时：
 
 1. 先向用户确认工号、Feature 和上传目录 `{PROJECT_CODE}/DEV/Features/{feature}/{工号}/`，确认后才继续；
 2. 常规同步前，按实际代码生成或更新 Feature 目录下的接口交付文档 `FEATURE_API_DETAIL.md`。代码仓库取创建 Feature 时选定的发布单元（`localRepoPath`），没有时取会话工作区中的 Git 仓库；实现范围取这些仓库中带“cmbdevclaw提交”的提交。没有源码或没有接口变更时，在文档中说明，不阻断其他产物的同步；
 3. 按同步配置上传有变化的产物，再上传产物清单 `ARTIFACT_CATALOG.json`；失败的上传保留记录，修复后可以重试。
 
-注意：
-
-- `FEATURE_API_DETAIL.md` 总会同步，不用自己配置：它不是节点输出，**不要写进 `artifacts`**（会报 `ARTIFACT_REF_UNKNOWN`）；生成的同步配置会自动把它加进 `extraPaths`，要改简述就在 `extraPaths` 里写上这一项；
-- 同步配置 `skills/<技能>/config/artifact-sync.json` 每次重新生成都会按本文件重写，不要手改；
-- 产物清单中的 `category` 按文件名对照（如 `PRD.md` 为 `requirement`，`plan.md`、`PLAN.md` 为 `implementation_plan`），对照表中没有的文件为 `artifact`。
+产物清单中的 `category` 按文件名对照（如 `PRD.md` 为 `requirement`，`plan.md`、`PLAN.md` 为 `implementation_plan`），对照表中没有的文件为 `artifact`。
 
 ### 3.7 钩子与产物检查
 
@@ -157,44 +159,6 @@ P/
 - 命令指向 `hooks/artifact_guard.py` 或 `hooks/<全局钩子 id>/` 的条目归脚手架：每次重新生成都排在最前面并按当前配置重写，手改会被覆盖；其他条目都是你的，原样保留；
 - 改自己的条目直接生效，不需要 doctor；结构不对报 `PLUGIN_HOOKS_INVALID`；
 - 钩子命令写的是 `python -X utf8 hooks/artifact_guard.py`，路径相对插件根目录。
-
-**插件全局钩子模块**：脚手架还自带一组可以按需启用的公共钩子，由模块 `globalHooks` 管理（见 §3.8），合并顺序是：产物检查钩子 → 全局钩子（按 `modules/globalHooks.json` 中列出的顺序）→ 你自己在 `hooks/hooks.json` 里写的条目。
-
-### 3.8 `modules/globalHooks.json`（可选，插件全局钩子）
-
-```json
-{ "hooks": ["secrets-check", "performance-check"] }
-```
-
-入口文件的 `modules.globalHooks` 引用这个文件即启用，和 knowledge、artifactSync 一样。
-
-| id | 做什么 |
-|---|---|
-| `secrets-check` | 写入 `.yaml`、`.yml`、`.properties` 时发现明文的密码、密钥、token 就拦截，提示先加密再写入 |
-| `performance-check` | 编码节点完成（`code_done`）前，对工作区 `git diff` 中变动的前端文件执行 7 条性能规则，发现问题就拦截 |
-
-```bash
-python3 -m scaffold -C P hook list                                      # 查看全部全局钩子及启用状态
-python3 -m scaffold -C P hook enable secrets-check performance-check    # 启用（写 modules/globalHooks.json，必要时启用模块）
-python3 -m scaffold -C P hook disable performance-check                 # 关闭；全部关掉后模块也关闭
-```
-
-也可以像其他模块一样 `module enable globalHooks --set 'hooks=["secrets-check"]'`，或直接编辑文件后执行 doctor。id 写错报 `GLOBAL_HOOK_UNKNOWN`，重复报 `GLOBAL_HOOK_DUP`。
-
-**给脚手架新增一个公共钩子**：在 `booter/scaffold/modules/global_hooks/hooks/` 下建一个目录，放 `hook.json` 和 `files/<脚本>`，不用改代码：
-
-```json
-{
-  "id": "my-check",
-  "title": "我的检查",
-  "description": "一句话说明在什么时候检查什么",
-  "files": ["my_check.py"],
-  "entries": { "PreToolUse": [ { "matcher": "execute",
-    "hooks": [ { "type": "command", "command": "python -X utf8 ${hookDir}/my_check.py", "timeout": 30 } ] } ] }
-}
-```
-
-`${hookDir}` 在 build 时替换成 `hooks/my-check`。之后 `hook list`、向导和 `--answers` 都会自动出现这个钩子；运行 `python3 -m unittest tests.test_global_hooks` 检查目录是否完整。
 
 ## 4. 新建插件：`new`
 
@@ -220,15 +184,13 @@ python3 -m scaffold new <目录> [--yes --answers <file>|-]
   "board": { "display": { "workflowLabel": "需求开发" } },
   "artifactSync": { "allowedFrom": "prd:done", "artifacts": { "PRD.md": "需求" } },
   "skills": { "my-prd": "/path/to/my-prd", "my-code": null },
-  "agents": "/path/to/agents",
-  "globalHooks": { "hooks": ["secrets-check"] }
+  "agents": "/path/to/agents"
 }
 ```
 
-- `plugin`、`nodes` 必填；`board`、`session`、`knowledge`、`artifactSync` 不写就用默认值，写了 `knowledge`、`artifactSync` 即启用；
+- `plugin`、`nodes` 必填；`board`、`session` 不写就用默认值；可选模块 `knowledge`、`artifactSync` 写了即启用。脚手架给插件 ID 和名称加上 `AutoBizDevOps_` 前缀，已带前缀时直接沿用；
 - `skills` 是技能名 → 技能目录，`null` 表示先不提供（生成空白 `SKILL.md`）；要逐个写，导入到 `skills/<skill>/`，不保留分组。整个技能集合（尤其是分组的集合）建议 `new` 之后用 `add skills --from` 导入；
 - `agents` 是 agents 目录，原样拷到 `P/agents/`；不写就不创建 `agents/`；
-- `globalHooks` 写了就启用插件全局钩子模块（见 §3.8），不写就只有产物检查钩子。
 
 由回答生成插件，再带上分组的技能和 agents（技能会引用 `skills/references/`、`skills/autobiz/hooks/` 等共享路径，所以用 `add skills` 整体导入，而不是在 `--answers` 里逐个列出）：
 
@@ -243,11 +205,11 @@ python3 -m scaffold -C $OUT add skills --from $G/my-skills --agents $G/my-agents
 **只写骨架**：想自己手写配置时，先让脚手架按 Schema 写出结构，再照着占位填：
 
 ```bash
-python3 -m scaffold new P --skeleton --module board --module artifactSync --module globalHooks
+python3 -m scaffold new P --skeleton --module board --module artifactSync
 ```
 
-- 写出 `plugin.scaffold.json`、`workflow.json`（biz、dev 各一个节点）、`--module` 选中的模块配置，以及 IDE 补全用的 `.scaffold/` Schema；可选模块：`board`、`session`、`knowledge`、`artifactSync`、`globalHooks`；
-- 要填的地方都写成 `[TODO: 说明]`；`modules/globalHooks.json` 例外：直接列出全部可用的全局钩子，删掉不需要的即可；`lint` 每个占位报一条 `TODO_FIELD`，带文件和 JSON Pointer。还有占位时 `doctor` 不生成（`artifactSync` 的简述除外：可以先生成，打包前填完）；
+- 写出 `plugin.scaffold.json`、`workflow.json`（biz、dev 各一个节点）、`--module` 选中的模块配置，以及 IDE 补全用的 `.scaffold/` Schema；可选模块：`board`、`session`、`knowledge`、`artifactSync`；
+- 要填的地方都写成 `[TODO: 说明]`，插件 ID 和名称保留预填的 `AutoBizDevOps_` 前缀；`lint` 每个占位报一条 `TODO_FIELD`，带文件和 JSON Pointer。还有占位时 `doctor` 不生成（`artifactSync` 的简述除外：可以先生成，打包前填完）；
 - 填完后：
 
 ```bash
@@ -319,7 +281,8 @@ python3 -m scaffold -C P module enable artifactSync --set allowedFrom=plan:done
 python3 -m scaffold -C P module disable knowledge
 ```
 
-- 看板能力固定开启；可以开关的是 `knowledge`、`artifactSync`；
+- `board`、`session` 始终启用；可以开关的是可选模块 `knowledge`、`artifactSync`；
+- 不确定要不要某个模块，先 `module list` 看说明；
 - `enable` 在模块配置不存在时创建骨架；`enable artifactSync` 会把非 `.json` 的输出预填进 `artifacts`，简述写成 `[TODO: 简述]`，删掉不需要的、补上简述；
 - `--set` 的 key 沿 Schema 用 `.` 逐级指定，字符串原样保留，其余按 JSON 解析；`artifacts`、`extraPaths` 这类以路径为键的映射不能用 `--set`，直接编辑文件；
 - `disable` 只去掉入口文件中的引用，`modules/*.json` 保留，之后 `enable` 会加回引用。

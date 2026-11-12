@@ -40,7 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument("--skeleton", action="store_true",
                      help="只写出带 [TODO: …] 占位的核心配置骨架，不生成插件；填完后执行 doctor")
     new.add_argument("--module", dest="modules", action="append", default=[], metavar="MODULE",
-                     help="--skeleton 时一并写出这个模块的配置骨架，可以重复：board、session、knowledge、artifactSync、globalHooks")
+                     help="--skeleton 时一并写出这个模块的配置骨架，可以重复：board、session，以及可选模块 knowledge、artifactSync")
 
     add = commands.add_parser("add", parents=[common], help="添加节点或技能")
     targets = add.add_subparsers(dest="target", parser_class=Parser)
@@ -64,19 +64,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     module = commands.add_parser("module", parents=[common], help="列出、启用或关闭模块")
     actions = module.add_subparsers(dest="action", parser_class=Parser)
-    actions.add_parser("list", parents=[common], help="列出可用模块、版本及启用状态")
-    enable = actions.add_parser("enable", parents=[common], help="启用 knowledge 或 artifactSync")
+    actions.add_parser("list", parents=[common], help="列出全部模块的说明、版本及启用状态；不在插件目录中也能运行")
+    enable = actions.add_parser("enable", parents=[common], help="启用可选模块：knowledge 或 artifactSync")
     enable.add_argument("module_id")
     enable.add_argument("--set", dest="sets", action="append", default=[], help="key=value，key 沿 Schema 用 . 逐级指定")
-    disable = actions.add_parser("disable", parents=[common], help="关闭 knowledge 或 artifactSync（只去掉引用）")
+    disable = actions.add_parser("disable", parents=[common], help="关闭可选模块（只去掉入口文件中的引用）")
     disable.add_argument("module_id")
-
-    hook = commands.add_parser("hook", parents=[common], help="列出、启用或关闭插件全局钩子（globalHooks 模块）")
-    hook_actions = hook.add_subparsers(dest="action", parser_class=Parser)
-    hook_actions.add_parser("list", parents=[common], help="列出全局钩子及启用状态")
-    for name, text in (("enable", "启用全局钩子（写 modules/globalHooks.json）"), ("disable", "关闭全局钩子")):
-        action = hook_actions.add_parser(name, parents=[common], help=text)
-        action.add_argument("hook_ids", nargs="+", metavar="hook_id")
 
     doctor = commands.add_parser("doctor", parents=[common], help="修改核心配置或更新脚手架后重新生成插件")
     doctor.add_argument("--dry-run", action="store_true", help="只列出将要发生的变化，不写文件")
@@ -137,14 +130,6 @@ def run(args) -> object:
         if args.action == "disable":
             return edit.module_disable(root, args.module_id)
         raise UsageError("用法：autobiz-plugin module list|enable|disable …")
-    if args.command == "hook":
-        from scaffold.commands import edit
-
-        if args.action == "list":
-            return edit.hook_list(root)
-        if args.action in ("enable", "disable"):
-            return edit.hook_toggle(root, args.hook_ids, enable=args.action == "enable")
-        raise UsageError("用法：autobiz-plugin hook list|enable|disable …")
     if args.command == "doctor":
         from scaffold.commands.doctor import doctor
 

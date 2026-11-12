@@ -1,7 +1,7 @@
 {
   "id": "performance-check",
   "title": "前端性能检查",
-  "description": "编码节点完成（code_done）前，对工作区 git diff 中变动的前端文件执行 7 条性能规则，发现问题就拦截",
+  "description": "节点 code 推进到 code_done 前，按 7 条前端性能规则检查工作区 git diff 中改动的 .js/.ts/.vue 等文件，有问题就拦下；编码节点的 id 不是 code 时不会触发",
   "files": ["performance_checker.py"],
   "entries": {
     "PreToolUse": [

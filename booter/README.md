@@ -6,7 +6,7 @@
 
 | 目录 | 内容 |
 |---|---|
-| `scaffold/` | CLI 与构建流水线（Python 包名仍为 `scaffold`）：`lib/` 公共基础，`build/` 流水线，`commands/` 各子命令，`modules/` 五个模块包（其中 `global_hooks/hooks/` 是插件全局钩子目录，每个钩子一个 `hook.json` 加脚本，加目录即可新增），`wizard.py` 初始化向导，`host.py` 模拟 DevClaw |
+| `scaffold/` | CLI 与构建流水线（Python 包名仍为 `scaffold`）：`lib/` 公共基础，`build/` 流水线，`commands/` 各子命令，`modules/` 五个模块包（每个模块包带一份填写说明 `guide.md`；其中 `global_hooks/hooks/` 是全局钩子目录，每个钩子一个 `hook.json` 加脚本，加目录即可新增），`wizard.py` 初始化向导，`host.py` 模拟 DevClaw |
 | `runtime/` | 运行框架模板：随生成的插件发布的 `query`/`engine` 内部库、宿主入口、会话入口和状态变更入口 |
 | `schemas/` | 核心配置的 JSON Schema（拷进插件的 `.scaffold/` 供 IDE 补全），以及宿主命令输出结构 `host/outputs.schema.json` |
 | `examples/` | `minimal/` 示例的核心配置和金样输出 `output/` |
@@ -28,7 +28,6 @@ python3 dist/autobiz-plugin.pyz -C ../../my-plugin add skills --from ../../my-sk
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin add skill doc-review --from ../../other-skills/doc-review  # 单独导入一个技能
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin add node review --name 评审 --skill doc-review --stage dev --seq 5 --output REVIEW.md
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin module enable artifactSync --set allowedFrom=plan:done
-python3 dist/autobiz-plugin.pyz -C ../../my-plugin hook enable secrets-check performance-check  # 启用插件全局钩子（写 modules/globalHooks.json）；hook list 查看全部
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin doctor     # 改了核心配置或更新脚手架后重新生成
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin check      # lint + 技能内容 + 漂移 + 契约测试
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin simulate   # 在临时目录中按宿主的方式走一遍流程

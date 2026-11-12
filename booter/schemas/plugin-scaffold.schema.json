@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.input.v1",
   "title": "AutoBiz 插件脚手架入口文件 v1（plugin.scaffold.json）",
-  "description": "插件基础信息、目录布局，以及对核心流程和各模块配置文件的引用。核心流程见 workflow.schema.json，模块配置见 modules/*.schema.json。语义校验见 input-config.md §7，Schema 只负责结构与取值范围。",
+  "description": "插件基础信息、目录布局，以及对核心流程和各模块配置文件的引用。核心流程见 workflow.schema.json，模块配置见 modules/*.schema.json。这里只检查结构和取值范围，其余规则由 autobiz-plugin lint 检查。",
   "type": "object",
   "additionalProperties": false,
   "required": ["scaffoldVersion", "plugin"],
@@ -19,13 +19,13 @@
     "modules": {
       "type": "object",
       "additionalProperties": false,
-      "description": "模块配置文件引用。board、session 不引用时全部取默认值；knowledge、artifactSync、globalHooks 引用即启用，不引用即不启用。",
+      "description": "模块配置文件引用。board、session 始终启用，不引用时全部取默认值；knowledge、artifactSync 是可选模块，引用即启用。",
       "properties": {
         "board": { "$ref": "#/definitions/fileRef", "description": "看板模块配置，建议 ./modules/board.json。" },
-        "session": { "$ref": "#/definitions/fileRef", "description": "会话与 Agent 配置，建议 ./modules/session.json。" },
+        "session": { "$ref": "#/definitions/fileRef", "description": "会话与运行策略配置，建议 ./modules/session.json。" },
         "knowledge": { "$ref": "#/definitions/fileRef", "description": "知识模块配置，建议 ./modules/knowledge.json。" },
         "artifactSync": { "$ref": "#/definitions/fileRef", "description": "产物同步模块配置，建议 ./modules/artifactSync.json。" },
-        "globalHooks": { "$ref": "#/definitions/fileRef", "description": "插件全局钩子模块配置，建议 ./modules/globalHooks.json。" }
+        "globalHooks": { "$ref": "#/definitions/fileRef", "description": "兼容已有插件的全局钩子配置。" }
       }
     }
   },
@@ -45,28 +45,30 @@
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$",
           "maxLength": 64,
-          "description": "插件稳定 ID，只含英文字母、数字、短横线和下划线：state.json.pluginId 与安装目录名相同。发布后不可修改，否则已有项目的状态会被拒绝读取。"
+          "description": "新插件以 AutoBizDevOps_ 开头。插件稳定 ID 只含英文字母、数字、短横线和下划线：state.json.pluginId 与安装目录名相同。发布后不可修改，否则已有项目的状态会被拒绝读取。"
         },
-        "name": { "$ref": "#/definitions/nonEmpty", "description": "根 plugin.json.name（DevClaw 沿用的展示名，可含大写）。" },
+        "name": { "$ref": "#/definitions/nonEmpty", "description": "插件在 DevClaw 中的显示名称。新插件以 AutoBizDevOps_ 开头。" },
         "version": {
           "type": "string",
-          "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$"
+          "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$",
+          "description": "插件版本，例如 0.1.0。package 默认递增末位版本号。"
         },
-        "description": { "$ref": "#/definitions/nonEmpty" },
+        "description": { "$ref": "#/definitions/nonEmpty", "description": "一句话说明插件的用途。" },
         "author": {
           "type": "object",
           "additionalProperties": false,
           "required": ["name"],
+          "description": "插件作者信息。填写 author 时需要提供 name。",
           "properties": {
-            "name": { "type": "string" },
-            "email": { "type": "string" },
-            "url": { "type": "string" }
+            "name": { "type": "string", "description": "作者姓名或团队名。" },
+            "email": { "type": "string", "description": "作者的联系邮箱。" },
+            "url": { "type": "string", "description": "作者的主页地址。" }
           }
         },
-        "homepage": { "type": "string" },
-        "repository": { "type": "string" },
-        "license": { "type": "string" },
-        "keywords": { "type": "array", "items": { "type": "string" } },
+        "homepage": { "type": "string", "description": "插件主页地址。" },
+        "repository": { "type": "string", "description": "插件源码仓库地址。" },
+        "license": { "type": "string", "description": "插件使用的许可证名称。" },
+        "keywords": { "type": "array", "items": { "type": "string" }, "description": "描述插件用途的关键词列表。" },
         "mcpServers": { "type": "string", "pattern": "^\\./", "description": "透传到清单 mcpServers，例如 ./.mcp.json；文件由开发者维护。" },
         "hooks": { "type": "string", "pattern": "^\\./", "description": "透传到根 plugin.json.hooks，例如 ./hooks/hooks.json；文件由开发者维护。" }
       }

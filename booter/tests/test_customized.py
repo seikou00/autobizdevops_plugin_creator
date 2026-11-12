@@ -8,10 +8,15 @@ import json
 import unittest
 import zipfile
 
+from scaffold.build import customize
+from scaffold.lib import fsio
 from tests.helpers import cli, new_from_example
 
 BOARD = "runtime/config/board.json"
 CONFIG = "board_core/board_config.json"
+RUNTIME = "runtime/config/runtime.json"
+MANIFEST = "runtime/build-manifest.json"
+RELEASE_ID = "AutoBizDevOps_doc-review"
 TODO = "[TODO: 做什么；在什么情况下使用]"
 TIP = "nodes.biz[draft].nextAction.not_started.dialogTips"
 
@@ -75,9 +80,9 @@ class CustomizedTextTest(unittest.TestCase):
         code, payload = cli("-C", str(root), "package")
         self.assertEqual(code, 0, payload)
         with zipfile.ZipFile(root / payload["package"]["path"]) as archive:
-            packed = json.loads(archive.read("doc-review/plugin.json"))
-            board = json.loads(archive.read(f"doc-review/{BOARD}"))
-            config = json.loads(archive.read(f"doc-review/{CONFIG}"))
+            packed = json.loads(archive.read(f"{RELEASE_ID}/plugin.json"))
+            board = json.loads(archive.read(f"{RELEASE_ID}/{BOARD}"))
+            config = json.loads(archive.read(f"{RELEASE_ID}/{CONFIG}"))
         self.assertEqual((packed["version"], packed["description"]), ("0.1.1", "资深开发者改过的描述"))
         self.assertEqual(board["nodes"]["biz"][0]["nextAction"]["not_started"]["dialogTips"], "先写一版草稿。")
         self.assertEqual(board["stateLabels"]["in_progress"], "处理中")
@@ -88,6 +93,36 @@ class CustomizedTextTest(unittest.TestCase):
         self.assertEqual(code, 0, payload)
         self.assertEqual(payload["written"], [])
         self.assertEqual(cli("-C", str(root), "check")[0], 0)
+
+    def test_package_prefixes_edited_name_and_legacy_id_with_or_without_bump(self):
+        root = self.plugin()
+        plugin = load(root, "plugin.json")
+        manifest = load(root, MANIFEST)
+        record = manifest["files"]["plugin.json"]
+        record["structure"] = customize.structure("plugin.json", plugin, exclude=("name",))
+        del record["texts"]["name"]
+        save(root, MANIFEST, manifest)
+        plugin["name"] = "手改名称"
+        save(root, "plugin.json", plugin)
+
+        for bump, version in (("none", "0.1.0"), ("patch", "0.1.1")):
+            with self.subTest(bump=bump):
+                code, payload = cli("-C", str(root), "package", "--bump", bump)
+                self.assertEqual(code, 0, payload)
+                path = payload["package"]["path"]
+                self.assertEqual(path, f"dist/{RELEASE_ID}-{version}.zip")
+                with zipfile.ZipFile(root / path) as archive:
+                    packed = archive.read(f"{RELEASE_ID}/plugin.json")
+                    runtime = archive.read(f"{RELEASE_ID}/{RUNTIME}")
+                    manifest = json.loads(archive.read(f"{RELEASE_ID}/{MANIFEST}"))
+                self.assertEqual(json.loads(packed)["name"], "AutoBizDevOps_手改名称")
+                self.assertEqual(json.loads(packed)["version"], version)
+                self.assertEqual(json.loads(runtime)["pluginId"], RELEASE_ID)
+                self.assertEqual(manifest["pluginId"], RELEASE_ID)
+                self.assertEqual(manifest["files"]["plugin.json"]["sha256"], fsio.digest(packed))
+                self.assertEqual(manifest["files"][RUNTIME]["sha256"], fsio.digest(runtime))
+                self.assertEqual(load(root, "plugin.json")["name"], "手改名称")
+                self.assertEqual(load(root, RUNTIME)["pluginId"], "doc-review")
 
     def test_core_changes_still_flow_into_the_file(self):
         root = self.plugin()

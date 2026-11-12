@@ -12,7 +12,7 @@ from pathlib import Path
 from scaffold.commands import CommandResult
 from scaffold.commands.check import frontmatter_issues, legacy_refs
 from scaffold.commands.doctor import doctor
-from scaffold.build.load import ENTRY, MODULE_KEYS, rel_path
+from scaffold.build.load import ENTRY, MODULE_KEYS, PUBLIC_MODULE_KEYS, rel_path
 from scaffold.build.manifest import read_manifest
 from scaffold.lib import derive, fsio, jsonedit, jsonschema, skillmd
 from scaffold.lib.issues import UsageError, warning
@@ -297,16 +297,20 @@ def module_list(root: Path) -> CommandResult:
     from scaffold.modules import discover
 
     tree = Tree(root)
-    _, entry = entry_of(tree)
+    # 不在插件目录中时也能列出全部模块（新建插件前选择用），可选模块的启用状态都是 false
+    entry = entry_of(tree)[1] if tree.is_file(ENTRY) else {}
     referenced = entry.get("modules") or {}
     modules, lines = [], []
-    for module_id, spec in discover().items():
+    specs = discover()
+    for module_id in PUBLIC_MODULE_KEYS:
+        spec = specs[module_id]
         enabled = spec.core or module_id in referenced
         file = _module_rel(entry, module_id) if module_id in referenced else None
-        modules.append({"id": module_id, "title": spec.title, "version": spec.version, "core": spec.core,
-                        "enabled": enabled, "file": file})
+        modules.append({"id": module_id, "title": spec.title, "description": spec.description, "version": spec.version,
+                        "core": spec.core, "enabled": enabled, "file": file, "guide": f"{spec.package}/guide.md"})
         state = "始终启用" if spec.core else ("已启用" if enabled else "未启用")
-        lines.append(f"{module_id:<13} {spec.version:<8} {state:<6} {spec.title}" + (f"（{file}）" if file else ""))
+        lines.append(f"{module_id:<13} {spec.version:<8} {state:<6} {spec.title}：{spec.description}"
+                     + (f"（{file}）" if file else ""))
     return CommandResult(Report(), extra={"modules": modules}, text="\n".join(lines))
 
 
@@ -380,8 +384,8 @@ def _artifact_skeleton(tree: Tree, entry: dict) -> dict:
 def module_enable(root: Path, module_id: str, sets: list) -> CommandResult:
     from scaffold.modules import discover
 
-    if module_id not in MODULE_KEYS:
-        raise UsageError(f"没有模块 {module_id}，可用：{'、'.join(MODULE_KEYS)}")
+    if module_id not in PUBLIC_MODULE_KEYS:
+        raise UsageError(f"没有模块 {module_id}，可用：{'、'.join(PUBLIC_MODULE_KEYS)}")
     if discover()[module_id].core:
         raise UsageError(f"{module_id} 是核心模块，始终启用；要修改它的配置请直接编辑 modules/{module_id}.json")
     tree = Tree(root)
@@ -396,8 +400,6 @@ def module_enable(root: Path, module_id: str, sets: list) -> CommandResult:
         skeleton = {"$schema": f"../.scaffold/modules/{module_id}.schema.json"}
         if module_id == "artifactSync":
             skeleton["artifacts"] = _artifact_skeleton(tree, entry)
-        if module_id == "globalHooks":
-            skeleton["hooks"] = []
         text = jsonedit.render(skeleton, "", "  ", "\n") + "\n"
     else:
         text = fsio.decode(data)
@@ -418,7 +420,7 @@ def module_disable(root: Path, module_id: str) -> CommandResult:
     from scaffold.modules import discover
 
     if module_id not in MODULE_KEYS:
-        raise UsageError(f"没有模块 {module_id}，可用：{'、'.join(MODULE_KEYS)}")
+        raise UsageError(f"没有模块 {module_id}，可用：{'、'.join(PUBLIC_MODULE_KEYS)}")
     if discover()[module_id].core:
         raise UsageError(f"{module_id} 是核心模块，不能关闭")
     tree = Tree(root)
@@ -427,55 +429,3 @@ def module_disable(root: Path, module_id: str) -> CommandResult:
         return CommandResult(Report(), text=f"{module_id} 本来就没有启用")
     entry_text = jsonedit.remove_member(entry_text, "/modules", module_id)
     return doctor(root, overlay={ENTRY: entry_text.encode("utf-8")})
-
-
-# —— hook list / enable / disable（globalHooks 模块的便捷入口）——
-
-def _global_hooks(tree: Tree, entry: dict) -> list:
-    if "globalHooks" not in (entry.get("modules") or {}):
-        return []
-    data = tree.read_bytes(_module_rel(entry, "globalHooks"))
-    try:
-        value = fsio.parse_json(data) if data is not None else {}
-    except fsio.JsonError:
-        return []
-    return list(value.get("hooks") or []) if isinstance(value, dict) else []
-
-
-def hook_list(root: Path) -> CommandResult:
-    from scaffold.lib.issues import Report
-    from scaffold.modules.global_hooks.catalog import catalog
-
-    tree = Tree(root)
-    # 不在插件目录中时也能列出全部钩子（新建插件前选择用），启用状态都是 false
-    enabled = _global_hooks(tree, entry_of(tree)[1]) if tree.is_file(ENTRY) else []
-    hooks, lines = [], []
-    for hook_id, spec in catalog().items():
-        hooks.append({"id": hook_id, "title": spec.title, "description": spec.description,
-                      "enabled": hook_id in enabled})
-        lines.append(f"{hook_id:<18} {'已启用' if hook_id in enabled else '未启用':<6} {spec.title}：{spec.description}")
-    lines.append("产物检查钩子 artifact_guard 始终启用，不在此列；启用的钩子记在 modules/globalHooks.json")
-    return CommandResult(Report(), extra={"hooks": hooks}, text="\n".join(lines))
-
-
-def hook_toggle(root: Path, hook_ids: list, *, enable: bool) -> CommandResult:
-    """在 modules/globalHooks.json 的 hooks 中加入或去掉钩子：模块未启用时先启用，去光了就关闭模块。"""
-    from scaffold.lib.issues import Report
-    from scaffold.modules.global_hooks.catalog import catalog
-
-    available = catalog()
-    unknown = [hook_id for hook_id in hook_ids if hook_id not in available]
-    if unknown:
-        raise UsageError(f"没有全局钩子 {'、'.join(unknown)}，可用：{'、'.join(available)}")
-    tree = Tree(root)
-    _, entry = entry_of(tree)
-    current = _global_hooks(tree, entry)
-    if enable:
-        updated = current + [hook_id for hook_id in dict.fromkeys(hook_ids) if hook_id not in current]
-    else:
-        updated = [hook_id for hook_id in current if hook_id not in hook_ids]
-    if updated == current:
-        return CommandResult(Report(), text="全局钩子没有变化")
-    if not updated:
-        return module_disable(root, "globalHooks")
-    return module_enable(root, "globalHooks", ["hooks=" + json.dumps(updated)])

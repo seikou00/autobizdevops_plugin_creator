@@ -20,7 +20,7 @@ from scaffold.lib import fsio
 from scaffold.lib.issues import Issue, error, warning
 
 TEXT_FIELDS = {
-    "plugin.json": ("description",),
+    "plugin.json": ("name", "description"),
     "board_core/board_config.json": (
         "inspectCommands.*.dialog_tips",
         "inspectCommands.*.system_prompt_inject",
@@ -35,7 +35,7 @@ TEXT_FIELDS = {
     ),
 }
 EDITABLE_HINT = {
-    "plugin.json": "description",
+    "plugin.json": "name、description",
     "board_core/board_config.json": "各平台的 dialog_tips、system_prompt_inject",
     "runtime/config/board.json": "template 的 label、description，stateLabels，节点的 description 和 nextAction 中的 userMessage、dialogTips",
 }
@@ -74,11 +74,12 @@ def texts(path: str, value) -> dict:
     return {name: parent[key] for name, (parent, key) in slots(path, value).items()}
 
 
-def structure(path: str, value) -> str:
+def structure(path: str, value, *, exclude: tuple = ()) -> str:
     """去掉文字字段之后的摘要：文字字段的值换成空串，字段本身仍算结构。"""
     stripped = copy.deepcopy(value)
-    for parent, key in slots(path, stripped).values():
-        parent[key] = ""
+    for name, (parent, key) in slots(path, stripped).items():
+        if name not in exclude:
+            parent[key] = ""
     return fsio.digest(fsio.dump_json(stripped))
 
 
@@ -95,6 +96,15 @@ def edited(path: str, value, record: dict) -> dict:
     """value 中被开发者改过的文字字段：与 record.texts 记录的生成值不同的字段 → 当前值。"""
     base = record.get("texts") or {}
     return {name: text for name, text in texts(path, value).items() if name in base and fsio.digest(text) != base[name]}
+
+
+def plugin_name_record(record: dict, generated: dict) -> dict:
+    """识别把 name 记为结构字段的旧清单，以原生成名称为自定义基线。"""
+    if ("name" in (record.get("texts") or {})
+            or record.get("structure") != structure("plugin.json", generated, exclude=("name",))):
+        return record
+    return {**record, "structure": structure("plugin.json", generated),
+            "texts": {**(record.get("texts") or {}), "name": fsio.digest(generated["name"])}}
 
 
 def merge(path: str, generated_data: bytes, disk: bytes | None, record: dict | None):
@@ -114,6 +124,8 @@ def merge(path: str, generated_data: bytes, disk: bytes | None, record: dict | N
                             hint="修好这个文件；要恢复生成内容就删掉它再执行 autobiz-plugin doctor"))
         return generated_data, extra, issues
     current = fsio.parse_json(disk)
+    if path == "plugin.json":
+        record = plugin_name_record(record, {**current, "name": generated["name"]})
     if record.get("structure") and structure(path, current) != record["structure"]:
         issues.append(warning("DRIFT_GENERATED", f"{path} 中可改文字以外的改动已按核心配置重写", file=path,
                               hint=f"这个文件只能改：{EDITABLE_HINT[path]}"))

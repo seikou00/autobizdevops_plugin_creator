@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.module.knowledge.v1",
   "title": "AutoBiz 知识模块配置 v1（modules/knowledge.json）",
-  "description": "知识模块：清单解析、发布单元查询、知识组装；可选由插件拉取知识仓库。入口文件引用此文件即表示启用知识模块。语义校验见 input-config.md §7。",
+  "description": "知识来源、清单路径和会话组装配置。通过入口文件的 modules.knowledge 引用启用。",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -11,28 +11,29 @@
       "type": "object",
       "additionalProperties": false,
       "default": {},
-      "description": "清单解析方式。",
+      "description": "知识清单。",
       "properties": {
-        "format": { "enum": ["agents-manifest-v1"], "default": "agents-manifest-v1", "description": "v1 只支持 agents.manifest.json 格式。" },
-        "path": { "$ref": "#/definitions/relativeDir", "default": "agents.manifest.json", "description": "清单文件，相对知识目录 sys/。" }
+        "format": { "enum": ["agents-manifest-v1"], "default": "agents-manifest-v1", "description": "清单格式，目前只支持 agents-manifest-v1（agents.manifest.json）。" },
+        "path": { "$ref": "#/definitions/relativeDir", "default": "agents.manifest.json", "description": "清单文件相对知识目录的路径，默认是 agents.manifest.json。" }
       }
     },
     "assembly": {
       "type": "object",
       "additionalProperties": false,
       "default": {},
+      "description": "知识组装。",
       "properties": {
-        "enabled": { "type": "boolean", "default": true },
+        "enabled": { "type": "boolean", "default": true, "description": "false 时会话不带知识，只保留发布单元的选择。" },
         "assembler": {
           "enum": ["plugin", "devclaw"],
           "default": "plugin",
-          "description": "组装方。plugin：插件执行组装脚本 runtime/knowledge/render_collected_session_context.py（插件可以直接替换这个文件），结果并入 sessionContext；devclaw：由 DevClaw 组装，插件只提供清单解析结果。"
+          "description": "谁把知识拼进上下文。plugin：插件的组装脚本 runtime/knowledge/render_collected_session_context.py 按所选发布单元取知识（可以整个替换这个文件）；devclaw：插件只列出发布单元，知识由 DevClaw 组装。"
         },
         "timeoutSec": {
           "type": "integer",
           "minimum": 1,
           "default": 30,
-          "description": "组装脚本的超时秒数；超时后本次会话不含知识段。"
+          "description": "组装脚本的超时秒数；超时后这次会话不带知识。"
         }
       }
     },
@@ -40,12 +41,12 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["url"],
-      "description": "可选：由插件拉取知识仓库，生成 sync_knowledge.py 与 pull_knowledge。",
+      "description": "可选：知识从 Git 仓库拉取。DevClaw 运行时调用插件的 pull_knowledge 把仓库拉到 sys/。知识随插件打包（放在 sys/）或由 DevClaw 提供时，删掉整个 source。",
       "properties": {
-        "type": { "const": "git", "default": "git" },
-        "url": { "type": "string", "minLength": 1 },
-        "sshUrl": { "type": "string", "default": "" },
-        "ref": { "type": "string", "default": "master" }
+        "type": { "const": "git", "default": "git", "description": "目前只支持 git。" },
+        "url": { "type": "string", "minLength": 1, "description": "知识仓库的 HTTPS 地址。保留 source 时必填。" },
+        "sshUrl": { "type": "string", "default": "", "description": "可选，HTTPS 克隆失败时改用的 SSH 地址。" },
+        "ref": { "type": "string", "default": "master", "description": "分支、标签或 commit。" }
       }
     }
   },

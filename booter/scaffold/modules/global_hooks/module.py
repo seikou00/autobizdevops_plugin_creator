@@ -1,4 +1,4 @@
-"""插件全局钩子模块（D62）：按 modules/globalHooks.json 的 hooks 启用 hooks/ 下的公共钩子。
+"""全局钩子模块（D62）：按 modules/globalHooks.json 的 hooks 启用 hooks/ 下的公共钩子。
 
 每个钩子的脚本拷到插件根目录的 hooks/<id>/（module），条目通过 Contribution.hooks 合并进 hooks/hooks.json：
 排在框架的产物检查钩子之后、开发者 plugin.hooks 的条目之前，按 hooks 中列出的顺序（interfaces.md §4.8）。

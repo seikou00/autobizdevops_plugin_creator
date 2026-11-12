@@ -6,13 +6,16 @@ import re
 import zipfile
 from pathlib import Path
 
-from scaffold.build import emit
+from scaffold.build import customize, emit
+from scaffold.build.framework import plugin_manifest
 from scaffold.build.manifest import MANIFEST, read_manifest
 from scaffold.commands import CommandResult
-from scaffold.lib import fsio, jsonedit
+from scaffold.lib import derive, fsio, jsonedit, jsonschema
 from scaffold.lib.tree import Tree
 
 ENTRY = "plugin.scaffold.json"
+PLUGIN_MANIFEST = "plugin.json"
+RUNTIME_CONFIG = "runtime/config/runtime.json"
 BUMPS = ("patch", "minor", "major", "none")
 
 RECORDED_ROOTS = ("plugin.json", "board_core/", "runtime/")
@@ -95,7 +98,34 @@ def bump_version(root: Path, bump: str):
     return old, new, written, result.report
 
 
-def write_zip(root: Path, plugin_id: str, files: list, output: Path) -> None:
+def release_tree(tree: Tree, plugin_id: str, manifest: dict, source_plugin: dict) -> Tree:
+    """发布包内统一身份，并同步更新归档文件的摘要。"""
+    overrides = {}
+    plugin_data = tree.read_bytes(PLUGIN_MANIFEST)
+    plugin = fsio.parse_json(plugin_data)
+    name = derive.prefixed_plugin_field(plugin["name"])
+    if name != plugin["name"]:
+        plugin["name"] = name
+        plugin_data = overrides[PLUGIN_MANIFEST] = fsio.dump_json(plugin)
+    record = customize.plugin_name_record(manifest["files"][PLUGIN_MANIFEST], plugin_manifest(source_plugin))
+    manifest["files"][PLUGIN_MANIFEST] = record
+    record["sha256"] = fsio.digest(plugin_data)
+    edits = customize.edited(PLUGIN_MANIFEST, plugin, record)
+    if edits:
+        record["customized"] = {key: fsio.digest(value) for key, value in sorted(edits.items())}
+    else:
+        record.pop("customized", None)
+    runtime = fsio.parse_json(tree.read_bytes(RUNTIME_CONFIG))
+    if runtime.get("pluginId") != plugin_id:
+        runtime["pluginId"] = plugin_id
+        overrides[RUNTIME_CONFIG] = fsio.dump_json(runtime)
+        manifest["files"][RUNTIME_CONFIG]["sha256"] = fsio.digest(overrides[RUNTIME_CONFIG])
+    manifest["pluginId"] = plugin_id
+    overrides[MANIFEST] = fsio.dump_json(manifest)
+    return Tree(tree.root, overrides)
+
+
+def write_zip(tree: Tree, plugin_id: str, files: list, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_name(output.name + ".tmp")
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -103,7 +133,7 @@ def write_zip(root: Path, plugin_id: str, files: list, output: Path) -> None:
             info = zipfile.ZipInfo(f"{plugin_id}/{rel}", date_time=FIXED_TIME)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, (root / rel).read_bytes())
+            archive.writestr(info, tree.read_bytes(rel))
     temporary.replace(output)
 
 
@@ -113,6 +143,23 @@ def package(root: Path, *, output: Path | None = None, bump: str = "patch") -> C
     result = check(root, package_mode=True)
     if result.report.failed():
         return CommandResult(result.report)
+    tree = Tree(root)
+    entry = fsio.parse_json(tree.read_bytes(ENTRY))
+    source_id = entry["plugin"]["id"]
+    plugin_id = derive.prefixed_plugin_field(source_id)
+    id_schema = jsonschema.load_schema("plugin-scaffold.schema.json")["definitions"]["plugin"]["properties"]["id"]
+    for _, reason in jsonschema.validate(plugin_id, id_schema):
+        result.report.add("error", "PACKAGE_PLUGIN_ID", f"加上 {derive.PLUGIN_PREFIX} 后的插件 ID 无效：{reason}",
+                          file=ENTRY, pointer="/plugin/id")
+    plugin_name = fsio.parse_json(tree.read_bytes(PLUGIN_MANIFEST)).get("name")
+    if not isinstance(plugin_name, str) or not plugin_name.strip():
+        result.report.add("error", "PACKAGE_PLUGIN_NAME", "插件名称不能为空", file=PLUGIN_MANIFEST, pointer="/name")
+    if result.report.failed():
+        return CommandResult(result.report)
+    if plugin_id != source_id:
+        result.report.add("warning", "PACKAGE_PLUGIN_ID_CHANGED", f"发布包使用插件 ID {plugin_id}。"
+                          f"已有项目的状态若记录了旧 ID {source_id}，需迁移后才能用新版读写",
+                          file=ENTRY, pointer="/plugin/id")
     written = []
     version = None
     if bump != "none":
@@ -132,9 +179,9 @@ def package(root: Path, *, output: Path | None = None, bump: str = "patch") -> C
     files, skipped = collect(root, entry, manifest, knowledge_enabled="knowledge" in modules,
                              knowledge_source=knowledge_source)
     plugin = entry["plugin"]
-    target = output or (root / "dist" / f"{plugin['id']}-{plugin['version']}.zip")
+    target = output or (root / "dist" / f"{plugin_id}-{plugin['version']}.zip")
     target = target if target.is_absolute() else Path.cwd() / target
-    write_zip(root, plugin["id"], files, target)
+    write_zip(release_tree(tree, plugin_id, manifest, plugin), plugin_id, files, target)
     try:
         shown = target.relative_to(root).as_posix()
     except ValueError:

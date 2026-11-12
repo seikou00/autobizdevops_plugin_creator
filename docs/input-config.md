@@ -12,7 +12,7 @@
 | 核心流程 | `workflow.json` | 按 `biz`、`dev`、`ops` 分组的节点、编排顺序 `seq`、技能绑定、输出、终态节点 | 创建配置骨架，辅助选择已有技能 | 编译后的流程契约及状态规则 `runtime/config/flow.json` |
 | 技能资源 | `skills/<skill>/` 或 `skills/<分组>/<skill>/` | 技能正文、模板、执行脚本、业务校验器；可以不提供 | 导入已有资源，或生成空白 `SKILL.md` | 开头带状态维护片段的交付技能及资源（output-spec.md §6.1） |
 | 看板模块配置 | `modules/board.json` | 目标平台、展示设置、可选能力 | 生成接入脚本和平台命令映射 | 看板 adapter `runtime/adapters/*`、宿主接口 `board_core/board_config.json`、`board_core/modules.json`，看板文案 `runtime/config/board.json` |
-| 会话与 Agent 配置 | `modules/session.json`；`agents/` | 运行策略、外挂资源 | 提供默认会话入口及配置骨架 | 会话模块 `runtime/session/*`、策略配置 `runtime/config/session.json`、资源引用 |
+| 会话与运行策略 | `modules/session.json`、`agents/` | 运行策略、自定义子代理 | 提供默认会话入口及配置骨架 | 会话模块 `runtime/session/*`、策略配置 `runtime/config/session.json`、资源引用 |
 | 知识模块配置 | `modules/knowledge.json` | 清单解析方式、组装方选择 | 引导启用和选择 | `runtime/knowledge/*`：清单解析、发布单元查询、内置组装脚本 |
 | 产物同步模块配置 | `modules/artifactSync.json` | 允许同步的阶段、要上传的产物 | 引导启用 | 同步技能 `skills/<skillName>/`、看板同步入口 `artifact_sync` |
 | 自定义扩展 | `hooks/` 等 | 开发者自己的 hooks 等资源 | 创建对应目录 | 原样交付的扩展资源 |
@@ -217,7 +217,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 ├── workflow.json            # 核心流程（§2）
 └── modules/
     ├── board.json           # 看板模块（可选；不引用时全部取默认值）
-    ├── session.json         # 会话与 Agent（可选；不引用时全部取默认值）
+    ├── session.json         # 会话与运行策略（省略时使用默认值）
     └── knowledge.json       # 知识模块（可选；不引用即不启用）
 ```
 
@@ -247,10 +247,10 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | 键 | 不引用时 | 配置内容 |
 |---|---|---|
 | `board` | 全部取默认值 | 看板模块：目标平台、展示设置、可选能力（§4.1） |
-| `session` | 全部取默认值 | 会话与 Agent：运行策略（§4.2） |
+| `session` | 全部取默认值 | 会话与运行策略（§4.2） |
 | `knowledge` | 不启用知识模块 | 清单解析、知识组装、可选的知识仓库同步（§4.3）。引用即启用 |
 | `artifactSync` | 不启用产物同步 | 上传产物到外部服务、看板上的同步入口（§4.5）。引用即启用 |
-| `globalHooks` | 只有产物检查钩子 | 插件全局钩子：启用脚手架自带的公共宿主钩子（§4.6）。引用即启用 |
+| `globalHooks` | 只有产物检查钩子 | 全局钩子模块暂停开放。构建兼容已有插件的配置（§4.6） |
 
 引用规则：
 
@@ -333,7 +333,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `nextAction.userMessage` | `请针对${projectCode}项目发起知识沉淀，这个是 token：${leanToken}` |
 | `nextAction.dialogTips` | `发起知识沉淀` |
 
-### 4.2 modules/session.json（会话与 Agent）
+### 4.2 modules/session.json（会话与运行策略）
 
 ```json
 {
@@ -439,7 +439,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 
 ### 4.6 modules/globalHooks.json（插件全局钩子模块）
 
-启用脚手架自带的公共宿主钩子（D62）。入口文件的 `modules.globalHooks` 引用了这个文件即表示启用，不引用即不启用。
+全局钩子模块暂停开放。本节说明已有插件中 `modules.globalHooks` 引用的配置文件。
 
 ```json
 {
@@ -450,13 +450,12 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 
 | 字段 | 必填 | 说明 |
 |---|---|---|
-| `hooks` | 是 | 要启用的钩子 id，按顺序写进 `hooks/hooks.json`。可用的钩子用 `autobiz-plugin hook list` 查看，目前有 `secrets-check`（明文密码检查）和 `performance-check`（前端性能检查），说明见 interfaces.md §4.8 |
+| `hooks` | 是 | 要启用的钩子 id，按顺序写进 `hooks/hooks.json`。包括 `secrets-check`（明文密码检查）和 `performance-check`（前端性能检查），说明见 interfaces.md §4.8 |
 
 - 生成：每个钩子的脚本拷到插件根目录的 `hooks/<id>/`（module），条目写进 `hooks/hooks.json`：产物检查钩子在最前，其次是这里列出的钩子，开发者在同一文件中自己写的条目在最后（interfaces.md §4.7）；
 - 产物检查钩子由框架始终注册，不需要、也不能在这里列出；
 - id 不存在报 `GLOBAL_HOOK_UNKNOWN`，重复报 `GLOBAL_HOOK_DUP`；
 - 从 `hooks` 中去掉某个钩子，或关闭模块（去掉入口文件的引用）后，以前生成的脚本在 build-manifest 中标为 `inactive`，不再打包；
-- 便捷命令：`hook enable <id> …` / `hook disable <id> …` 编辑这个文件，模块未启用时先启用，`hooks` 去光后关闭模块；也可以用 `module enable globalHooks --set 'hooks=["secrets-check"]'`。
 
 ## 5. 资源目录
 
@@ -607,7 +606,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 | `MODULE_INACTIVE_FILES` | warning | 有模块已关闭，它以前生成的文件还在插件目录中（build-manifest 中标为 `inactive`）。这些文件不再生效、不会打包，可以删除（D52） |
 | `PLUGIN_ID_CHANGED` | error | `plugin.id` 与 `runtime/build-manifest.json` 中记录的不一致。确认要改时执行 `doctor --allow-id-change`（D47） |
 | `LAYOUT_CHANGED` | error | `runtime.metaRoot` 与 build-manifest 中记录的不一致：已有项目的状态会找不到。确认要改时执行 `doctor --allow-layout-change`（D47） |
-| `GLOBAL_HOOK_UNKNOWN` | error | `modules/globalHooks.json` 的 `hooks` 中的 id 不是脚手架自带的全局钩子（`autobiz-plugin hook list`，D62） |
+| `GLOBAL_HOOK_UNKNOWN` | error | `modules/globalHooks.json` 的 `hooks` 中的 id 不是脚手架自带的全局钩子（D62） |
 | `GLOBAL_HOOK_DUP` | error | `modules/globalHooks.json` 的 `hooks` 中同一个 id 出现了多次 |
 | `PLUGIN_HOOKS_INVALID` | error | `hooks/hooks.json` 的结构不对：要求“事件名 → 条目对象数组”，可以包在 `{"hooks": {…}}` 下（D61） |
 | `PLUGIN_HOOKS_PATH` | error | 入口文件的 `plugin.hooks` 不是 `./hooks/hooks.json`：钩子配置固定在这个文件（D61） |

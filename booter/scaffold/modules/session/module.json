@@ -1,7 +1,7 @@
 {
   "id": "session",
-  "title": "会话与 Agent",
-  "description": "默认会话入口与运行策略",
+  "title": "会话与运行策略",
+  "description": "会话开始时带上当前 Feature 的流程上下文，并给各节点下发运行策略（multi、solo 等）",
   "schema": "modules/session.schema.json",
   "core": true,
   "entry": "module:SessionModule"

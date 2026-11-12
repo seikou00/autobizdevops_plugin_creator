@@ -36,8 +36,8 @@ autobizdevops_plugin_creator/
     │   ├── wizard.py                    # 单元 12：初始化向导问答
     │   └── modules/                     # 单元 6、9：模块契约与四个模块包
     │       ├── __init__.py
-    │       └── board/  session/  knowledge/  artifact_sync/
-    │           └── module.json  module.py  files/
+    │       └── board/  session/  knowledge/  artifact_sync/  global_hooks/
+    │           └── module.json  module.py  guide.md  files/
     ├── runtime/                         # 单元 15：运行框架模板（随插件发布）
     ├── SKILL.md  __main__.py            # 单元 14：骨架引导技能，整个 booter/ 目录就是技能（D69）
     ├── schemas/  examples/

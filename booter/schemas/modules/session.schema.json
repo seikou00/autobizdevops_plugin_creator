@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.module.session.v1",
-  "title": "AutoBiz 会话与 Agent 配置 v1（modules/session.json）",
-  "description": "会话与 Agent：运行策略。外挂资源（agents/*.md）由策略按路径引用。不引用此文件时全部取默认值。语义校验见 input-config.md §7。",
+  "title": "AutoBiz 会话与运行策略配置 v1（modules/session.json）",
+  "description": "会话与运行策略：给各节点下发运行方式和子代理配置。始终启用；不写这个文件时所有节点都用 multi。",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -11,6 +11,7 @@
       "type": "object",
       "additionalProperties": false,
       "default": {},
+      "description": "全局默认策略和各节点的覆盖配置。",
       "properties": {
         "default": {
           "type": "object",
@@ -21,13 +22,13 @@
             "toolCustomConfig": { "$ref": "#/definitions/toolCustomConfig" }
           },
           "default": {},
-          "description": "全局默认策略。只有这里的 agentMode 有默认值 multi：节点策略与它深合并，节点不写 agentMode 时沿用这里的。"
+          "description": "所有节点的默认策略，agentMode 默认 multi。单独配置的节点与它合并，没写的字段沿用这里的。"
         },
         "nodes": {
           "type": "object",
           "additionalProperties": false,
           "default": {},
-          "description": "节点策略，按阶段 biz、dev、ops 分组；每项的 id 必须是 workflow.json 同一分组中的节点。原样写入 runtime/config/session.json，id 以外的字段即看板数据中对应节点的 runtimePolicy。",
+          "description": "单独配置的节点，按 biz、dev、ops 分组，组要与节点在 workflow.json 中所在的组一致；只写需要单独配置的节点。",
           "properties": {
             "biz": { "$ref": "#/definitions/stagePolicies" },
             "dev": { "$ref": "#/definitions/stagePolicies" },
@@ -38,16 +39,18 @@
     }
   },
   "definitions": {
-    "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "workflow.json 中的节点 id。" },
     "stagePolicies": {
       "type": "array",
       "minItems": 1,
+      "description": "本阶段需要自定义运行策略的节点。",
       "items": { "$ref": "#/definitions/nodePolicy" }
     },
     "nodePolicy": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id"],
+      "description": "单个节点的运行策略。省略的字段沿用全局默认策略。",
       "properties": {
         "id": { "$ref": "#/definitions/nodeId" },
         "agentMode": { "$ref": "#/definitions/agentMode" },
@@ -55,21 +58,23 @@
         "toolCustomConfig": { "$ref": "#/definitions/toolCustomConfig" }
       }
     },
-    "agentMode": { "enum": ["solo", "multi", "agent_team", "workflow"] },
+    "agentMode": { "enum": ["solo", "multi", "agent_team", "workflow"], "description": "运行方式，由 DevClaw 解释。" },
     "subagentConfig": {
       "type": "object",
       "additionalProperties": false,
+      "description": "子代理配置。",
       "properties": {
-        "disabledBuiltinSubagents": { "type": "array", "items": { "type": "string" } },
+        "disabledBuiltinSubagents": { "type": "array", "items": { "type": "string" }, "description": "要禁用的内置子代理名，例如 Explore、critic。" },
         "customSubagentFiles": {
           "type": "array",
+          "description": "插件自带的子代理文件，放在插件的 agents/ 下，例如 agents/explore.md；文件不存在时运行时跳过。",
           "items": { "type": "string", "pattern": "^agents/(?!.*\\.\\.)[^\\\\:]+\\.md$" }
         }
       }
     },
     "toolCustomConfig": {
       "type": "object",
-      "description": "宿主工具的定制开关，例如 { \"task\": { \"enabled\": true } }。脚手架不解释其内容，原样写入 runtimePolicy 和 agentConfig。"
+      "description": "宿主工具的开关，例如 { \"task\": { \"enabled\": true } }，原样下发给 DevClaw。"
     }
   }
 }

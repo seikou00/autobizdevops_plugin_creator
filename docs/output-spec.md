@@ -12,7 +12,7 @@
 ├── workflow.json                         # developer  核心流程（不随包发布）
 ├── modules/                              # developer  模块配置，按需存在（不随包发布）
 │   └── board.json  session.json  knowledge.json  artifactSync.json  globalHooks.json
-├── plugin.json                           # generated  插件清单（DevClaw 只读这一份）；description 可以手改（D70）
+├── plugin.json                           # generated  插件清单（DevClaw 只读这一份）；name 和 description 可以手改（D70）
 ├── board_core/                           #            DevClaw 读取的全部静态内容（§3）
 │   ├── board_config.json                 # generated  宿主命令 inspectCommands；dialog_tips、system_prompt_inject 可以手改（D70）
 │   └── modules.json                      # generated  已开启的模块与看板入口
@@ -64,7 +64,7 @@
 
 打包前，`package` 先把入口文件的 `plugin.version` 按 `--bump` 递增一位（默认 `patch`，`none` 不改），重新生成 `plugin.json` 和 build-manifest，所以每打一次包版本号加一（interfaces.md §1.1）。
 
-打包产物（`autobiz-plugin package`）是一个 zip，其中只有一个顶层目录 `<plugin.id>/`，DevClaw 由它得到安装目录名（README §9）。目录下的内容按以下规则收集（D57）：
+打包产物（`autobiz-plugin package`）是一个 zip，其中只有一个顶层目录 `<plugin.id>/`，DevClaw 由它得到安装目录名（README §9）。打包时补齐 ID 和 `plugin.json.name` 的 `AutoBizDevOps_` 前缀，`--bump none` 同样处理。发布包的运行配置和构建清单使用带前缀的 ID。手改的名称保留，前缀仅补到归档里。目录下的内容按以下规则收集（D57）：
 
 | 内容 | 规则 |
 |---|---|

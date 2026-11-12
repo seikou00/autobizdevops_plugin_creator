@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scaffold import resources
-from scaffold.build.load import MODULE_KEYS
+from scaffold.build.load import PUBLIC_MODULE_KEYS
 from scaffold.commands import CommandResult
 from scaffold.commands.doctor import doctor
 from scaffold.commands.edit import import_agents, import_skill
@@ -68,11 +68,17 @@ def apply_answers(answers: dict) -> tuple:
     if isinstance(answers.get("plugin"), dict):
         entry["plugin"] = {key: answers["plugin"][key] for key in PLUGIN_FIELDS + ("mcpServers", "hooks")
                            if key in answers["plugin"]}
+        for field in ("id", "name"):
+            value = entry["plugin"].get(field)
+            if isinstance(value, str):
+                entry["plugin"][field] = derive.prefixed_plugin_field(value)
+    if answers.get("globalHooks") is not None:
+        raise UsageError("新建插件暂不支持 globalHooks")
     if "nodes" in answers:
         if not isinstance(answers["nodes"], list) or not answers["nodes"]:
             raise UsageError("--answers 的 nodes 必须是非空数组")
         files["workflow.json"] = dump_config(workflow_from(answers["nodes"]))
-    for key in MODULE_KEYS:
+    for key in PUBLIC_MODULE_KEYS:
         if key not in answers or answers[key] is None:
             continue
         rel = f"modules/{key}.json"
@@ -150,20 +156,11 @@ SKELETON_MODULES = {
     "board": {"display": {"workflowLabel": "[TODO: 看板上的流程名称]"}},
     "session": {"policies": {"default": {"agentMode": "multi"}}},
     "knowledge": {"assembly": {"assembler": "plugin"},
-                  "source": {"type": "git", "url": "[TODO: 知识仓库 HTTPS 地址；插件不拉取知识仓库就删掉 source]",
+                  "source": {"type": "git", "url": "[TODO: 知识仓库 HTTPS 地址；知识随插件打包或由 DevClaw 提供时，删掉整个 source]",
                              "ref": "master"}},
     "artifactSync": {"allowedFrom": "[TODO: 从哪个节点完成起允许同步，写成 <节点 id>:done]",
                      "artifacts": {"[TODO: 要上传的产物路径，与 workflow.json 中的 outputs 一致]": "[TODO: 简述]"}},
 }
-
-
-def skeleton_module(key: str) -> dict:
-    """模块骨架。globalHooks 直接列出全部可用的全局钩子，用户删掉不需要的（id 不用自己查）。"""
-    if key == "globalHooks":
-        from scaffold.modules.global_hooks.catalog import catalog
-
-        return {"hooks": list(catalog())}
-    return SKELETON_MODULES[key]
 
 
 def skeleton_files(modules: list) -> dict:
@@ -171,7 +168,8 @@ def skeleton_files(modules: list) -> dict:
     from scaffold.build.framework import SCHEMA_FILES
 
     entry = {"$schema": schema_ref("plugin.scaffold.json"), "scaffoldVersion": 1,
-             "plugin": {"id": "[TODO: 插件 id，英文字母、数字、短横线和下划线，发布后不能改]", "name": "[TODO: 插件名]",
+             "plugin": {"id": f"{derive.PLUGIN_PREFIX}[TODO: 插件 ID 后缀，仅英文字母、数字、短横线和下划线]",
+                        "name": f"{derive.PLUGIN_PREFIX}[TODO: 插件名后缀]",
                         "version": "0.1.0", "description": "[TODO: 一句话描述]"},
              "workflow": "./workflow.json"}
     if modules:
@@ -181,7 +179,7 @@ def skeleton_files(modules: list) -> dict:
     files = {"plugin.scaffold.json": dump_config(entry), "workflow.json": dump_config(workflow)}
     for key in modules:
         rel = f"modules/{key}.json"
-        files[rel] = dump_config({"$schema": schema_ref(rel), **skeleton_module(key)})
+        files[rel] = dump_config({"$schema": schema_ref(rel), **SKELETON_MODULES[key]})
     for name in SCHEMA_FILES:
         files[f".scaffold/{name}"] = resources.read_bytes(f"schemas/{name}")
     return files
@@ -190,10 +188,10 @@ def skeleton_files(modules: list) -> dict:
 def skeleton(target: Path, modules: list) -> CommandResult:
     from scaffold.lib.issues import Report
 
-    unknown = [key for key in modules if key not in MODULE_KEYS]
+    unknown = [key for key in modules if key not in PUBLIC_MODULE_KEYS]
     if unknown:
-        raise UsageError(f"没有模块 {'、'.join(unknown)}，可选：{'、'.join(MODULE_KEYS)}")
-    modules = [key for key in MODULE_KEYS if key in modules]
+        raise UsageError(f"没有模块 {'、'.join(unknown)}，可选：{'、'.join(PUBLIC_MODULE_KEYS)}")
+    modules = [key for key in PUBLIC_MODULE_KEYS if key in modules]
     target = Path(target)
     if target.exists() and (not target.is_dir() or any(target.iterdir())):
         raise UsageError(f"目标目录 {target} 必须不存在或为空")

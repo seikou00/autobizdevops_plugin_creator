@@ -1,7 +1,7 @@
 {
   "id": "secrets-check",
   "title": "明文密码检查",
-  "description": "写入 .yaml/.yml/.properties 时发现明文的密码、密钥、token 就拦截，提示先加密再写入",
+  "description": "模型写入 .yaml、.yml、.properties 文件时，发现明文的密码、密钥、token 就拦下，提示先加密再写入",
   "files": ["check_secrets.py"],
   "entries": {
     "PreToolUse": [

@@ -5,6 +5,15 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+PLUGIN_PREFIX = "AutoBizDevOps_"
+
+
+def prefixed_plugin_field(value: str) -> str:
+    if not value or value.startswith(PLUGIN_PREFIX):
+        return value
+    return PLUGIN_PREFIX + value
+
+
 GROUPS = ("biz", "dev", "ops")
 # 节点技能所在的分组目录：skills/<分组目录>/<技能>/（D64）
 SKILL_GROUP_DIRS = {"biz": "autobiz", "dev": "autodev", "ops": "autoops"}

@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.host.outputs.v1",
-  "title": "宿主命令的输出结构（interfaces.md §3.3、§4.2）",
-  "description": "每个命令一个 definitions 项，供 check 的契约测试和 simulate 校验输出结构，同时作为给 DevClaw 的协议文档。只校验结构，不写 additionalProperties: false：宿主应忽略不认识的字段（D55）。不拷进插件。",
+  "title": "宿主命令的输出结构",
+  "description": "definitions 中的命令输出结构供 check、simulate 和 DevClaw 使用。DevClaw 应忽略扩展字段。",
   "definitions": {
     "failure": {
       "type": "object",

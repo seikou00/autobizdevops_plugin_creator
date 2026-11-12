@@ -7,7 +7,7 @@ from pathlib import Path
 
 from scaffold.build import customize
 from scaffold.build.dangling import LEGACY_PATHS, dangling_refs
-from scaffold.build.framework import skill_dir
+from scaffold.build.framework import plugin_manifest, skill_dir
 from scaffold.build.manifest import MANIFEST
 from scaffold.build.pipeline import analyze, build
 from scaffold.commands import CommandResult
@@ -138,6 +138,8 @@ def resource_rules(result, tree: Tree, *, package_mode: bool = False) -> list:
         data, record = tree.read_bytes(path), recorded.get(path) or {}
         if data is None or TODO.encode() not in data or customize.problem_of(data):
             continue
+        if path == "plugin.json":
+            record = customize.plugin_name_record(record, plugin_manifest(ir.plugin))
         names = [name for name, text in customize.edited(path, fsio.parse_json(data), record).items() if TODO in text]
         if names:
             make = error if package_mode else warning
@@ -146,13 +148,15 @@ def resource_rules(result, tree: Tree, *, package_mode: bool = False) -> list:
     return issues
 
 
-def drift_issues(tree: Tree, previous: dict | None, replaceable: set) -> list:
+def drift_issues(tree: Tree, previous: dict | None, replaceable: set, *, plugin: dict) -> list:
     issues = []
     for path, record in sorted((previous or {}).get("files", {}).items()):
         ownership = record.get("ownership")
         if record.get("inactive") or ownership not in ("generated", "managed", "module") or path in replaceable:
             continue
         data = tree.read_bytes(path)
+        if path == "plugin.json":
+            record = customize.plugin_name_record(record, plugin_manifest(plugin))
         if data is not None and record.get("structure") and fsio.digest(data) != record.get("sha256"):
             # 有可改文字字段的生成文件（D70）：只改了文字字段不算漂移
             problem = customize.problem_of(data)
@@ -192,7 +196,7 @@ def check(root: Path, *, strict: bool = False, package_mode: bool = False) -> Co
             replay = build(tree, dry_run=True)
             replaceable = {path for path, planned in (replay.plan.files.items() if replay.plan else [])
                            if planned.replaceable}
-            report.extend(drift_issues(tree, result.previous, replaceable))
+            report.extend(drift_issues(tree, result.previous, replaceable, plugin=result.ir.plugin))
             for module_id, module in result.modules.items():
                 report.extend(module.prepare(tree.root, result.normalized.modules[module_id], install=False))
     if report.failed():

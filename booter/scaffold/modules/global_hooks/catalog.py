@@ -1,4 +1,4 @@
-"""插件全局钩子目录（D62）：hooks/<包>/ 下一个 hook.json 加上 files/ 中的脚本就是一个可选钩子。
+"""全局钩子目录（D62）：hooks/<包>/ 下一个 hook.json 加上 files/ 中的脚本就是一个可选钩子。
 
 开发者在 modules/globalHooks.json 的 hooks 中按 id 列出要启用的钩子；globalHooks 模块把脚本拷到插件的
 hooks/<id>/，把 hook.json 的 entries 合并进 hooks/hooks.json。新增钩子只需在 hooks/ 下
@@ -57,9 +57,9 @@ def catalog() -> dict:
         spec = HookSpec(id=data["id"], title=data["title"], description=data["description"], package=package,
                         files=tuple(data.get("files", [])), entries=data["entries"])
         if not HOOK_ID.match(spec.id) or spec.id in specs:
-            raise ValueError(f"可选钩子 id 不合法或重复：{spec.id}（{package}/hook.json）")
+            raise ValueError(f"全局钩子 id 不合法或重复：{spec.id}（{package}/hook.json）")
         for name in spec.files:
             if not resources.exists(f"{package}/files/{name}"):
-                raise ValueError(f"可选钩子 {spec.id} 缺少文件 files/{name}")
+                raise ValueError(f"全局钩子 {spec.id} 缺少文件 files/{name}")
         specs[spec.id] = spec
     return {hook_id: specs[hook_id] for hook_id in sorted(specs)}

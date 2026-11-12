@@ -2,7 +2,7 @@
   "id": "artifactSync",
   "version": "1.0.0",
   "title": "产物同步",
-  "description": "把节点产物上传到外部服务，并在看板上生成同步入口",
+  "description": "在看板上增加“发起产物同步”入口，把选定的节点产物和接口文档上传到外部服务。",
   "schema": "modules/artifactSync.schema.json",
   "core": false,
   "entry": "module:ArtifactSyncModule"

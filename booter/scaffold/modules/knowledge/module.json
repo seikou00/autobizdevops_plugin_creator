@@ -2,7 +2,7 @@
   "id": "knowledge",
   "version": "1.0.0",
   "title": "知识",
-  "description": "知识清单解析、发布单元查询、内置知识组装与可选的知识仓库同步",
+  "description": "有了带 agents.manifest.json 清单的知识目录，就能在创建 Feature 时选择发布单元，并在会话开始时自动带上所选发布单元的知识。",
   "schema": "modules/knowledge.schema.json",
   "core": false,
   "entry": "module:KnowledgeModule"

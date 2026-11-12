@@ -2,49 +2,49 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.module.artifactSync.v1",
   "title": "AutoBiz 产物同步模块配置 v1（modules/artifactSync.json）",
-  "description": "产物同步模块：把产物上传到外部服务，并在看板上生成同步入口。入口文件引用此文件即表示启用，不引用即不启用（D30）。语义校验见 input-config.md §7。",
+  "description": "产物同步的允许范围、产物清单和上传设置。通过入口文件的 modules.artifactSync 引用启用。allowedFrom 与 allowedCheckpoints 二选一。",
   "type": "object",
   "additionalProperties": false,
   "required": ["artifacts"],
   "properties": {
     "$schema": { "type": "string" },
-    "skillName": { "$ref": "#/definitions/skillName", "default": "autobizdevops-artifact-sync" },
+    "skillName": { "$ref": "#/definitions/skillName", "default": "autobizdevops-artifact-sync", "description": "生成的同步技能的名字，不能与节点技能重名。" },
     "allowedFrom": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]*(:(in_progress|done))?$",
-      "description": "<nodeId>:<in_progress|done> 或 checkpoint 名；从该点到流程末尾都允许同步。"
+      "description": "从哪一步起允许同步，写成 <节点 id>:done 或 <节点 id>:in_progress（也可以直接写 checkpoint 名），之后到流程结束都可以同步。与 allowedCheckpoints 二选一。"
     },
-    "excludeCheckpoints": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "excludeCheckpoints": { "type": "array", "items": { "type": "string" }, "default": [], "description": "在允许范围里再排除的 checkpoint，例如 code_in_progress。" },
     "allowedCheckpoints": {
       "type": "array",
       "items": { "type": "string" },
       "minItems": 1,
-      "description": "显式列表，与 allowedFrom 二选一。"
+      "description": "显式列出允许同步的 checkpoint，与 allowedFrom 二选一。"
     },
     "artifacts": {
       "type": "object",
       "propertyNames": { "type": "string", "minLength": 1 },
       "additionalProperties": { "$ref": "#/definitions/nonEmpty" },
-      "description": "要上传的产物清单：产物路径（workflow.json 某个节点 outputs 中的路径）→ 同步目录中的简述。只同步列出的产物，归属节点从节点输出推导。"
+      "description": "要上传的产物：键是 workflow.json 某个节点 outputs 中的路径，写法完全一致；值是同步目录中的简述。没列出的产物不上传。接口文档 FEATURE_API_DETAIL.md 总会同步，不要写在这里。"
     },
     "entry": {
       "type": "object",
       "additionalProperties": false,
       "default": {},
-      "description": "看板上的产物同步入口，生成 board_core/modules.json 顶层 artifact_sync（slashSkill 固定为 skillName）。",
+      "description": "看板上的“发起产物同步”入口。",
       "properties": {
-        "enabled": { "type": "boolean", "default": true },
-        "syncType": { "type": "string", "default": "invoke_session" },
-        "userMessage": { "type": "string", "default": "请针对${projectCode}项目的${feature}特性发起产物同步" },
-        "dialogTips": { "type": "string", "default": "发起产物同步" }
+        "enabled": { "type": "boolean", "default": true, "description": "false 时看板上不显示入口。" },
+        "syncType": { "type": "string", "default": "invoke_session", "description": "入口的触发方式，一般不用改。" },
+        "userMessage": { "type": "string", "default": "请针对${projectCode}项目的${feature}特性发起产物同步", "description": "点击入口后发给模型的消息。" },
+        "dialogTips": { "type": "string", "default": "发起产物同步", "description": "入口的提示文字。" }
       }
     },
     "uploadUrl": { "type": "string", "pattern": "^https?://", "default": "https://tscode-cos-plugin.paasuat.cmbchina.cn/file/upload", "description": "上传服务地址。" },
-    "maxFileSizeMiB": { "type": "integer", "minimum": 1, "default": 5 },
+    "maxFileSizeMiB": { "type": "integer", "minimum": 1, "default": 5, "description": "单个文件的大小上限（MiB），超过的跳过并报告。" },
     "extraPaths": {
       "type": "object",
       "default": {},
-      "description": "不属于节点输出但需要同步的路径：{ 路径模式（相对 FEATURE_DIR）: 简述 }，不按阶段和节点归属。",
+      "description": "节点产出以外要一起上传的文件：路径（可以用 glob，相对 Feature 目录）→ 简述。要改 FEATURE_API_DETAIL.md 的简述时也写在这里。",
       "propertyNames": { "type": "string", "minLength": 1 },
       "additionalProperties": { "$ref": "#/definitions/nonEmpty" }
     }

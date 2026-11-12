@@ -7,7 +7,7 @@ import zipfile
 from tests.helpers import SIBLINGS, cli, new_from_example, temp_dir
 
 ANSWERS = {
-    "plugin": {"id": "doc-review", "name": "Doc-Review-Kanban", "version": "0.1.0", "description": "文档起草与评审"},
+    "plugin": {"id": "doc-review", "name": "AutoBizDevOps_Doc-Review-Kanban", "version": "0.1.0", "description": "文档起草与评审"},
     "nodes": [
         {"id": "draft", "name": "起草", "stage": "biz", "seq": 1, "skill": "doc-draft", "outputs": ["DRAFT.md"]},
         {"id": "review", "name": "评审", "stage": "biz", "seq": 2, "skill": "doc-review", "outputs": ["REVIEW.md"]},
@@ -52,18 +52,19 @@ class NewAndPackageTest(unittest.TestCase):
         code, payload = cli("-C", str(root), "package")
         self.assertEqual(code, 0, payload)
         self.assertEqual(payload["package"]["version"], {"from": "0.1.0", "to": "0.1.1"})
-        self.assertTrue(payload["package"]["path"].endswith("doc-review-0.1.1.zip"))
+        self.assertTrue(payload["package"]["path"].endswith("AutoBizDevOps_doc-review-0.1.1.zip"))
         with zipfile.ZipFile(root / payload["package"]["path"]) as archive:
             names = archive.namelist()
-            packed = json.loads(archive.read("doc-review/plugin.json"))
+            packed = json.loads(archive.read("AutoBizDevOps_doc-review/plugin.json"))
         self.assertEqual(packed["version"], "0.1.1")
+        self.assertEqual(packed["name"], "AutoBizDevOps_Doc-Review-Kanban")
         entry = json.loads((root / "plugin.scaffold.json").read_text("utf-8"))
         self.assertEqual(entry["plugin"]["version"], "0.1.1")
         self.assertEqual(cli("-C", str(root), "check")[0], 0)
-        self.assertTrue(all(name.startswith("doc-review/") for name in names))
-        self.assertIn("doc-review/runtime/build-manifest.json", names)
-        self.assertNotIn("doc-review/workflow.json", names)
-        self.assertNotIn("doc-review/.scaffold/workflow.schema.json", names)
+        self.assertTrue(all(name.startswith("AutoBizDevOps_doc-review/") for name in names))
+        self.assertIn("AutoBizDevOps_doc-review/runtime/build-manifest.json", names)
+        self.assertNotIn("AutoBizDevOps_doc-review/workflow.json", names)
+        self.assertNotIn("AutoBizDevOps_doc-review/.scaffold/workflow.schema.json", names)
         self.assertEqual(names, sorted(names))
         board = json.loads((root / "runtime/config/board.json").read_text("utf-8"))
         self.assertEqual(board["nodes"]["biz"][0]["description"], "起草或评审文档时使用")
@@ -75,7 +76,7 @@ class NewAndPackageTest(unittest.TestCase):
         code, payload = cli("-C", str(root), "package", "--bump", "none")
         self.assertEqual(code, 0, payload)
         self.assertIsNone(payload["package"]["version"])
-        self.assertTrue(payload["package"]["path"].endswith("doc-review-0.1.0.zip"))
+        self.assertTrue(payload["package"]["path"].endswith("AutoBizDevOps_doc-review-0.1.0.zip"))
         code, payload = cli("-C", str(root), "package", "--bump", "minor")
         self.assertEqual(payload["package"]["version"], {"from": "0.1.0", "to": "0.2.0"})
         code, payload = cli("-C", str(root), "package", "--bump", "major")

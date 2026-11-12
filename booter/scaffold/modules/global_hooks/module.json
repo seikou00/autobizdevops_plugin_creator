@@ -1,8 +1,8 @@
 {
   "id": "globalHooks",
   "version": "1.0.0",
-  "title": "插件全局钩子",
-  "description": "脚手架自带的公共宿主钩子（明文密码检查、前端性能检查等），按需启用后注册到 hooks/hooks.json",
+  "title": "全局钩子",
+  "description": "在模型写文件或推进节点时运行所选检查，发现问题会拦截并说明原因。",
   "schema": "modules/globalHooks.schema.json",
   "core": false,
   "entry": "module:GlobalHooksModule"

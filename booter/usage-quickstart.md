@@ -25,12 +25,12 @@ cd ~/Documents/GitHub/autobizdevops_plugin_creator/booter
 python3 -m scaffold new ~/Documents/GitHub/my-plugin
 ```
 
-按下表回答，没提到的问题直接回车，用默认值：
+按下表回答。提示中有默认值的问题可以直接回车：
 
 | 向导问题 | 怎么填 |
 |---|---|
-| 插件 ID | 英文字母、数字、短横线和下划线，如 `my-plugin`、`Doc_Review`，发布后不能改 |
-| 插件名、一句话描述 | 随意填写，会显示在 DevClaw 中 |
+| 插件 ID | 英文字母、数字、短横线和下划线。输入 `my-plugin` 会生成 `AutoBizDevOps_my-plugin`，含前缀共不超过 64 字符，发布后不能改 |
+| 插件名、一句话描述 | 会显示在 DevClaw 中，插件名自动加 `AutoBizDevOps_` 前缀 |
 | 节点 id、显示名 | 每个节点起一个英文 id（如 `prd`）和一个中文名（如 `需求`） |
 | 所属阶段 | 需求类选 `biz`，开发类选 `dev`，发布、运维类选 `ops`；顺序必须是 biz → dev → ops |
 | 编排顺序 seq | 回车即可，自动递增 |
@@ -39,7 +39,9 @@ python3 -m scaffold new ~/Documents/GitHub/my-plugin
 | 继续添加节点？ | 还有节点就回车，最后一个节点输入 `N` |
 | 最后一个节点是终态节点吗？ | 回车（选 N）；只有最后一步是「归档」这种收尾动作时才选 Y |
 | 已有技能目录的路径 | 留空回车，下一步统一导入 |
-| 启用明文密码检查 / 前端性能检查？ | 需要就输入 `Y`；前端性能检查在编码节点 `code_done` 时检查变动的前端文件 |
+| 要启用哪些可选模块？ | 向导会先介绍各模块，再逐个询问是否启用。回车选 `N` |
+| 知识从哪来、谁组装？ | 启用知识后选择 Git 仓库、随插件打包或 DevClaw 提供，再选插件或 DevClaw 组装 |
+| 要不要自定义运行策略？ | 回车沿用 `multi`。选 `Y` 可以更改全局默认策略或覆盖单个节点 |
 
 - 目标目录必须不存在或为空；
 - 不想回答向导、想自己填配置：见下文[想自己填配置时](#想自己填配置时)。
@@ -68,27 +70,27 @@ python3 -m scaffold -C ~/Documents/GitHub/my-plugin add skills --from ~/Document
 python3 -m scaffold -C ~/Documents/GitHub/my-plugin package
 ```
 
-打包前会自动检查。通过后生成 `my-plugin/dist/<插件 id>-<版本>.zip`，导入 DevClaw 即可。
+打包前会自动检查。ZIP 中的插件 ID 和显示名称会补齐 `AutoBizDevOps_` 前缀，手改 `plugin.json` 的名称后也一样。生成的 `my-plugin/dist/AutoBizDevOps_<ID 后缀>-<版本>.zip` 可以直接导入 DevClaw。
 
 插件自带一个产物检查钩子：技能执行完成命令时，如果 `workflow.json` 中声明的产物还没生成或是空文件，这条命令会被拦下，模型补齐产物后再推进。不需要额外配置。钩子都在插件根目录的 `hooks/` 下：配置是 `hooks/hooks.json`，想加自己的钩子就照着里面已有的条目写在同一个文件里，重新生成时会原样保留。
-
-还想加明文密码检查、前端性能检查（插件全局钩子模块 `globalHooks`，配置在 `modules/globalHooks.json`）：用向导新建时会逐个询问；已经建好的插件运行下面的命令（`hook list` 查看全部全局钩子）：
-
-```bash
-python3 -m scaffold -C ~/Documents/GitHub/my-plugin hook enable secrets-check performance-check
-```
 
 ## 想自己填配置时
 
 不想回答向导，可以让脚手架只写出配置的骨架，要填的地方都标成 `[TODO: 说明]`：
 
 ```bash
-python3 -m scaffold new ~/Documents/GitHub/my-plugin --skeleton --module board
+python3 -m scaffold new ~/Documents/GitHub/my-plugin --skeleton
 ```
 
-要启用知识、产物同步、全局钩子，就再加 `--module knowledge`、`--module artifactSync`、`--module globalHooks`。
+要启用可选模块，就再加 `--module knowledge` 或 `--module artifactSync`。自定义看板或运行策略时，分别加 `--module board` 或 `--module session`。可以先看每个模块的说明：
 
-照着说明把 `[TODO: …]` 填好，然后检查还缺什么：
+```bash
+python3 -m scaffold module list
+```
+
+各模块的字段怎么填，见模块包里的说明文件：[知识](scaffold/modules/knowledge/guide.md)、[产物同步](scaffold/modules/artifact_sync/guide.md)、[看板](scaffold/modules/board/guide.md)、[会话与运行策略](scaffold/modules/session/guide.md)。
+
+照着说明把 `[TODO: …]` 填好。插件 ID 和名称已预填 `AutoBizDevOps_` 前缀，保留前缀并填写后缀，然后检查还缺什么：
 
 ```bash
 python3 -m scaffold -C ~/Documents/GitHub/my-plugin lint

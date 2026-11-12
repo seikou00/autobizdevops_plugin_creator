@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.workflow.v1",
   "title": "核心流程 workflow.json",
-  "description": "人与 agent 共同维护的最小流程骨架。Schema 只检查字段名、类型和必填项；引用、路径安全等规则由 autobiz-plugin lint 检查（input-config.md §7）。插件运行时使用的是编译结果 runtime/config/flow.json。",
+  "description": "人与 agent 共同维护的最小流程骨架。Schema 只检查字段名、类型和必填项；引用、路径安全等规则由 autobiz-plugin lint 检查。插件运行时使用的是编译结果 runtime/config/flow.json。",
   "type": "object",
   "additionalProperties": false,
   "required": ["nodes"],
@@ -21,7 +21,7 @@
     }
   },
   "definitions": {
-    "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "nodeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "节点 ID，以小写字母开头，只能用小写字母、数字和下划线。" },
     "path": { "type": "string", "minLength": 1, "description": "相对 FEATURE_DIR 的路径，可含 glob。" },
     "output": {
       "description": "路径；可选输出写成 { path, optional: true }。完成时必需输出要存在且非空。",

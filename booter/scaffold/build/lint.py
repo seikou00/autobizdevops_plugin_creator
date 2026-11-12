@@ -191,7 +191,7 @@ def _inactive(ctx):
     files = [path for path, record in sorted((ctx.previous or {}).get("files", {}).items())
              if record.get("inactive") and ctx.tree.is_file(path)]
     if files:
-        yield warning("MODULE_INACTIVE_FILES", "以下文件来自已关闭的模块或可选钩子，不再生效、不会打包，可以删除：" + "、".join(files),
+        yield warning("MODULE_INACTIVE_FILES", "以下文件来自已关闭的模块或全局钩子，不再生效、不会打包，可以删除：" + "、".join(files),
                       file="runtime/build-manifest.json")
 
 
