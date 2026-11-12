@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.module.knowledge.v1",
-  "title": "AutoBiz 知识模块配置 v1（modules/knowledge.json）",
-  "description": "知识来源、清单路径和会话组装配置。通过入口文件的 modules.knowledge 引用启用。",
+  "title": "AutoBiz 发布单元知识配置 v1（modules/knowledge.json）",
+  "description": "发布单元知识的来源、清单路径和组装方。通过入口文件的 modules.knowledge 引用启用。",
   "type": "object",
   "additionalProperties": false,
   "properties": {

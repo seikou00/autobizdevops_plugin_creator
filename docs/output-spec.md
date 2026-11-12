@@ -283,7 +283,7 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
 
 ## 5. 内部配置 runtime/config/
 
-编译后的内部配置，只给运行框架和模块脚本读取，DevClaw 不读。每个文件由一个模块生成，脚本只读自己需要的那几份：`engine.py` 只依赖 `runtime.json`、`flow.json` 和 `state.json`；适配入口（`adapters/`、`session/`）拼装宿主数据时再读 `board.json`（展示文案）和 `session.json`（运行策略）。
+编译后的内部配置供运行框架和模块脚本读取。`engine.py` 读取 `runtime.json`、`flow.json` 和 `state.json`。适配入口读取 `board.json` 的展示文案。框架的会话入口从 `session.json` 读取运行策略和可选的知识组装配置。
 
 ### 5.1 runtime.json
 
@@ -418,7 +418,7 @@ DevClaw 与插件只通过 `board_core/` 下的两个文件交互：从 `board_c
 
 `policies.nodes` 原样取自 `session.policies.nodes`，与 `workflow.json` 一样按 `biz`、`dev`、`ops` 分组，没有配置节点策略时为 `{}`。adapter 按 `id` 查到节点策略，去掉 `id` 后作为该节点的 `runtimePolicy` 输出。
 
-`knowledgeAssembly` 由知识模块在 `assembler = plugin` 时写入（interfaces.md §2.4）：`script` 固定为内置组装脚本，`timeoutSec` 取 `knowledge.assembly.timeoutSec`；未启用知识模块或 `assembler = devclaw` 时为 `null`。
+发布单元知识模块在 `assembly.enabled = true` 且 `assembler = plugin` 时提供 `knowledgeAssembly`，由构建流程写入此文件。`script` 指向内置组装脚本，`timeoutSec` 取 `knowledge.assembly.timeoutSec`。其他情况编译为 `null`。
 
 ### 5.5 knowledge.json（知识模块）
 

@@ -12,8 +12,8 @@
 | 核心流程 | `workflow.json` | 按 `biz`、`dev`、`ops` 分组的节点、编排顺序 `seq`、技能绑定、输出、终态节点 | 创建配置骨架，辅助选择已有技能 | 编译后的流程契约及状态规则 `runtime/config/flow.json` |
 | 技能资源 | `skills/<skill>/` 或 `skills/<分组>/<skill>/` | 技能正文、模板、执行脚本、业务校验器；可以不提供 | 导入已有资源，或生成空白 `SKILL.md` | 开头带状态维护片段的交付技能及资源（output-spec.md §6.1） |
 | 看板模块配置 | `modules/board.json` | 目标平台、展示设置、可选能力 | 生成接入脚本和平台命令映射 | 看板 adapter `runtime/adapters/*`、宿主接口 `board_core/board_config.json`、`board_core/modules.json`，看板文案 `runtime/config/board.json` |
-| 会话与运行策略 | `modules/session.json`、`agents/` | 运行策略、自定义子代理 | 提供默认会话入口及配置骨架 | 会话模块 `runtime/session/*`、策略配置 `runtime/config/session.json`、资源引用 |
-| 知识模块配置 | `modules/knowledge.json` | 清单解析方式、组装方选择 | 引导启用和选择 | `runtime/knowledge/*`：清单解析、发布单元查询、内置组装脚本 |
+| 运行策略 | `modules/session.json`、`agents/` | 默认与逐节点运行方式、子代理、工具开关 | 询问是否自定义 | `runtime/config/session.json` 中的 `policies`、子代理资源引用 |
+| 发布单元知识 | `modules/knowledge.json` | 知识来源、清单和组装方 | 询问是否按发布单元带入知识 | `runtime/knowledge/*`、发布单元查询和知识组装配置 |
 | 产物同步模块配置 | `modules/artifactSync.json` | 允许同步的阶段、要上传的产物 | 引导启用 | 同步技能 `skills/<skillName>/`、看板同步入口 `artifact_sync` |
 | 自定义扩展 | `hooks/` 等 | 开发者自己的 hooks 等资源 | 创建对应目录 | 原样交付的扩展资源 |
 
@@ -217,8 +217,8 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 ├── workflow.json            # 核心流程（§2）
 └── modules/
     ├── board.json           # 看板模块（可选；不引用时全部取默认值）
-    ├── session.json         # 会话与运行策略（省略时使用默认值）
-    └── knowledge.json       # 知识模块（可选；不引用即不启用）
+    ├── session.json         # 运行策略（省略时使用默认值）
+    └── knowledge.json       # 发布单元知识（可选）
 ```
 
 脚手架从入口文件出发，读取它引用的 `workflow.json` 和各模块配置文件。模块配置文件只写本模块的内容，不再引用其他文件。
@@ -247,8 +247,8 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | 键 | 不引用时 | 配置内容 |
 |---|---|---|
 | `board` | 全部取默认值 | 看板模块：目标平台、展示设置、可选能力（§4.1） |
-| `session` | 全部取默认值 | 会话与运行策略（§4.2） |
-| `knowledge` | 不启用知识模块 | 清单解析、知识组装、可选的知识仓库同步（§4.3）。引用即启用 |
+| `session` | 全部取默认值 | 运行策略（§4.2） |
+| `knowledge` | 不启用发布单元知识 | 清单解析、发布单元查询和知识组装（§4.3）。引用即启用 |
 | `artifactSync` | 不启用产物同步 | 上传产物到外部服务、看板上的同步入口（§4.5）。引用即启用 |
 | `globalHooks` | 只有产物检查钩子 | 全局钩子模块暂停开放。构建兼容已有插件的配置（§4.6） |
 
@@ -333,7 +333,9 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `nextAction.userMessage` | `请针对${projectCode}项目发起知识沉淀，这个是 token：${leanToken}` |
 | `nextAction.dialogTips` | `发起知识沉淀` |
 
-### 4.2 modules/session.json（会话与运行策略）
+### 4.2 modules/session.json（运行策略）
+
+自定义节点怎么运行时填写此文件。框架自动提供会话入口，发布单元知识在 `modules/knowledge.json` 中配置。
 
 ```json
 {
@@ -364,7 +366,7 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 | `subagentConfig.customSubagentFiles` | 外挂资源：插件内相对路径 `agents/*.md`。`agents/` 目录是可选的，文件可以稍后再补：lint 报 `SUBAGENT_FILE_MISSING`（warning），会话入口下发 `agentConfig` 时跳过不存在的文件 |
 | `toolCustomConfig` | 宿主工具的定制开关，例如 `{"task": {"enabled": true}}`。脚手架不解释其内容，原样写入 `runtimePolicy` 和 `agentConfig` |
 
-### 4.3 modules/knowledge.json（知识模块）
+### 4.3 modules/knowledge.json（发布单元知识）
 
 入口文件引用了这个文件即表示启用知识模块。
 
@@ -399,7 +401,8 @@ v1 不由用户配置，`flow.json` 的 `skip` 固定为 `null`（§2.5），看
 `assembler = plugin` 时，知识由 `runtime/knowledge/render_collected_session_context.py` 组装，它和 `collect-knowledge.js` 都来自全栈版，lite 和全栈版都直接使用：
 
 - 调用 `collect-knowledge.js`（collector，需要 Node）按所选发布单元组装知识；collector 不可用或单元不在它的列表中时，按清单映射加载，最后回退 `<localRepoPath>/AGENTS.md`；
-- 无论选没选发布单元，都读取会话工作区的 `<sessionWorkspacePath>/AGENTS.md` 作为会话工作区指令。
+- 无论选没选发布单元，都读取会话工作区的 `<sessionWorkspacePath>/AGENTS.md` 作为会话工作区指令；
+- 未取得任何非空单元内容时，读取项目元数据目录中的 `CONTEXT.md` 作为领域词汇表，默认路径为项目下的 `.autobizdevops/CONTEXT.md`。
 
 所以知识仓库里没有 collector 知识的插件，也能直接用它从各仓库和工作区的 `AGENTS.md` 取到上下文。
 
@@ -636,7 +639,7 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 
 ## 8. 最小示例
 
-两个节点，不写任何模块配置文件：看板和会话全部取默认值，不启用知识模块（文件见 [examples/minimal/](../booter/examples/minimal/)）。
+两个节点，使用默认看板和运行策略。输入见 [examples/minimal/input/](../booter/examples/minimal/input/)。
 
 `workflow.json`：
 
@@ -664,13 +667,13 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 
 编译结果：
 
-- checkpoint 链为 `draft_in_progress → draft_done → review_in_progress → review_done`，产物目录为 `.autobizdevops/doc-review/features/<feature>/`；两个节点都在 `Biz` 分组下，产物的 `label` 为 `DRAFT.md`、`REVIEW.md`。完整的 `flow.json` 见 output-spec.md §5.2；
+- checkpoint 链为 `draft_in_progress → draft_done → review_in_progress → review_done`，产物目录为项目下的 `.autobizdevops/features/<feature>/`。两个节点都在 `Biz` 分组下，产物的 `label` 为 `DRAFT.md`、`REVIEW.md`。完整的 `flow.json` 见 output-spec.md §5.2；
 - 没有提供技能，生成两个空白 `SKILL.md`：只有 frontmatter 和状态维护片段（`draft_in_progress`/`draft_done`、`review_in_progress`/`review_done`），正文由开发者填写；
 - 推进到 `review_done` 时，框架检查 `REVIEW.md` 存在即放行；两个节点的 `inputs` 为 `[]`、`validate` 为 `null`；
 - `inspectCommands` 中不含 `knowledge_path`、`deploy_units`、`pull_knowledge`；`modules.json` 中 `knowledge`、`artifactSync` 为 `{"enabled": false}`，只有固定的 `knowledge_config`，没有 `artifact_sync`；
 - `session_context_inject` 返回流程上下文和默认策略的 `agentConfig`，不含知识段；
 
-全部生成内容见 [examples/minimal/output/](../booter/examples/minimal/output/)。
+生成结果预览见 [examples/minimal/output/](../booter/examples/minimal/output/)。
 
 以后需要调整看板文案时，新建 `modules/board.json` 并在入口文件的 `modules.board` 中引用即可，`workflow.json` 不用动。
 
@@ -714,4 +717,4 @@ adapter 输出看板数据时的拼装：`WorkflowNode` 的 `label`、`group`、
 - 已下架的精简路线、自定义节点子集和遗留的 `profiles` 不再表达，新建 Feature 只从第一个节点开始（全栈版的 `initial` 中其余 4 个 checkpoint 只服务于已下架的模板）；
 - 节点描述和 `nextAction` 不再覆写，全部按推导规则生成（§6）：描述取技能的 `description`，提示文案使用脚手架默认文案；
 - 节点输入、`stage_gate.py` 校验命令、详细设计动态阶段和跳过节点不在核心配置中表达（§2.5），`flow.json` 中对应字段取默认值；全栈版的 `autodev-detail-design` 技能不再挂在流程上；产物显示名不再配置，统一取路径（全栈版的“PRD文档”等名称不再保留）；
-- 知识组装沿用全栈版的 `render_collected_session_context.py` 与 `collect-knowledge.js`，它们成为知识模块的内置组装脚本（README §6.3），会话入口的流程上下文和运行策略改由会话模块给出。
+- 发布单元知识沿用全栈版的 `render_collected_session_context.py` 与 `collect-knowledge.js`。框架的会话入口生成流程上下文，读取运行策略，再追加知识组装结果。

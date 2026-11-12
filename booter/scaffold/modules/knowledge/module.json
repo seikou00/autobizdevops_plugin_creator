@@ -1,8 +1,8 @@
 {
   "id": "knowledge",
   "version": "1.0.0",
-  "title": "知识",
-  "description": "有了带 agents.manifest.json 清单的知识目录，就能在创建 Feature 时选择发布单元，并在会话开始时自动带上所选发布单元的知识。",
+  "title": "发布单元知识",
+  "description": "从带清单的知识库列出创建 Feature 时可选的发布单元，并在会话开始时带上所选单元的知识。",
   "schema": "modules/knowledge.schema.json",
   "core": false,
   "entry": "module:KnowledgeModule"

@@ -23,8 +23,8 @@ P/
 ├── workflow.json             # 流程节点
 ├── modules/
 │   ├── board.json            # 看板展示
-│   ├── session.json          # 会话与运行策略
-│   ├── knowledge.json        # 知识模块（可选）
+│   ├── session.json          # 运行策略
+│   ├── knowledge.json        # 发布单元知识（可选）
 │   └── artifactSync.json     # 产物同步模块（可选）
 ├── skills/autobiz|autodev|autoops/<skill>/   # 节点技能按节点阶段分组；辅助技能可以直接放 skills/<skill>/
 ├── agents/                   # 子代理文件，由 session.json 引用（可选）

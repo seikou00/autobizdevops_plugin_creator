@@ -52,7 +52,7 @@ v1 范围：
 | [schemas/workflow.schema.json](../booter/schemas/workflow.schema.json) | 核心流程 JSON Schema |
 | [schemas/plugin-scaffold.schema.json](../booter/schemas/plugin-scaffold.schema.json) | 入口文件 JSON Schema |
 | [schemas/modules/](../booter/schemas/modules/) | 看板、会话、知识模块配置的 JSON Schema |
-| [examples/minimal/](../booter/examples/minimal/) | 两个节点、没有模块配置文件的最小样例（input-config.md §8） |
+| [examples/](../booter/examples/) | 最小示例和全栈技能示例，均提供 `input/` 和 `output/` |
 | [fixtures/lite/](../fixtures/lite/) | 复刻 autobizdevops_lite 的完整输入样例；只供测试，不随 booter 分发（D67） |
 | [fixtures/fullstack/](../fixtures/fullstack/) | 按全栈版（autobiz_kanban）编写的完整输入样例，用到全部流程规则（input-config.md §9.2）；只供测试，不随 booter 分发（D67） |
 

@@ -1,0 +1,328 @@
+{
+  "schema": "autobiz.build-manifest.v1",
+  "scaffoldVersion": "1.0.0",
+  "coreVersion": "1.0.0",
+  "pluginId": "AutoBizDevOps_autobizdevops-plugin",
+  "metaRoot": ".autobizdevops",
+  "modules": {
+    "board": "1.0.0",
+    "session": "1.0.0",
+    "knowledge": "1.0.0",
+    "artifactSync": "1.0.0"
+  },
+  "inputs": {
+    "plugin.scaffold.json": "sha256:45e686813d638063adb5b2d619d1aa92ddfca528b18775649c254e31d832b702",
+    "workflow.json": "sha256:55a4b2b148bac6bd14441d74fd4c017deae4c325fba6a5227d5718716353ac3c",
+    "modules/board.json": "sha256:771c82b2d270025de167540bff032d03530235dba32a75e686d1bb547487671a",
+    "modules/session.json": "sha256:253c7adcd6617a04d40f9b5d72fa2e002dbf800b1bf8c4a1f67e9c72cb942c50",
+    "modules/knowledge.json": "sha256:c39512508d31c7c916de066a898c5c5415f858a0ea044d646f84a24a4afd1cc2",
+    "modules/artifactSync.json": "sha256:c68dbe8da57aaedd570ae74af84e2f489026c3ae531dfbbe20ee6c00c0019c96",
+    "skills/autobiz/autobiz-requirement-discuss/SKILL.md#description": "sha256:e5243036301b885f43e44d75149b7381ce6e1d407d5fc765d9915f326ad273e8",
+    "skills/autodev/autodev-code/SKILL.md#description": "sha256:4ecbf1e7e3a3472cc2c0bd1c8b8b81620985eda5d6398438540a132290009726",
+    "skills/autodev/autodev-design/SKILL.md#description": "sha256:dd1a15a3d922935470d88c8da2ffc3aea001601e2dcc6b39fec70c89eb2d5804",
+    "skills/autodev/autodev-plan/SKILL.md#description": "sha256:06bc7ae17f9501abc07f283902caad238b87d6f9d3ec6cb2ed95273fb5419e6c",
+    "skills/autodev/autodev-specs/SKILL.md#description": "sha256:5e519b6ee5925c3f29722b2abcccedbe8adf2572c2e943738ffe034ade34f27f",
+    "skills/autoops/autoops-archive/SKILL.md#description": "sha256:185ce463723f213c268bf2a9dd10ac205ed23de1573af2dc29aecdc1ade65344",
+    "skills/autoops/autoops-cicd/SKILL.md#description": "sha256:1a541f82de3497471f230366d5c1aadb6e03adb2012403659773b18e41683eb2"
+  },
+  "files": {
+    ".scaffold/modules/artifactSync.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".scaffold/modules/board.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".scaffold/modules/globalHooks.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".scaffold/modules/knowledge.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".scaffold/modules/session.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".scaffold/plugin-scaffold.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    ".scaffold/workflow.schema.json": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "board_core/board_config.json": {
+      "ownership": "generated",
+      "sha256": "sha256:e00928a21a6148bde9fb33ae97b6f7e07551928832a3dd780664065f5cf0071b",
+      "structure": "sha256:45952eb3f655cbbdf2274ea6f6f3d0b931d19b72598d9fcb5b1adfe64da6c170",
+      "texts": {
+        "inspectCommands.darwin.dialog_tips": "sha256:aab7ca9958a2f2b4d5033f9a4b84318367266f75d43c885d055636ca0aff564c",
+        "inspectCommands.darwin.system_prompt_inject": "sha256:d29fefec46b57314c11e28c206a7a6ef8a0c28c958c4590c4acb00881977cbf5",
+        "inspectCommands.linux.dialog_tips": "sha256:aab7ca9958a2f2b4d5033f9a4b84318367266f75d43c885d055636ca0aff564c",
+        "inspectCommands.linux.system_prompt_inject": "sha256:d29fefec46b57314c11e28c206a7a6ef8a0c28c958c4590c4acb00881977cbf5",
+        "inspectCommands.win32.dialog_tips": "sha256:aab7ca9958a2f2b4d5033f9a4b84318367266f75d43c885d055636ca0aff564c",
+        "inspectCommands.win32.system_prompt_inject": "sha256:d29fefec46b57314c11e28c206a7a6ef8a0c28c958c4590c4acb00881977cbf5"
+      }
+    },
+    "board_core/modules.json": {
+      "ownership": "generated",
+      "sha256": "sha256:4069af6c55fa6479f4dd090b76773c38f80c97a4335b0201ea53c31954b12549"
+    },
+    "hooks/artifact_guard.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "hooks/hooks.json": {
+      "ownership": "seeded",
+      "regions": {
+        "hooks": "sha256:c3fc901214919889eeb66881dd0058281ca92952bca2215f60d53f8dc6ea03aa"
+      }
+    },
+    "plugin.json": {
+      "ownership": "generated",
+      "sha256": "sha256:d179842c4e6e18ae1e49f3c45fa8d81261ec1d166e03708d88fb9575435ec00e",
+      "structure": "sha256:0ca60ffaf8f4d9861301fd22e6670bb77a4b62d174096be93e2780ebb1109be1",
+      "texts": {
+        "description": "sha256:d7fb3696262c1a2bf1d3cb01d4318d88824dbeacf4640f9e0774b79d436dc40a",
+        "name": "sha256:f9bc1f4efeb8cae50fd6ba17ea8992e81b1dc016f35bd378fe816ec099f8e7da"
+      }
+    },
+    "runtime/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/board_events.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/board_view.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/init_feature.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/init_workspace.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/inspect_state.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/adapters/inspect_workflow_templates.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/cli.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/engine.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/common/query.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/config/board.json": {
+      "ownership": "generated",
+      "sha256": "sha256:71a80b22942e6ecb22b052a454b164e9bad912167a1fabead7683a368a3986d2",
+      "structure": "sha256:1e1590ab0828c3c2d9016f8d2d4e5dc315f6d0a93fbcbb57ea3f16ff262d7b21",
+      "texts": {
+        "nodes.biz[prd].description": "sha256:e5243036301b885f43e44d75149b7381ce6e1d407d5fc765d9915f326ad273e8",
+        "nodes.biz[prd].nextAction.done.dialogTips": "sha256:4c04eabbd0d6de3e835bee9b66dbc2a78cd35c8e7bf4503fb58aa36407965e1d",
+        "nodes.biz[prd].nextAction.done.userMessage": "sha256:2c253ff86379f545d69a115860d076a730ee8170ecda2353c6fe46a4770f5008",
+        "nodes.biz[prd].nextAction.in_progress.dialogTips": "sha256:4c8a44d7ae364576dbd7faa4f2ca9f7f963dff7cf54cbe15a6d0a07c2e17bed4",
+        "nodes.biz[prd].nextAction.in_progress.userMessage": "sha256:c8d1e427a2d2b855aa9d24ae2cc47afdbfcb0fa3117123d230e1cde9fc31d71c",
+        "nodes.biz[prd].nextAction.not_started.dialogTips": "sha256:4c8a44d7ae364576dbd7faa4f2ca9f7f963dff7cf54cbe15a6d0a07c2e17bed4",
+        "nodes.biz[prd].nextAction.not_started.userMessage": "sha256:c8d1e427a2d2b855aa9d24ae2cc47afdbfcb0fa3117123d230e1cde9fc31d71c",
+        "nodes.dev[code].description": "sha256:4ecbf1e7e3a3472cc2c0bd1c8b8b81620985eda5d6398438540a132290009726",
+        "nodes.dev[code].nextAction.done.dialogTips": "sha256:dc8c7c1dbc177dbea6d9e482b637213b0d148436f92f0a4b77f73ba36e45cd4c",
+        "nodes.dev[code].nextAction.done.userMessage": "sha256:8757aab725ff68d2034c141782d3bf9720fe38dd13b83ee106c9de054a21ce73",
+        "nodes.dev[code].nextAction.in_progress.dialogTips": "sha256:afab20e77fb4f7f506f6d8e0e1f2988c09c2bf29c203ed13deea09a44829d989",
+        "nodes.dev[code].nextAction.in_progress.userMessage": "sha256:a3945fbe8b08fe700d02f3cfbe33ef6d992e4b4189184f0ad28f4b5e9002390c",
+        "nodes.dev[code].nextAction.not_started.dialogTips": "sha256:afab20e77fb4f7f506f6d8e0e1f2988c09c2bf29c203ed13deea09a44829d989",
+        "nodes.dev[code].nextAction.not_started.userMessage": "sha256:a3945fbe8b08fe700d02f3cfbe33ef6d992e4b4189184f0ad28f4b5e9002390c",
+        "nodes.dev[design].description": "sha256:dd1a15a3d922935470d88c8da2ffc3aea001601e2dcc6b39fec70c89eb2d5804",
+        "nodes.dev[design].nextAction.done.dialogTips": "sha256:42d8dbc39a4470434d779d5ee08c29f90fffe76409aeb246d95be5b7f2b30c90",
+        "nodes.dev[design].nextAction.done.userMessage": "sha256:68e3f0e9885cb39bea58d0c006b00bf254f7530485b5d6872312978c89a79375",
+        "nodes.dev[design].nextAction.in_progress.dialogTips": "sha256:4d2752addcf12991af0378be5a449c944831f2b23b7b133d7392719e160324ed",
+        "nodes.dev[design].nextAction.in_progress.userMessage": "sha256:464299747762fa9601ccfaaac9231e1afa0f4743aee64accbc519bac42c6f240",
+        "nodes.dev[design].nextAction.not_started.dialogTips": "sha256:4d2752addcf12991af0378be5a449c944831f2b23b7b133d7392719e160324ed",
+        "nodes.dev[design].nextAction.not_started.userMessage": "sha256:464299747762fa9601ccfaaac9231e1afa0f4743aee64accbc519bac42c6f240",
+        "nodes.dev[plan].description": "sha256:06bc7ae17f9501abc07f283902caad238b87d6f9d3ec6cb2ed95273fb5419e6c",
+        "nodes.dev[plan].nextAction.done.dialogTips": "sha256:569c6aa9a25f0e5af7a531e489ba4d5889455e9ac1db8a8a93f01a96a330ada3",
+        "nodes.dev[plan].nextAction.done.userMessage": "sha256:a3945fbe8b08fe700d02f3cfbe33ef6d992e4b4189184f0ad28f4b5e9002390c",
+        "nodes.dev[plan].nextAction.in_progress.dialogTips": "sha256:224c9c6f230c62f72dff85aa5b4e53a80fb0e7852b9727ae3e764cd216e576b0",
+        "nodes.dev[plan].nextAction.in_progress.userMessage": "sha256:68e3f0e9885cb39bea58d0c006b00bf254f7530485b5d6872312978c89a79375",
+        "nodes.dev[plan].nextAction.not_started.dialogTips": "sha256:224c9c6f230c62f72dff85aa5b4e53a80fb0e7852b9727ae3e764cd216e576b0",
+        "nodes.dev[plan].nextAction.not_started.userMessage": "sha256:68e3f0e9885cb39bea58d0c006b00bf254f7530485b5d6872312978c89a79375",
+        "nodes.dev[specs].description": "sha256:5e519b6ee5925c3f29722b2abcccedbe8adf2572c2e943738ffe034ade34f27f",
+        "nodes.dev[specs].nextAction.done.dialogTips": "sha256:761e9535fac954d920a618a2ce523b97e38cd85b415249503170c5014f8d8877",
+        "nodes.dev[specs].nextAction.done.userMessage": "sha256:464299747762fa9601ccfaaac9231e1afa0f4743aee64accbc519bac42c6f240",
+        "nodes.dev[specs].nextAction.in_progress.dialogTips": "sha256:8d63e16b1dd20f7e63355ffa0228988aedc724d3da9eacb326be91063bba8a4c",
+        "nodes.dev[specs].nextAction.in_progress.userMessage": "sha256:2c253ff86379f545d69a115860d076a730ee8170ecda2353c6fe46a4770f5008",
+        "nodes.dev[specs].nextAction.not_started.dialogTips": "sha256:8d63e16b1dd20f7e63355ffa0228988aedc724d3da9eacb326be91063bba8a4c",
+        "nodes.dev[specs].nextAction.not_started.userMessage": "sha256:2c253ff86379f545d69a115860d076a730ee8170ecda2353c6fe46a4770f5008",
+        "nodes.ops[archive].description": "sha256:185ce463723f213c268bf2a9dd10ac205ed23de1573af2dc29aecdc1ade65344",
+        "nodes.ops[archive].nextAction.archived.dialogTips": "sha256:919d389e6dbe83d79e1a85eb05a442af0ad6eeff2855d415115642f6a656645c",
+        "nodes.ops[archive].nextAction.archived.userMessage": "sha256:248d8e51e459c6acd2c6e466fd82bc2c0f051252aea3680d4da7839cf904f323",
+        "nodes.ops[archive].nextAction.not_started.dialogTips": "sha256:75f215c6dd94bf40aae45aba40a70d8d75fc566c68c68c5a0cc5a6cf16499fc0",
+        "nodes.ops[archive].nextAction.not_started.userMessage": "sha256:4252c5dafc9c80229dc17b9bddd3a0d0b71b2e0d089bab0dd49f0be82ff905bd",
+        "nodes.ops[cicd].description": "sha256:1a541f82de3497471f230366d5c1aadb6e03adb2012403659773b18e41683eb2",
+        "nodes.ops[cicd].nextAction.done.dialogTips": "sha256:6a1e9bbc2fe7cbd05a6883c1051c84e78b235e86e56120534d78d4cd9dc0af42",
+        "nodes.ops[cicd].nextAction.done.userMessage": "sha256:4252c5dafc9c80229dc17b9bddd3a0d0b71b2e0d089bab0dd49f0be82ff905bd",
+        "nodes.ops[cicd].nextAction.in_progress.dialogTips": "sha256:de160b406320c9f54f3e2f4863821e0574f3334189471778c6a6474b28dfc812",
+        "nodes.ops[cicd].nextAction.in_progress.userMessage": "sha256:8757aab725ff68d2034c141782d3bf9720fe38dd13b83ee106c9de054a21ce73",
+        "nodes.ops[cicd].nextAction.not_started.dialogTips": "sha256:de160b406320c9f54f3e2f4863821e0574f3334189471778c6a6474b28dfc812",
+        "nodes.ops[cicd].nextAction.not_started.userMessage": "sha256:8757aab725ff68d2034c141782d3bf9720fe38dd13b83ee106c9de054a21ce73",
+        "stateLabels.archived": "sha256:82395d423099a07ae94b5d220ca6cf86468b3754bc153aaad5a1ec273c13a92e",
+        "stateLabels.done": "sha256:f28461bb49c8564716309d575f90f72cf15b5c4667e40c2d037434bedb54a01a",
+        "stateLabels.in_progress": "sha256:dc9591e56d502b436c29bdd2819998a8460b951a7baff457484a930492c1a9d7",
+        "stateLabels.not_started": "sha256:f6e0d6919f8e55ded60f6a37848bd30272d06879e3fc805eb8d80b09fba82b3a",
+        "template.description": "sha256:20833b46ef310427cd0af38806bee4a9cb5968480eb0ba7345c8a2553b2a0f54",
+        "template.label": "sha256:6bea77acefb364ac3d4024c2fd7d82b1426d931cf25274abdc9e2d77969e24d9"
+      }
+    },
+    "runtime/config/flow.json": {
+      "ownership": "generated",
+      "sha256": "sha256:07d442c7fa595712568f6cd7261f785e7c4a7a206ac8789142c8e8fdef62149a"
+    },
+    "runtime/config/knowledge.json": {
+      "ownership": "generated",
+      "sha256": "sha256:a9039cf1e98f811d7f49002aaadc6b3deaf6e718f012589f105c0bbe82bb60bd"
+    },
+    "runtime/config/runtime.json": {
+      "ownership": "generated",
+      "sha256": "sha256:dcb6c8635c59a9bad1d7787dcfbf315583811008f754afde661da53eeec136ec"
+    },
+    "runtime/config/session.json": {
+      "ownership": "generated",
+      "sha256": "sha256:8d1c02e0a98ff28c8bb96d7b5db3146331a2af388c57d49ce8fec061f1147c0e"
+    },
+    "runtime/knowledge/__init__.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "runtime/knowledge/collect-knowledge.js": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "runtime/knowledge/inspect_deploy_units.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "runtime/knowledge/package.json": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "runtime/knowledge/render_collected_session_context.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "runtime/knowledge/sync_knowledge.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "runtime/session/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/session/render_session_context.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/workflow/__init__.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "runtime/workflow/update_state.py": {
+      "ownership": "managed",
+      "sha256": "…"
+    },
+    "skills/autobiz/autobiz-requirement-discuss/SKILL.md": {
+      "ownership": "seeded",
+      "regions": {
+        "state": "sha256:408b796c175bbf1e5f9e85cb5fc19305a68e40bad759191420faf3c301a89218"
+      }
+    },
+    "skills/autobizdevops-artifact-sync/SKILL.md": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "skills/autobizdevops-artifact-sync/config/artifact-sync.json": {
+      "ownership": "generated",
+      "sha256": "sha256:124ce52e57ca2310b85c3c795c7ec434a9cfb77af79fdf40d6e7942cefe4eddf"
+    },
+    "skills/autobizdevops-artifact-sync/references/ask-user-question.md": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "skills/autobizdevops-artifact-sync/references/feature-api-detail.md": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "skills/autobizdevops-artifact-sync/references/sync-runtime.md": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "skills/autobizdevops-artifact-sync/scripts/artifact_sync_utils.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "skills/autobizdevops-artifact-sync/scripts/sync_artifacts.py": {
+      "ownership": "module",
+      "sha256": "…"
+    },
+    "skills/autodev/autodev-code/SKILL.md": {
+      "ownership": "seeded",
+      "regions": {
+        "state": "sha256:6b13b97548d71e9ccd38b96d4e3d5ab1db20e0b12e8107533084261799122abe"
+      }
+    },
+    "skills/autodev/autodev-design/SKILL.md": {
+      "ownership": "seeded",
+      "regions": {
+        "state": "sha256:5b96344d500a09cdab9433e85f9afbe23464ed553757da4a26caf9ceaa9e5107"
+      }
+    },
+    "skills/autodev/autodev-plan/SKILL.md": {
+      "ownership": "seeded",
+      "regions": {
+        "state": "sha256:9567b3125b8066a7d96059d87188ac8a456bfeb6032ec00588de7dcf910c0cdb"
+      }
+    },
+    "skills/autodev/autodev-specs/SKILL.md": {
+      "ownership": "seeded",
+      "regions": {
+        "state": "sha256:2af56a17bb4b855e23cd767dd33590dd8259774505474ce1ad877f46a5fb4f1d"
+      }
+    },
+    "skills/autoops/autoops-archive/SKILL.md": {
+      "ownership": "seeded",
+      "regions": {
+        "state": "sha256:0c69aabb678cf73616b45271ff5fc53c822d409de3fe2bd5050104292a8b9fd0"
+      }
+    },
+    "skills/autoops/autoops-cicd/SKILL.md": {
+      "ownership": "seeded",
+      "regions": {
+        "state": "sha256:7db4117a167ddbe574e389855d096eb397d68b2e294e7242d66c8cd22a58bbf6"
+      }
+    }
+  }
+}

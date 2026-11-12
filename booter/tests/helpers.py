@@ -38,7 +38,9 @@ def example_dir(test, name: str) -> Path:
 
 
 def copy_example(test, name: str, target: Path) -> Path:
-    shutil.copytree(example_dir(test, name), target, ignore=shutil.ignore_patterns("output", ".DS_Store"))
+    example = example_dir(test, name)
+    source = example / "input" if (example / "input").is_dir() else example
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns("output", ".DS_Store"))
     return target
 
 

@@ -56,8 +56,8 @@
     },
     "board_core/board_config.json": {
       "ownership": "generated",
-      "sha256": "sha256:e97eb2d8b41c05726c276d61a5e3d7c760d73c11fbc85b0322137471c8ae817e",
-      "structure": "sha256:19f21e58d89322afa75d1e04967c6843dcf9403bfadb979b51d9888d9e298162",
+      "sha256": "sha256:e00928a21a6148bde9fb33ae97b6f7e07551928832a3dd780664065f5cf0071b",
+      "structure": "sha256:45952eb3f655cbbdf2274ea6f6f3d0b931d19b72598d9fcb5b1adfe64da6c170",
       "texts": {
         "inspectCommands.darwin.dialog_tips": "sha256:aab7ca9958a2f2b4d5033f9a4b84318367266f75d43c885d055636ca0aff564c",
         "inspectCommands.darwin.system_prompt_inject": "sha256:d29fefec46b57314c11e28c206a7a6ef8a0c28c958c4590c4acb00881977cbf5",

@@ -183,6 +183,106 @@ class StateTest(unittest.TestCase):
         self.assertEqual(code, 1)
 
 
+class SessionContextTest(unittest.TestCase):
+    def test_platform_knowledge_selects_library_for_deploy_unit(self):
+        ws = Workspace(self, "fullstack")
+        unrelated = ws.root / "其他知识库"
+        platform = ws.root / "平台 知识库"
+        local = ws.plugin / "sys"
+        for directory, unit_id, content in (
+            (unrelated, "other", "其他发布单元知识"),
+            (platform, "unit", "平台发布单元知识"),
+            (local, "unit", "插件发布单元知识"),
+        ):
+            directory.mkdir()
+            (directory / "agents.manifest.json").write_text(json.dumps({"systems": [{
+                "systemId": "system", "deployUnits": [{"deployUnitId": unit_id, "agentsPath": "unit.md"}],
+            }]}), encoding="utf-8")
+            (directory / "unit.md").write_text(content, encoding="utf-8")
+
+        for platform_arg, expected in (
+            (json.dumps([{"path": str(unrelated)}, {"path": "${unexpanded}"}, {"path": str(platform)}]),
+             "平台发布单元知识"),
+            (str(platform), "平台发布单元知识"),
+            (json.dumps([{"path": str(unrelated)}]), "插件发布单元知识"),
+            ("${knowledgePath}", "插件发布单元知识"),
+            ("[]", "插件发布单元知识"),
+        ):
+            with self.subTest(platform_arg=platform_arg):
+                code, payload, _ = ws.host(
+                    "runtime/session/render_session_context.py", "--plugin-workspace", str(ws.root), "--project", "p1",
+                    "--selected-deployUnit", '[{"deployUnitId":"unit"}]',
+                    "--knowledge-path", str(local), "--knowledge-path-platform", platform_arg,
+                )
+                self.assertEqual(code, 0, payload)
+                self.assertTrue(payload["ok"], payload)
+                self.assertIn(expected, payload["sessionContext"])
+
+    def test_domain_context_is_fallback_for_missing_unit_content(self):
+        ws = Workspace(self, "fullstack")
+        knowledge = ws.root / "knowledge"
+        knowledge.mkdir()
+        (knowledge / "agents.manifest.json").write_text(json.dumps({"systems": [{
+            "systemId": "system", "agentsPath": "AGENTS.md",
+            "deployUnits": [{"deployUnitId": "unit", "agentsPath": "unit.md"}],
+        }]}), encoding="utf-8")
+        (knowledge / "AGENTS.md").write_text("系统级知识", encoding="utf-8")
+        (ws.root / "AGENTS.md").write_text("工作区指令", encoding="utf-8")
+        (ws.root / "CONTEXT.md").write_text("旧工作区词汇表", encoding="utf-8")
+        ws.meta.mkdir()
+        domain_path = ws.meta / "CONTEXT.md"
+        domain_path.write_text("领域词汇表内容", encoding="utf-8")
+        unit_doc = knowledge / "unit.md"
+        for selected, content, expect_domain in (
+            ([], "单元级知识", True),
+            ([{"deployUnitId": "unit"}], None, True),
+            ([{"deployUnitId": "unit"}], " \n", True),
+            ([{"deployUnitId": "unit"}, {"deployUnitId": "unknown"}], "单元级知识", False),
+        ):
+            with self.subTest(selected=selected, content=content):
+                if content is None:
+                    unit_doc.unlink(missing_ok=True)
+                else:
+                    unit_doc.write_text(content, encoding="utf-8")
+                code, payload, _ = ws.host(
+                    "runtime/session/render_session_context.py", "--plugin-workspace", str(ws.root), "--project", "p1",
+                    "--session-workspace-path", str(ws.root), "--knowledge-path", str(knowledge),
+                    "--selected-deployUnit", json.dumps(selected),
+                )
+                self.assertEqual(code, 0, payload)
+                self.assertTrue(payload["ok"], payload)
+                self.assertIn("当前流程", payload["sessionContext"])
+                self.assertIn("工作区指令", payload["sessionContext"])
+                self.assertEqual("系统级知识" in payload["sessionContext"], bool(selected))
+                self.assertEqual("单元级知识" in payload["sessionContext"], not expect_domain)
+                self.assertEqual("领域词汇表内容" in payload["sessionContext"], expect_domain)
+                self.assertNotIn("旧工作区词汇表", payload["sessionContext"])
+                domain_status = [Path(item["path"]).resolve() for item in payload["agentmdLoadStatus"]
+                                 if item["deployUnitId"] == "领域词汇表"]
+                self.assertEqual(domain_status, [domain_path.resolve()] if expect_domain else [])
+
+    def test_domain_context_uses_custom_project_metadata_directory(self):
+        ws = Workspace(self, "fullstack")
+        runtime_path = ws.plugin / "runtime/config/runtime.json"
+        runtime_config = json.loads(runtime_path.read_text("utf-8"))
+        runtime_config["metaRoot"] = ".custom/metadata"
+        runtime_path.write_text(json.dumps(runtime_config), encoding="utf-8")
+        for project in ("p1", "p2"):
+            directory = ws.root / project / ".custom/metadata"
+            directory.mkdir(parents=True)
+            (directory / "CONTEXT.md").write_text(f"项目 {project} 词汇表", encoding="utf-8")
+        for project, other in (("p1", "p2"), ("p2", "p1")):
+            with self.subTest(project=project):
+                code, payload, _ = ws.host(
+                    "runtime/session/render_session_context.py", "--plugin-workspace", str(ws.root),
+                    "--project", project, "--session-workspace-path", str(ws.root),
+                )
+                self.assertEqual(code, 0, payload)
+                self.assertTrue(payload["ok"], payload)
+                self.assertIn(f"项目 {project} 词汇表", payload["sessionContext"])
+                self.assertNotIn(f"项目 {other} 词汇表", payload["sessionContext"])
+
+
 class ReservedFieldsTest(unittest.TestCase):
     def test_dynamic_stages_and_skip_are_refused(self):
         ws = Workspace(self)

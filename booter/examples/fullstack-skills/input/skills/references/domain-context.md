@@ -4,8 +4,9 @@
 
 ## 位置与创建
 
-- 路径：会话工作区目录下的 `CONTEXT.md`。项目级、跨 feature 持久；不属于任何 feature 的阶段产物，不进 feature 目录，不随 feature 归档。
-- lazy 创建：第一个术语对齐时才创建；创建时先原样写入下方文件头模板，再追加词条。
+- 使用会话提供的 `FEATURE_DIR`，取它的上两级目录后追加 `CONTEXT.md`。例如 `FEATURE_DIR` 是 `${pluginWorkspace}/${projectDir}/.autobizdevops/features/${feature}` 时，词汇表是 `${pluginWorkspace}/${projectDir}/.autobizdevops/CONTEXT.md`。这个写法也适用于自定义 `runtime.metaRoot`。
+- 词汇表归当前项目，所有 Feature 共用。第一个术语对齐时创建，先写入下方文件头模板，再追加词条。
+- 若旧版已在会话工作区创建词汇表，确认它属于当前项目后，可将已有词条合并到项目元数据目录的 `CONTEXT.md`。
 
 ## 回写规则
 

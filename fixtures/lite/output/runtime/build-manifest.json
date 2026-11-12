@@ -53,8 +53,8 @@
     },
     "board_core/board_config.json": {
       "ownership": "generated",
-      "sha256": "sha256:26850a42ae93956a4078926b35fad6c33e3b1bba742d0605ce8f2a34e500115e",
-      "structure": "sha256:19f21e58d89322afa75d1e04967c6843dcf9403bfadb979b51d9888d9e298162",
+      "sha256": "sha256:5eab16524ea8dd5672ef35172c26631bb2203709258657187569fc1c2028aca7",
+      "structure": "sha256:45952eb3f655cbbdf2274ea6f6f3d0b931d19b72598d9fcb5b1adfe64da6c170",
       "texts": {
         "inspectCommands.darwin.dialog_tips": "sha256:3ffd14d4f3573fe9a0e8155fda62dc3ddcdc781ffa33835a60e49b6b5473f4eb",
         "inspectCommands.darwin.system_prompt_inject": "sha256:d8cc6bd89455dbf0881461415f3a8f32fc6a42bbde2da760b796fbcad6675c1c",

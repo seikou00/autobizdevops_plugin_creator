@@ -7,7 +7,7 @@
 1. 调用同目录的 collect-knowledge.js（需要 Node 和 gray-matter）列出支持的发布单元，再逐个取所选单元的知识；
 2. collector 不可用或单元不在它的列表中时，按清单映射加载系统 AGENTS.md 和单元文档；
 3. 仍没有时回退 <localRepoPath>/AGENTS.md；
-4. 始终读取 <sessionWorkspacePath>/AGENTS.md（会话工作区指令）和 CONTEXT.md（领域词汇表）。
+4. 读取 <sessionWorkspacePath>/AGENTS.md（会话工作区指令）。未取得任何非空单元内容时读取 <projectMetaDir>/CONTEXT.md（项目领域词汇表）。
 
 插件可以整个替换这个文件，只要在同一路径实现上面的协议；doctor 不会覆盖被替换的文件。
 gray-matter 由 doctor 在本目录执行 npm install 安装并随包带上；缺失时不在会话中安装（会话入口不得写文件），
@@ -266,11 +266,12 @@ def assemble(request: dict) -> dict:
     units = [item for item in request.get("selectedDeployUnits") or [] if isinstance(item, dict)]
     knowledge_dir = Path(request.get("knowledgePath") or (ROOT / "sys"))
     workspace_dir = str(request.get("sessionWorkspacePath") or "").strip()
+    project_meta_dir = str(request.get("projectMetaDir") or "")
     status, systems, sections, notes, seen_local, refs, anchors = resolve_units(units, knowledge_dir, platform)
     workspace = read_nonempty(Path(workspace_dir) / AGENTS_MD) if workspace_dir else ""
     if workspace and str((Path(workspace_dir) / AGENTS_MD).resolve()) in seen_local:
         workspace = ""
-    domain = read_nonempty(Path(workspace_dir) / CONTEXT_MD) if workspace_dir else ""
+    domain = read_nonempty(Path(project_meta_dir) / CONTEXT_MD) if project_meta_dir and not sections else ""
     with_section = {section["deployUnitId"] for section in sections}
     bindings = []
     if workspace:
@@ -288,7 +289,7 @@ def assemble(request: dict) -> dict:
                                                                                          platform=platform),
                                "loaded": True, "source": "local", "message": ""})
     if domain:
-        session_status.append({"deployUnitId": DOMAIN_STATUS_ID, "path": display_join(workspace_dir, CONTEXT_MD,
+        session_status.append({"deployUnitId": DOMAIN_STATUS_ID, "path": display_join(project_meta_dir, CONTEXT_MD,
                                                                                       platform=platform),
                                "loaded": True, "source": "local", "message": ""})
     counts = {"remote": 0, "local": 0, "miss": 0}

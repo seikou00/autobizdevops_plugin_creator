@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "autobiz.scaffold.module.session.v1",
-  "title": "AutoBiz 会话与运行策略配置 v1（modules/session.json）",
-  "description": "会话与运行策略：给各节点下发运行方式和子代理配置。始终启用；不写这个文件时所有节点都用 multi。",
+  "title": "AutoBiz 运行策略配置 v1（modules/session.json）",
+  "description": "设置全局和逐节点的运行方式、子代理与工具开关。省略此文件时，各节点沿用 multi。",
   "type": "object",
   "additionalProperties": false,
   "properties": {

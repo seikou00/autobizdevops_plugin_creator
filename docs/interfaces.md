@@ -108,15 +108,17 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 ── 4 看板 ──
 ? 目标平台                              › [x] darwin  [x] linux  [x] win32
 ── 5 可选模块 ──
-  知识：有了带 agents.manifest.json 清单的知识目录，…   ← 每个可选模块先打出 module.json 的 title 和 description
-? 启用知识模块？                        › Y
+  发布单元知识：从带清单的知识库列出创建 Feature 时可选的发布单元，…
+? 要不要按发布单元带入知识？            › Y
   产物同步：在看板上增加“发起产物同步”入口，…
 ? 启用产物同步模块？                    › N
-? 知识从哪来？                          › 随插件打包
-? 谁把知识放进会话上下文？              › plugin
+? 发布单元知识从哪来？                  › 随插件打包
+? 谁把发布单元知识放进会话？            › plugin
   …
-── 6 会话与运行策略 ──
-? 要不要自定义运行策略？                › N
+── 6 运行策略 ──
+  可选模式为 multi（多 Agent）、solo（单 Agent）、agent_team（team，Agent 团队）和 workflow（工作流）。
+  N 沿用默认（各节点使用 multi）；Y 自定义（设置全局默认模式，可按节点覆盖）。
+? 要不要自定义节点的 Agent 运行模式？  › N
 ── 7 自定义扩展 ──
   已创建 hooks/（agents/ 可选，需要外挂子代理时再创建）
 ```
@@ -125,7 +127,7 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 - 最后一个节点没有产物时，追问它是否为终态节点（只推进到 `archived`，D56）；
 - 向导在内存中生成配置后先运行 `lint`，有 error 时回到对应问题重新回答；通过后写入配置并执行 doctor，第一次生成时全部节点列为新增；
 - 选择“不提供”时，build 生成空白 `SKILL.md`：只有 frontmatter 和状态维护片段，正文由开发者自行填写（output-spec.md §6.1）；导入已有目录时，build 只在 `SKILL.md` 开头插入状态维护片段。模板由技能自己维护，向导不问、不生成（D29）；
-- 看板一类会生成接入脚本（`runtime/adapters/*`）和三平台命令映射；会话一类会生成默认会话入口和策略骨架；
+- 看板模块提供看板接入脚本和命令。框架提供会话入口，自定义运行策略时另写 `modules/session.json`；
 - 第 4–6 类的回答分别写入 `modules/board.json`、`modules/session.json`、`modules/knowledge.json` 和 `modules/artifactSync.json`，并在入口文件的 `modules` 中引用。全部取默认值的类别不生成文件，所以入口文件只有基础信息和真正用到的引用。启用产物同步时追问从哪个节点起允许同步，`artifacts` 的预填与 `module enable artifactSync` 相同（§1.1）；
 - `--yes` 时不提问，回答全部取自 `--answers`，必须给出 `plugin` 和 `nodes`，缺少必填项报用法错误（退出码 2）；lint 有 error 时报出 Issue，不写任何文件。
 
@@ -217,18 +219,19 @@ simulate 在临时目录中扮演 DevClaw，调用一遍已经生成的插件，
 
 ```text
 booter/
-├── SKILL.md                  # 流程、选择题和填写指南（见下）
+├── SKILL.md                  # 流程、选择题和指南入口
+├── references/config-guide.md # 入口文件与 workflow 的填写指南
 ├── __main__.py               # CLI 入口：python3 <booter 目录> <命令>，直接从源码运行，与 autobiz-plugin.pyz 等价
 └── scaffold/  runtime/  schemas/  …   # CLI 运行时读取的源码和资源
 ```
 
-SKILL.md 中的命令写作 `python "<booter>" <命令> --json`，`<booter>` 是 SKILL.md 所在目录的绝对路径。入口文件与 workflow 的填写指南在 SKILL.md 内。模块简介取自 `module list` 的 `description`，填写指南取自 `guide` 指向的文件，新增模块时随模块包提供。检查细节以 CLI 的 Issue（`code`、`pointer`、`hint`）和插件目录 `.scaffold/` 下的 Schema 为准。需要用户决定时用 `request_user_input` 出选择题（D65）。
+SKILL.md 中的命令写作 `python "<booter>" <命令> --json`，`<booter>` 是 SKILL.md 所在目录的绝对路径。入口文件与 workflow 的填写指南在 `references/config-guide.md`。模块简介取自 `module list` 的 `description`，填写指南取自 `guide` 指向的文件，新增模块时随模块包提供。检查细节以 CLI 的 Issue（`code`、`pointer`、`hint`）和插件目录 `.scaffold/` 下的 Schema 为准。需要用户决定时用 `request_user_input` 出选择题（D65）。
 
 流程（SKILL.md 正文）：
 
 | 步骤 | agent 做什么 | 调用 |
 |---|---|---|
-| 1. 目录和模块 | 单独问目录，再介绍可选模块并逐个问要不要。选了知识再问来源和组装方。自定义运行策略单独问。按回答生成骨架并写入对应字段 | `module list`、`new --skeleton` |
+| 1. 目录和模块 | 单独问目录，再介绍可选模块并逐个问要不要。选了发布单元知识再问来源和组装方。单独给出「沿用默认」（各节点用 `multi`）和「自定义运行模式」（可全局设置和按节点覆盖）两个选项。按回答生成骨架并写入对应字段 | `module list`、`new --skeleton` |
 | 2. 讲解后停下 | 读取所选模块的指南，展示启用后多出什么、什么时候需要、要先准备什么、最少要填哪些字段。开发者自己填写，也可以先描述流程，由 agent 整理成表格回显，确认后写入 | — |
 | 3. 检查配置 | 转述 `TODO_FIELD` 和其他 error 的位置与 `hint`，开发者改完后再检查，直到没有 error | `lint` |
 | 4. 技能 | 导入已有技能集合；没有技能时生成空白 `SKILL.md`，引导开发者填写 `description` 和正文 | `add skills --from`，或 `doctor` |
@@ -310,7 +313,7 @@ autobiz-plugin doctor [-C <plugin-dir>] [--dry-run] [--force] [--allow-id-change
 
 ## 2. 模块契约
 
-模块分两类：核心模块 `board`（看板）和 `session`（会话与运行策略）始终启用；可选模块 `knowledge`（知识）和 `artifactSync`（产物同步）按配置启用，各自有独立的配置文件，入口文件引用即启用。知识沉淀入口只是 `board_core/modules.json` 中的一个看板入口，由 `board` 模块直接生成。
+核心模块 `board`（看板）和 `session`（运行策略）始终启用。可选模块 `knowledge`（发布单元知识）和 `artifactSync`（产物同步）通过入口文件引用启用。框架提供 `session_context_inject`，读取流程和运行策略，并接入 `knowledge` 提供的组装结果。看板模块直接生成 `board_core/modules.json` 中调用 DevClaw `knowledge-sync` 的“发起知识沉淀”入口。
 
 ### 2.1 模块包结构
 
@@ -430,7 +433,7 @@ class ModuleContext:
     package_dir: Path                      # 模块包目录
     runtime_dir: Path                      # 仓库根目录的 runtime/
     core_version: str
-    enabled: frozenset[str]                # 启用的模块；session 据此决定会话入口是否带知识目录参数（D53）
+    enabled: frozenset[str]                # 已启用的模块 ID
 
 class Module(Protocol):
     id: str
@@ -451,14 +454,14 @@ class Module(Protocol):
 | `entries` | 写入 `modules.json` 的顶层键，不能占用由核心写入的 `apiVersion`、`modules`、`boardEvents` | `MODULE_CONFLICT` |
 | `manifest` | 只写本模块在 `modules.<id>` 下的条目，`enabled`、`version` 由核心填写 | `MODULE_CONFLICT` |
 | `runtime_config` | 写入 `runtime/config/<name>.json`：`runtime`、`flow` 由框架生成，`board`、`session` 由同名的核心模块生成，`knowledge` 由知识模块生成 | `MODULE_CONFLICT` |
-| `inspect_commands` | 写入 `board_config.json`，每个平台各生成一份，键按贡献顺序排列；output-spec.md §3.2 中标为“必有”的键都由 board、session 贡献。模块未启用时它贡献的键直接不出现（D1），不输出空值 | `MODULE_CONFLICT` |
+| `inspect_commands` | 写入 `board_config.json`，每个平台各生成一份，键按贡献顺序排列。会话入口由框架提供，其他必有命令由看板模块提供。可选模块的命令只在模块启用时生成 | `MODULE_CONFLICT` |
 | `files` | `dst` 不能与框架文件或其他模块重复 | `MODULE_CONFLICT` |
 | `skills` | 不能与节点技能重名，由 artifactSync 在 validate 中检查（D47） | `MODULE_SKILL_CONFLICT` |
 | `knowledge_assembly` | 写入 `runtime/config/session.json` 的 `knowledgeAssembly`（§2.4）；只有知识模块提供 | — |
 
 ### 2.4 运行期接口：知识组装
 
-默认会话入口 `runtime/session/render_session_context.py` 读取 `runtime/config/session.json` 中的 `knowledgeAssembly`，执行其中的组装脚本，把输出并入会话内容。`knowledgeAssembly` 由知识模块在 `assembler = plugin` 时写入，其他情况为 `null`：
+框架的会话入口 `runtime/session/render_session_context.py` 从编译产物 `runtime/config/session.json` 读取 `knowledgeAssembly`，执行其中的组装脚本并追加输出。发布单元知识模块在 `assembly.enabled = true` 且 `assembler = plugin` 时提供这个配置，其他情况编译为 `null`：
 
 ```json
 { "schema": "autobiz.session.v1",
@@ -713,7 +716,7 @@ runtime/session/render_session_context.py --platform <p> --plugin-workspace <dir
 
 `flow` 是新增字段，现有宿主忽略即可。
 
-启用知识模块时，生成的命令末尾带 `--knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledgePath}"`（D53），用来兼容两种知识目录：`--knowledge-path-platform` 是 DevClaw 传入的知识库 JSON 数组（也接受单个目录），其中有可用目录时取它，多个时优先取清单登记了所选发布单元的那个，否则取第一个（D68）；为 `[]` 或为空时走旧模式，取 `--knowledge-path`，即插件自己的 `${pluginPath}/sys`。未启用知识模块时命令不带这两个参数。
+启用知识模块时，生成的命令末尾带 `--knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledgePath}"`（D53）。`--knowledge-path-platform` 接受 DevClaw 传入的知识库 JSON 数组或单个目录。解析数组时逐项跳过路径含未展开占位符的条目。会话入口按平台知识库的顺序查找清单中登记了任一所选发布单元的目录，再查找插件自己的 `${pluginPath}/sys`。没有匹配或未选发布单元时，取第一个平台目录，平台未提供有效路径时取插件目录。未启用知识模块时命令不带这两个参数。
 
 **策略目标节点**（与宿主拉起技能时依据的 nextAction 保持一致）：
 
@@ -752,7 +755,7 @@ runtime/knowledge/inspect_deploy_units.py --knowledge-path <dir> --knowledge-pat
 }
 ```
 
-知识目录的选择与会话入口相同（§3.3.7）：`--knowledge-path-platform` 不为空时取它，为空时取 `--knowledge-path`（D53）。只读，不访问网络。清单不存在或格式不符时返回 `{"ok": false, "errors": ["…"]}`，退出码 1。
+此命令取第一个有效的平台知识库路径，平台未提供有效路径时取 `--knowledge-path`（§3.3.7）。命令只读且不访问网络。清单不存在或格式不符时返回 `{"ok": false, "errors": ["…"]}`，退出码 1。
 
 #### 3.3.9 pull_knowledge（sync_knowledge.py，声明 knowledge.source 时）
 
@@ -988,13 +991,13 @@ python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp
 
   ```json
   { "schema": "autobiz.session.request.v1", "platform": "darwin", "pluginRoot": "…",
-    "pluginWorkspace": "…", "project": "…", "feature": "f1", "featureDir": "…",
+    "pluginWorkspace": "…", "project": "…", "feature": "f1", "featureDir": "…", "projectMetaDir": "/abs/project/.autobizdevops",
     "selectedDeployUnits": [ { "deployUnitId": "…", "localRepoPath": "…", "description": "…" } ],
     "sessionWorkspacePath": "…", "knowledgePath": "/abs/plugin/sys",
     "flow": { … }, "agentConfig": { … } }
   ```
 
-  `selectedDeployUnits` 已解析并校验；`knowledgePath` 为按 §3.3.7 选出的知识目录的绝对路径（`--knowledge-path-platform` 不为空时取它，否则取 `--knowledge-path`）；`featureDir` 在 Feature 尚未创建时为空字符串；
+  `selectedDeployUnits` 已解析并校验。`knowledgePath` 为按 §3.3.7 选出的知识目录的绝对路径。`featureDir` 在 Feature 尚未创建时为空字符串。`projectMetaDir` 为按 `runtime.metaRoot` 解析的项目元数据目录的绝对路径，无法解析时为空字符串。
 - **stdout**：`{"sessionContext": "…", "agentmdLoadStatus": [ … ], "message": "…"}`，三个字段都可以省略。`sessionContext` 是知识段，追加在流程上下文之后；`agentmdLoadStatus` 的条目格式见 §3.3.7；
 - 工作目录为插件根目录，超时为 `knowledge.assembly.timeoutSec`（默认 30 秒）；
 - 退出码非 0、超时或输出不是合法 JSON 时，本次会话不含知识段，`agentmdLoadStatus` 为 `[]`，在 `message` 中追加 `"知识组装失败: <原因>"`，`session_context_inject` 仍然返回 `ok:true`；
@@ -1002,6 +1005,8 @@ python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --checkpoint <cp
 - stdout 只用于协议 JSON，日志写 stderr；不得修改项目文件和知识目录，知识仓库同步是 `pull_knowledge` 的职责。
 
 内置组装脚本的做法（来自全栈版）：调用同目录的 `collect-knowledge.js`（需要 Node）列出 collector 支持的发布单元，再逐个取所选单元的知识；collector 不可用（没有 Node、接口失败、超时）或单元不在它的列表中时，按清单映射加载，最后回退 `<localRepoPath>/AGENTS.md`。另外始终读取 `<sessionWorkspacePath>/AGENTS.md` 作为会话工作区指令。collector 依赖的 `gray-matter` 由 doctor 在 `runtime/knowledge/` 下执行 `npm install` 安装并随包带上；缺失时会话入口不安装，直接按清单映射加载（README §9 第 7 条）。
+
+仅当所有选中的发布单元都未取得非空单元内容时，才读取 `<projectMetaDir>/CONTEXT.md` 作为项目级领域词汇表。默认位置是项目下的 `.autobizdevops/CONTEXT.md`。未选发布单元时也走此回退。
 
 插件替换这个文件时，只需在同一路径实现上面的协议。主体逻辑可以用任何语言写，由这个 Python 文件调用（内置版本就是这样调用 Node 的）。doctor 重新生成或替换运行框架时都不覆盖被替换的文件（README §4）。
 

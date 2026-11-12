@@ -187,19 +187,20 @@ def ask_board(prompter: Prompter) -> dict | None:
     return None if platforms == list(PLATFORMS) else {"target": {"platforms": platforms}}
 
 
-def ask_session(prompter: Prompter, nodes: list) -> dict | None:
-    prompter.say("── 6 会话与运行策略 ──")
+def ask_runtime_policy(prompter: Prompter, nodes: list) -> dict | None:
+    prompter.say("── 6 运行策略 ──")
     spec = discover()["session"]
     prompter.say(f"  {spec.title}：{spec.description}")
-    prompter.say("  沿用默认时各节点使用 multi。自定义时写入 modules/session.json，可以设置全局默认策略或覆盖单个节点。")
-    if not yes(prompter, "要不要自定义运行策略？", False):
+    prompter.say("  可选模式为 multi（多 Agent）、solo（单 Agent）、agent_team（team，Agent 团队）和 workflow（工作流）。")
+    prompter.say("  N 沿用默认（各节点使用 multi）；Y 自定义（设置全局默认模式，可按节点覆盖）。")
+    if not yes(prompter, "要不要自定义节点的 Agent 运行模式？", False):
         return None
-    mode = prompter.ask("默认运行方式（policies.default.agentMode）", default="multi", choices=AGENT_MODES)
+    mode = prompter.ask("全局默认 Agent 运行模式（policies.default.agentMode）", default="multi", choices=AGENT_MODES)
     policies = {"default": {"agentMode": mode}}
-    if yes(prompter, "为节点单独配置策略？", False):
+    if yes(prompter, "为个别节点覆盖 Agent 运行模式？", False):
         groups = {}
         for node in nodes:
-            node_mode = prompter.ask(f"{node['id']} 的运行策略", default=mode, choices=AGENT_MODES)
+            node_mode = prompter.ask(f"{node['id']} 的 Agent 运行模式", default=mode, choices=AGENT_MODES)
             if node_mode != mode:
                 groups.setdefault(node["stage"], []).append({"id": node["id"], "agentMode": node_mode})
         if groups:
@@ -212,9 +213,9 @@ def ask_knowledge(prompter: Prompter) -> dict:
                  "  随插件打包：省略 source，把带清单的知识目录放进 sys/。\n"
                  "  DevClaw 提供：省略 source，在 DevClaw 中给项目绑定知识库。\n"
                  "  运行时优先使用项目绑定的知识库。")
-    source = prompter.ask("知识从哪来？", choices=("Git 仓库", "随插件打包", "DevClaw 提供"))
+    source = prompter.ask("发布单元知识从哪来？", choices=("Git 仓库", "随插件打包", "DevClaw 提供"))
     prompter.say("  插件组装时 assembly.assembler 写 plugin，DevClaw 组装时写 devclaw。")
-    assembler = prompter.ask("谁把知识放进会话上下文？", default="plugin", choices=("plugin", "devclaw"))
+    assembler = prompter.ask("谁把发布单元知识放进会话？", default="plugin", choices=("plugin", "devclaw"))
     knowledge = {"assembly": {"assembler": assembler}}
     if source == "Git 仓库":
         url = prompter.ask("知识仓库 HTTPS 地址（source.url）")
@@ -245,7 +246,8 @@ def ask_modules(prompter: Prompter, nodes: list) -> dict:
     for module_id in ("knowledge", "artifactSync"):
         spec = discover()[module_id]
         prompter.say(f"  {spec.title}：{spec.description}")
-        if yes(prompter, f"启用{spec.title}模块？", False):
+        question = "要不要按发布单元带入知识？" if module_id == "knowledge" else f"启用{spec.title}模块？"
+        if yes(prompter, question, False):
             selected.add(module_id)
 
     answers = {}
@@ -266,8 +268,8 @@ def ask(prompter: Prompter, *, existing_skills: list | None = None) -> dict:
     if board is not None:
         answers["board"] = board
     answers.update(ask_modules(prompter, answers["nodes"]))
-    session = ask_session(prompter, answers["nodes"])
-    if session is not None:
-        answers["session"] = session
+    policy = ask_runtime_policy(prompter, answers["nodes"])
+    if policy is not None:
+        answers["session"] = policy
     prompter.say("── 7 自定义扩展 ──\n  将创建 hooks/（agents/ 可选，需要外挂子代理时再创建）")
     return answers

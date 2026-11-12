@@ -1,0 +1,165 @@
+{
+  "schema": "autobiz.board.v1",
+  "template": {
+    "id": "standard",
+    "label": "标准",
+    "description": "完整主干流程（Biz→Dev→Ops）。"
+  },
+  "stateLabels": {
+    "not_started": "未开始",
+    "in_progress": "进行中",
+    "done": "已完成",
+    "archived": "已归档"
+  },
+  "nodes": {
+    "biz": [
+      {
+        "id": "prd",
+        "description": "Biz 阶段需求澄清与正式 PRD 生成技能。",
+        "nextAction": {
+          "not_started": {
+            "slashSkill": "autobiz-requirement-discuss",
+            "userMessage": "请使用 /autobiz-requirement-discuss 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：需求澄清与 PRD。"
+          },
+          "in_progress": {
+            "slashSkill": "autobiz-requirement-discuss",
+            "userMessage": "请使用 /autobiz-requirement-discuss 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：需求澄清与 PRD。"
+          },
+          "done": {
+            "slashSkill": "autodev-specs",
+            "userMessage": "请使用 /autodev-specs 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "下一阶段：行为规格。"
+          }
+        }
+      }
+    ],
+    "dev": [
+      {
+        "id": "specs",
+        "description": "将需求转为简短 proposal 与按可独立验收能力组织的行为规格，供设计、计划和验收使用。",
+        "nextAction": {
+          "not_started": {
+            "slashSkill": "autodev-specs",
+            "userMessage": "请使用 /autodev-specs 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：行为规格。"
+          },
+          "in_progress": {
+            "slashSkill": "autodev-specs",
+            "userMessage": "请使用 /autodev-specs 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：行为规格。"
+          },
+          "done": {
+            "slashSkill": "autodev-design",
+            "userMessage": "请使用 /autodev-design 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "下一阶段：技术设计。"
+          }
+        }
+      },
+      {
+        "id": "design",
+        "description": "基于行为规格与必要代码证据生成精简技术设计并锁定 Design 到 Plan 的契约。",
+        "nextAction": {
+          "not_started": {
+            "slashSkill": "autodev-design",
+            "userMessage": "请使用 /autodev-design 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：技术设计。"
+          },
+          "in_progress": {
+            "slashSkill": "autodev-design",
+            "userMessage": "请使用 /autodev-design 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：技术设计。"
+          },
+          "done": {
+            "slashSkill": "autodev-plan",
+            "userMessage": "请使用 /autodev-plan 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "下一阶段：执行计划。"
+          }
+        }
+      },
+      {
+        "id": "plan",
+        "description": "将已确认的行为与技术设计转为任务、真实依赖和仓库归属，生成并发布 Plan。",
+        "nextAction": {
+          "not_started": {
+            "slashSkill": "autodev-plan",
+            "userMessage": "请使用 /autodev-plan 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：执行计划。"
+          },
+          "in_progress": {
+            "slashSkill": "autodev-plan",
+            "userMessage": "请使用 /autodev-plan 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：执行计划。"
+          },
+          "done": {
+            "slashSkill": "autodev-code",
+            "userMessage": "请使用 /autodev-code 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "下一阶段：代码实现。"
+          }
+        }
+      },
+      {
+        "id": "code",
+        "description": "启动或恢复固定 Code Workflow，在隔离工作树完成实现、Review、集成和最终证据汇总。",
+        "nextAction": {
+          "not_started": {
+            "slashSkill": "autodev-code",
+            "userMessage": "请使用 /autodev-code 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：代码实现。"
+          },
+          "in_progress": {
+            "slashSkill": "autodev-code",
+            "userMessage": "请使用 /autodev-code 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：代码实现。"
+          },
+          "done": {
+            "slashSkill": "autoops-cicd",
+            "userMessage": "请使用 /autoops-cicd 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "下一阶段：CI/CD。"
+          }
+        }
+      }
+    ],
+    "ops": [
+      {
+        "id": "cicd",
+        "description": "生成 CI/CD 清单与 PR 描述，使用 DevClaw 提交当前 Feature 代码，并处理流水线构建与阻断。",
+        "nextAction": {
+          "not_started": {
+            "slashSkill": "autoops-cicd",
+            "userMessage": "请使用 /autoops-cicd 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：CI/CD。"
+          },
+          "in_progress": {
+            "slashSkill": "autoops-cicd",
+            "userMessage": "请使用 /autoops-cicd 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：CI/CD。"
+          },
+          "done": {
+            "slashSkill": "autoops-archive",
+            "userMessage": "请使用 /autoops-archive 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "下一阶段：归档。"
+          }
+        }
+      },
+      {
+        "id": "archive",
+        "description": "Ops 归档阶段技能。",
+        "nextAction": {
+          "not_started": {
+            "slashSkill": "autoops-archive",
+            "userMessage": "请使用 /autoops-archive 处理当前 Feature，先读取现有状态和产物。",
+            "dialogTips": "当前阶段：归档。"
+          },
+          "archived": {
+            "slashSkill": "autoops-archive",
+            "userMessage": "请使用 /autoops-archive 查看当前 Feature 的归档状态。",
+            "dialogTips": "归档已完成。"
+          }
+        }
+      }
+    ]
+  },
+  "dynamicStages": {}
+}

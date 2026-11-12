@@ -5,16 +5,24 @@ metadata:
   version: v2.0
 ---
 
+<!-- plugin workflow: begin state -->
+## 技能状态维护
+
+技能开始执行：python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --feature "${feature}" --checkpoint specs_in_progress
+
+技能完成执行：python -X utf8 "${pluginPath}/runtime/workflow/update_state.py" --feature "${feature}" --checkpoint specs_done
+<!-- plugin workflow: end state -->
+
 # /autodev-specs — Behavior Specs
 
-产物目录：`${pluginWorkspace}/${projectDir}/.autobizdevops/features/${feature}/`。默认在主会话完成。
+产物目录使用会话提供的 `FEATURE_DIR`。默认在主会话完成。
 
 ## 输入与查证
 
 - 读取 `PRD.md`（缺失用用户需求）、已有 proposal/specs、`IMPLEMENTATION_SCOPE.json` 和 `UI_CONTEXT.json`。实现范围缺失按 `full_stack`；`backend_only` / `frontend_only` 只描述本期对应端的行为。
 - 需求以用户与 PRD 为依据。只为已有行为、冲突或入口等具体问题查代码，复用已有证据；得到当前规格所需事实即停止，不要求每条未来需求都有源码证据。
 - 局部查证直接完成；有独立检索价值时才向 `Explore-autodev` 提供 1–3 个问题、相关目录/入口和已有证据。未找到时保留搜索范围与未知项，仅为阻断项继续查证。
-- 只澄清影响行为、范围或验收的真实未决项，提问时读取 `${pluginPath}/skills/references/ask-user-question.md`；已确认内容直接复用，无未决项直接生成。新对齐术语按 `${pluginPath}/skills/references/domain-context.md` 回写 `CONTEXT.md`。
+- 只澄清影响行为、范围或验收的真实未决项，提问时读取 `${pluginPath}/skills/references/ask-user-question.md`；已确认内容直接复用，无未决项直接生成。新对齐术语按 `${pluginPath}/skills/references/domain-context.md` 回写 `FEATURE_DIR` 上两级目录里的 `CONTEXT.md`。
 - 有外部资料时查看 `source-context.json` 索引，只打开约束本期行为的资料/快照；已保存快照视为已提供，不重复索取。
 
 

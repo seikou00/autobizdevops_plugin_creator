@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-from scaffold.build.contribute import Contribution, FileSpec
+from scaffold.build.contribute import CommandSpec, Contribution, FileSpec
 from scaffold.build.load import HOOKS_FILE, MODULE_KEYS, hook_events
 from scaffold.lib import fsio
 
+SESSION_SCRIPT = "runtime/session/render_session_context.py"
+SESSION_ARGS = ('--platform {platform} --plugin-workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" '
+                '--selected-deployUnit ${selectedDeployUnits} --session-workspace-path "${sessionWorkspacePath}"')
+SESSION_KNOWLEDGE_ARGS = ' --knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledgePath}"'
 FRAMEWORK_FILES = (
     "runtime/__init__.py",
     "runtime/common/__init__.py", "runtime/common/query.py", "runtime/common/engine.py", "runtime/common/cli.py",
     "runtime/workflow/__init__.py", "runtime/workflow/update_state.py",
     "runtime/adapters/__init__.py", "runtime/adapters/board_view.py", "runtime/adapters/board_events.py",
+    "runtime/session/__init__.py", SESSION_SCRIPT,
 )
 GUARD_SCRIPT = "hooks/artifact_guard.py"   # 模板在 runtime/hooks/，拷到插件根目录的 hooks/
 # 默认钩子：执行完成命令前检查必需产物存在且非空，不满足时拦截（与 update_state.py 的检查冗余，D61）
@@ -122,8 +127,10 @@ def framework_contribution(ir, normalized, skill_dirs: dict) -> Contribution:
     files += [FileSpec(f".scaffold/{name}", "managed", src=f"schemas/{name}") for name in SCHEMA_FILES]
     files.append(FileSpec(GUARD_SCRIPT, "managed", src="runtime/hooks/artifact_guard.py"))
     files.append(FileSpec("plugin.json", "generated", content=fsio.dump_json(plugin_manifest(ir.plugin))))
+    session_args = SESSION_ARGS + (SESSION_KNOWLEDGE_ARGS if "knowledge" in normalized.modules else "")
     return Contribution(files=files, runtime_config={"runtime": runtime_config(ir),
                                                      "flow": flow_config(ir, normalized, skill_dirs)},
+                        inspect_commands={"session_context_inject": CommandSpec(SESSION_SCRIPT, session_args)},
                         hooks={"PreToolUse": [ARTIFACT_GUARD]})
 
 

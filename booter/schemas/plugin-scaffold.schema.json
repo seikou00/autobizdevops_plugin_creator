@@ -22,8 +22,8 @@
       "description": "模块配置文件引用。board、session 始终启用，不引用时全部取默认值；knowledge、artifactSync 是可选模块，引用即启用。",
       "properties": {
         "board": { "$ref": "#/definitions/fileRef", "description": "看板模块配置，建议 ./modules/board.json。" },
-        "session": { "$ref": "#/definitions/fileRef", "description": "会话与运行策略配置，建议 ./modules/session.json。" },
-        "knowledge": { "$ref": "#/definitions/fileRef", "description": "知识模块配置，建议 ./modules/knowledge.json。" },
+        "session": { "$ref": "#/definitions/fileRef", "description": "运行策略配置，建议 ./modules/session.json。" },
+        "knowledge": { "$ref": "#/definitions/fileRef", "description": "发布单元知识配置，建议 ./modules/knowledge.json。" },
         "artifactSync": { "$ref": "#/definitions/fileRef", "description": "产物同步模块配置，建议 ./modules/artifactSync.json。" },
         "globalHooks": { "$ref": "#/definitions/fileRef", "description": "兼容已有插件的全局钩子配置。" }
       }

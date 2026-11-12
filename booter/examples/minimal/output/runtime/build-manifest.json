@@ -9,8 +9,8 @@
     "session": "1.0.0"
   },
   "inputs": {
-    "plugin.scaffold.json": "sha256:b99b8694bbd3110cc46159d17e85f071705f1737649f0ed3af885eab31c4f542",
-    "workflow.json": "sha256:2e57ad627387c9866d4f5fd77373f0cefe8f27b106ed6e8f6ca97d5336e2d3d0",
+    "plugin.scaffold.json": "sha256:d63f7985df33f11c99f690d7cd73d4fbb89d3bb5a594e285da2f533a3e1993a2",
+    "workflow.json": "sha256:45d2d90a8a3741e56d4915f953c128785a55fe369de1c268ddca063e0d44bb1f",
     "skills/autobiz/doc-draft/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545",
     "skills/autobiz/doc-review/SKILL.md#description": "sha256:c0a2ab5c0a94e5d4566532aa424b9a73f26d2afb4776a2cdb717b29b93d97545"
   },
@@ -45,8 +45,8 @@
     },
     "board_core/board_config.json": {
       "ownership": "generated",
-      "sha256": "sha256:140d8118dcf3a0849d6c45a020a668a65894cd6a5b3fe7af386e66e2e5af1ba9",
-      "structure": "sha256:853cae8ad039522f33624134166fbc8dfda05fdde9875627450eebd9a8dbe91f",
+      "sha256": "sha256:cb1fce4134e030f429f0e847fab2f281df17e76e5c6196ab50e9ecf3f97af4d7",
+      "structure": "sha256:f55199fe11193d38f97c84f1258fb87f17c3e5eb0cd2073c3bac3d7b1af8ebf1",
       "texts": {
         "inspectCommands.darwin.dialog_tips": "sha256:9c938a65414756ce63326797df873b2235e9b74f2d021e5262cd467c417a96d6",
         "inspectCommands.darwin.system_prompt_inject": "sha256:d8cc6bd89455dbf0881461415f3a8f32fc6a42bbde2da760b796fbcad6675c1c",
@@ -155,7 +155,7 @@
     },
     "runtime/config/flow.json": {
       "ownership": "generated",
-      "sha256": "sha256:4d85e2eed4a0ab9f8771ad899e0fb575dade4aafbc753ad134f5857750d6a1e4"
+      "sha256": "sha256:1f00d5385d67cff2acc6821dcf1499cb14c8d9b2d9e52c50e6379421d3cb9f7c"
     },
     "runtime/config/runtime.json": {
       "ownership": "generated",

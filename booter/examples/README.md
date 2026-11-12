@@ -1,21 +1,26 @@
 # 示例
 
-每个示例目录下，根目录的文件是**核心配置**（开发者维护的输入），`output/` 是对这份输入执行 `autobiz-plugin build` 后**应得到的生成内容**（金样）。`output/` 按插件根目录的结构摆放，只收录由输入推导出来的文件：
+每套示例都有一份开发者维护的输入和一份用当前脚手架生成的输出。
 
-| 文件 | 归属 | 规则 |
+| 示例 | 输入 | 输出 |
 |---|---|---|
-| `plugin.json` | generated | output-spec.md §2.1 |
-| `board_core/board_config.json` | generated | DevClaw 读取的宿主命令，output-spec.md §3.1 |
-| `board_core/modules.json` | generated | DevClaw 读取的模块开启情况与看板入口，output-spec.md §3.3 |
-| `runtime/config/runtime.json`、`flow.json`、`board.json`、`session.json`、`knowledge.json` | generated | 只给插件脚本读，output-spec.md §5；看板上的流程数据由 adapter 用它们拼出、通过命令输出 |
-| `runtime/build-manifest.json` | generated | output-spec.md §8 |
-| `hooks/hooks.json` | seeded | 产物检查钩子（和启用的全局钩子）的条目，开发者的条目写在同一文件，interfaces.md §4.7 |
-| `skills/autobiz\|autodev\|autoops/<skill>/SKILL.md` | seeded | 按节点阶段分组（D64）；示例中没有技能目录，所以是 build 生成的空白 `SKILL.md`：只有 frontmatter 和状态维护片段，checkpoint 与 `workflow.json` 的节点一一对应（output-spec.md §6.1） |
-| `skills/autobizdevops-artifact-sync/config/artifact-sync.json` | generated | 产物同步模块，output-spec.md §7.2 |
+| 最小示例 | [minimal/input/](minimal/input/)。起草、评审两个节点，使用默认看板和运行策略。 | [minimal/output/](minimal/output/)。包含生成的插件配置、产物检查钩子和待填写的节点技能。 |
+| 全栈技能示例 | [fullstack-skills/input/](fullstack-skills/input/)。包含 Biz、Dev、Ops 流程、看板、运行策略、发布单元知识、产物同步，以及原有的技能、子代理和自定义钩子。 | [fullstack-skills/output/](fullstack-skills/output/)。包含看板宿主命令、编译配置、合并后的钩子和插入状态维护片段的节点技能。 |
 
-不收录内容固定、与输入无关的文件：运行框架入口与内部库（managed）、知识模块和产物同步模块的脚本与文案（module）、`.scaffold/` 下的 Schema。它们在 `build-manifest.json` 中照常登记，摘要写作 `sha256: "…"`。build-manifest 和 `flow.json` 中输入文件的摘要是真实值，改了输入就要重新生成 `output/`（相当于对示例执行 `doctor`）。节点技能 `description` 的摘要按 `output/skills/` 下生成的空白 SKILL.md 计算（示例目录本身没有技能）。
+全栈示例中，流程脚本位于 `skills/scripts/flowlib/`，节点与产物定义取自生成的 `runtime/config/flow.json`，额外的节点校验规则取自 `node_contracts.json`。`hooks/` 放由 `hooks/hooks.json` 注册的宿主钩子。
 
-| 示例 | 用到的能力 |
-|---|---|
-| [minimal/](minimal/) | 两个节点（都在 `biz` 组，`seq` 为 1、2）；不写模块配置 |
-| [fullstack-skills/](fullstack-skills/) | 全栈版的核心配置和技能（产物同步技能由模块生成，不收录），以及按新目录结构重构后的流程脚本：`hooks/` 只放 `hooks.json` 注册的宿主钩子（新增 `state_write_guard.py`、`stage_gate_guard.py` 取代原 `state_checkpoint.py`）；原插件根目录 `hooks/` 下由技能调用的流程脚本和共用库放在 `skills/scripts/flowlib/`，原 `board_core` 由其中的 `contracts.py`、`state_store.py` 取代（节点、产物、checkpoint 读运行框架的 `flow.json`，校验器清单等读 `node_contracts.json`，状态变更只走运行框架）；已被运行框架、知识模块、globalHooks 取代的脚本删除。v1 运行框架只有 standard 流程，阶段回退只保留 `target_in_progress`。用来验证搬入已有技能后的悬空引用和绝对路径检查（`SKILL_REF_DANGLING`、`SKILL_REF_ABSOLUTE`，D71），以及流程脚本能在新结构下运行（`tests/test_fullstack_skills.py`）。没有 `output/` 金样 |
+全栈示例的规格技能根据 `FEATURE_DIR` 定位项目词汇表。默认路径为项目下的 `.autobizdevops/CONTEXT.md`，由技能在首次确认术语时写入，属于业务项目的数据。 [词汇表维护协议](fullstack-skills/input/skills/references/domain-context.md) · [生成后的规格技能](fullstack-skills/output/skills/autodev/autodev-specs/SKILL.md)
+
+## 复现生成结果
+
+从仓库根目录运行下面的命令，把示例输入复制到临时目录，再运行 `doctor`。将 `minimal` 换成 `fullstack-skills` 可以复现全栈输出。全栈示例配置了知识仓库，在离线环境下可以像下面这样跳过拉取知识和安装 Node 依赖。
+
+```bash
+example_dir=$(mktemp -d)
+cp -R booter/examples/minimal/input/. "$example_dir/"
+AUTOBIZ_SKIP_KNOWLEDGE_PULL=1 AUTOBIZ_SKIP_NPM_INSTALL=1 \
+  python3 booter -C "$example_dir" doctor
+python3 booter -C "$example_dir" check
+```
+
+`output/` 按插件根目录的结构存放便于对照的生成文件。可直接比较入口清单、看板配置、运行配置、合并后的钩子和节点技能。通用运行脚本、模块资源和 `.scaffold/` Schema 由 `doctor` 补齐，未收录的这些文件在预览构建清单中以 `sha256: "…"` 标记。要验证或打包完整插件，请在 `doctor` 生成的目录操作。最小示例需要先补全技能描述和正文。

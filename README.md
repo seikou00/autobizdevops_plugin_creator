@@ -34,7 +34,7 @@ python3 -m unittest discover -s tests -t .              # 脚手架自身的测�
 | [docs/priorities.md](docs/priorities.md) | 草案：v1 功能分期（P0 / P1） |
 | [booter/](booter/README.md) | 脚手架本身：CLI 与构建流水线 `scaffold/`、运行框架模板 `runtime/`、发布脚本和测试；整个目录也是骨架引导技能（入口 `booter/SKILL.md`） |
 | [booter/schemas/](booter/schemas/) | `workflow.schema.json`、`plugin-scaffold.schema.json`、`modules/*.schema.json`、`host/outputs.schema.json` |
-| [booter/examples/](booter/examples/) | `minimal/`；`output/` 是 build 应生成的内容 |
+| [booter/examples/](booter/examples/) | 最小示例和全栈技能示例，各自提供 `input/` 和 `output/` |
 | [fixtures/](fixtures/) | 只供测试、不随 booter 分发的样例：`lite/`（复刻 autobizdevops_lite）、`fullstack/`（全栈版），结构同 `booter/examples/` |
 
 ## 参考插件

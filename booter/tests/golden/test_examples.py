@@ -1,6 +1,6 @@
 """金样测试：对示例执行 build，生成内容与示例的 output/ 逐字节一致（examples/README.md）。
 
-minimal 在 booter/examples/，lite、fullstack 在仓库根目录的 fixtures/（不在时跳过）。
+minimal、fullstack-skills 在 booter/examples/，lite、fullstack 在仓库根目录的 fixtures/（不在时跳过）。
 
 build-manifest 中内容固定的托管文件摘要写作 "…"，只比较归属。
 """
@@ -21,6 +21,7 @@ class ExamplesTest(unittest.TestCase):
     def compare(self, name):
         root = built_example(self, name)
         expected_root = example_dir(self, name) / "output"
+        self.assertTrue((expected_root / "runtime/build-manifest.json").is_file(), f"{name}: 缺少输出金样")
         for expected in sorted(path for path in expected_root.rglob("*") if path.is_file() and path.name != ".DS_Store"):
             rel = expected.relative_to(expected_root).as_posix()
             actual = root / rel
@@ -43,6 +44,9 @@ class ExamplesTest(unittest.TestCase):
 
     def test_minimal(self):
         self.compare("minimal")
+
+    def test_fullstack_skills(self):
+        self.compare("fullstack-skills")
 
     def test_lite(self):
         self.compare("lite")

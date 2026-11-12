@@ -1,0 +1,310 @@
+{
+  "schema": "autobiz.flow.v1",
+  "source": {
+    "workflow.json": "sha256:55a4b2b148bac6bd14441d74fd4c017deae4c325fba6a5227d5718716353ac3c"
+  },
+  "stages": [
+    "Biz",
+    "Dev",
+    "Ops"
+  ],
+  "artifacts": {
+    "prd": {
+      "label": "PRD.md",
+      "type": "file",
+      "paths": [
+        "PRD.md"
+      ],
+      "producer": "prd"
+    },
+    "ui_context_json": {
+      "label": "UI_CONTEXT.json",
+      "type": "json",
+      "paths": [
+        "UI_CONTEXT.json"
+      ],
+      "producer": "prd"
+    },
+    "proposal": {
+      "label": "proposal.md",
+      "type": "file",
+      "paths": [
+        "proposal.md"
+      ],
+      "producer": "specs"
+    },
+    "specs": {
+      "label": "specs/**/*.md",
+      "type": "file",
+      "paths": [
+        "specs/**/*.md"
+      ],
+      "producer": "specs"
+    },
+    "design": {
+      "label": "design.md",
+      "type": "file",
+      "paths": [
+        "design.md"
+      ],
+      "producer": "design"
+    },
+    "design_contract_lock_json": {
+      "label": ".design-contract.lock.json",
+      "type": "json",
+      "paths": [
+        ".design-contract.lock.json"
+      ],
+      "producer": "design"
+    },
+    "plan": {
+      "label": "PLAN.md",
+      "type": "file",
+      "paths": [
+        "PLAN.md"
+      ],
+      "producer": "plan"
+    },
+    "plan_json": {
+      "label": "plan.json",
+      "type": "json",
+      "paths": [
+        "plan.json"
+      ],
+      "producer": "plan"
+    },
+    "evidence_jsonl": {
+      "label": "evidence/EVIDENCE.jsonl",
+      "type": "file",
+      "paths": [
+        "evidence/EVIDENCE.jsonl"
+      ],
+      "producer": "code"
+    },
+    "cicd_checklist": {
+      "label": "CICD_CHECKLIST.md",
+      "type": "file",
+      "paths": [
+        "CICD_CHECKLIST.md"
+      ],
+      "producer": "cicd"
+    },
+    "pr_body": {
+      "label": "PR_BODY.md",
+      "type": "file",
+      "paths": [
+        "PR_BODY.md"
+      ],
+      "producer": "cicd"
+    }
+  },
+  "nodes": [
+    {
+      "id": "prd",
+      "name": "需求澄清与 PRD",
+      "stage": "Biz",
+      "skill": "autobiz-requirement-discuss",
+      "skillDir": "skills/autobiz/autobiz-requirement-discuss",
+      "seq": 1,
+      "order": 10,
+      "terminal": false,
+      "checkpoints": [
+        "prd_in_progress",
+        "prd_done"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "prd",
+          "required": true
+        },
+        {
+          "id": "ui_context_json",
+          "required": true
+        }
+      ],
+      "validate": null
+    },
+    {
+      "id": "specs",
+      "name": "行为规格",
+      "stage": "Dev",
+      "skill": "autodev-specs",
+      "skillDir": "skills/autodev/autodev-specs",
+      "seq": 2,
+      "order": 20,
+      "terminal": false,
+      "checkpoints": [
+        "specs_in_progress",
+        "specs_done"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "proposal",
+          "required": true
+        },
+        {
+          "id": "specs",
+          "required": true
+        },
+        {
+          "id": "ui_context_json",
+          "required": true
+        }
+      ],
+      "validate": null
+    },
+    {
+      "id": "design",
+      "name": "技术设计",
+      "stage": "Dev",
+      "skill": "autodev-design",
+      "skillDir": "skills/autodev/autodev-design",
+      "seq": 3,
+      "order": 30,
+      "terminal": false,
+      "checkpoints": [
+        "design_in_progress",
+        "design_done"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "design",
+          "required": true
+        },
+        {
+          "id": "design_contract_lock_json",
+          "required": true
+        }
+      ],
+      "validate": null
+    },
+    {
+      "id": "plan",
+      "name": "执行计划",
+      "stage": "Dev",
+      "skill": "autodev-plan",
+      "skillDir": "skills/autodev/autodev-plan",
+      "seq": 4,
+      "order": 40,
+      "terminal": false,
+      "checkpoints": [
+        "plan_in_progress",
+        "plan_done"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "plan",
+          "required": true
+        },
+        {
+          "id": "plan_json",
+          "required": true
+        }
+      ],
+      "validate": null
+    },
+    {
+      "id": "code",
+      "name": "代码实现",
+      "stage": "Dev",
+      "skill": "autodev-code",
+      "skillDir": "skills/autodev/autodev-code",
+      "seq": 5,
+      "order": 50,
+      "terminal": false,
+      "checkpoints": [
+        "code_in_progress",
+        "code_done"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "evidence_jsonl",
+          "required": true
+        }
+      ],
+      "validate": null
+    },
+    {
+      "id": "cicd",
+      "name": "CI/CD",
+      "stage": "Ops",
+      "skill": "autoops-cicd",
+      "skillDir": "skills/autoops/autoops-cicd",
+      "seq": 6,
+      "order": 60,
+      "terminal": false,
+      "checkpoints": [
+        "cicd_in_progress",
+        "cicd_done"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "cicd_checklist",
+          "required": true
+        },
+        {
+          "id": "pr_body",
+          "required": false
+        }
+      ],
+      "validate": null
+    },
+    {
+      "id": "archive",
+      "name": "归档",
+      "stage": "Ops",
+      "skill": "autoops-archive",
+      "skillDir": "skills/autoops/autoops-archive",
+      "seq": 7,
+      "order": 70,
+      "terminal": true,
+      "checkpoints": [
+        "archived"
+      ],
+      "inputs": [],
+      "outputs": [],
+      "validate": null
+    }
+  ],
+  "dynamicStages": [],
+  "skip": null,
+  "checkpoints": {
+    "chain": [
+      "prd_in_progress",
+      "prd_done",
+      "specs_in_progress",
+      "specs_done",
+      "design_in_progress",
+      "design_done",
+      "plan_in_progress",
+      "plan_done",
+      "code_in_progress",
+      "code_done",
+      "cicd_in_progress",
+      "cicd_done",
+      "archived"
+    ],
+    "initial": "prd_in_progress",
+    "labels": {
+      "prd_in_progress": "需求澄清与 PRD进行中",
+      "prd_done": "需求澄清与 PRD完成",
+      "specs_in_progress": "行为规格进行中",
+      "specs_done": "行为规格完成",
+      "design_in_progress": "技术设计进行中",
+      "design_done": "技术设计完成",
+      "plan_in_progress": "执行计划进行中",
+      "plan_done": "执行计划完成",
+      "code_in_progress": "代码实现进行中",
+      "code_done": "代码实现完成",
+      "cicd_in_progress": "CI/CD进行中",
+      "cicd_done": "CI/CD完成",
+      "archived": "archive"
+    }
+  }
+}

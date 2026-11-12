@@ -1,4 +1,0 @@
-{
-  "$schema": "../../../schemas/modules/globalHooks.schema.json",
-  "hooks": ["secrets-check", "performance-check"]
-}

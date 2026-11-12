@@ -1,17 +1,13 @@
-"""会话模块（core）：默认会话入口与运行策略 session.json（input-config.md §4.2，interfaces.md §3.3.7）。"""
+"""运行策略模块：校验并编译全局和逐节点策略。"""
 
 from __future__ import annotations
 
-from scaffold.build.contribute import CommandSpec, Contribution, FileSpec
+from scaffold.build.contribute import Contribution
 from scaffold.lib import derive
 from scaffold.lib.issues import error, warning
 from scaffold.modules import Module
 
 FILE = "modules/session.json"
-SCRIPT = "runtime/session/render_session_context.py"
-ARGS = ('--platform {platform} --plugin-workspace "${pluginWorkspace}" --project "${projectDir}" --feature "${feature}" '
-        '--selected-deployUnit ${selectedDeployUnits} --session-workspace-path "${sessionWorkspacePath}"')
-KNOWLEDGE_ARGS = ' --knowledge-path "${pluginPath}/sys" --knowledge-path-platform "${knowledgePath}"'
 
 
 def policies(options: dict) -> dict:
@@ -53,9 +49,5 @@ class SessionModule(Module):
         return issues
 
     def contribute(self, ir, options, ctx):
-        args = ARGS + (KNOWLEDGE_ARGS if "knowledge" in ctx.enabled else "")
-        files = [FileSpec("runtime/session/__init__.py", "managed", src="runtime/session/__init__.py"),
-                 FileSpec(SCRIPT, "managed", src=SCRIPT)]
-        config = {"schema": "autobiz.session.v1", "policies": policies(options), "knowledgeAssembly": None}
-        return Contribution(files=files, runtime_config={"session": config},
-                            inspect_commands={"session_context_inject": CommandSpec(SCRIPT, args)})
+        config = {"schema": "autobiz.session.v1", "policies": policies(options)}
+        return Contribution(runtime_config={"session": config})

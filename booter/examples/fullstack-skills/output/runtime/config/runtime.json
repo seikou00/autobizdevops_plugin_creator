@@ -1,0 +1,6 @@
+{
+  "schema": "autobiz.runtime.v1",
+  "pluginId": "AutoBizDevOps_autobizdevops-plugin",
+  "metaRoot": ".autobizdevops",
+  "validateTimeoutSec": 120
+}

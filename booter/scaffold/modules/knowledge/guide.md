@@ -1,4 +1,4 @@
-# 知识模块（modules/knowledge.json）
+# 发布单元知识（modules/knowledge.json）
 
 | 什么时候需要 | 要先准备什么 | 最少要填哪些字段 |
 |---|---|---|
@@ -8,13 +8,15 @@
 
 | 要定什么 | 选项 | 怎么写 |
 |---|---|---|
-| 知识从哪来 | 从 Git 仓库拉取 | 保留 `source`，填写 `source.url`。 |
+| 发布单元知识从哪来 | 从 Git 仓库拉取 | 保留 `source`，填写 `source.url`。 |
 | | 随插件一起打包 | 省略 `source`。打包前把带清单的知识目录放进插件根目录的 `sys/`。 |
 | | 由 DevClaw 提供 | 省略 `source`，在 DevClaw 给项目绑定知识库。 |
-| 谁把知识放进会话上下文 | 插件（默认） | `assembly.assembler` 写 `plugin`，由插件按所选发布单元组装。 |
+| 谁把发布单元知识放进会话 | 插件（默认） | `assembly.assembler` 写 `plugin`，由插件按所选发布单元组装。 |
 | | DevClaw | `assembly.assembler` 写 `devclaw`，由 DevClaw 组装。 |
 
 运行时优先使用 DevClaw 传入的项目绑定知识库，其次使用插件的 `sys/`。
+
+看板上的“发起知识沉淀”调用 DevClaw 的 `knowledge-sync` 技能，由看板直接提供。
 
 ## 字段
 

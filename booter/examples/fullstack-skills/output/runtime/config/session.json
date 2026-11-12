@@ -1,0 +1,101 @@
+{
+  "schema": "autobiz.session.v1",
+  "policies": {
+    "default": {
+      "agentMode": "multi"
+    },
+    "nodes": {
+      "biz": [
+        {
+          "id": "prd",
+          "agentMode": "multi",
+          "toolCustomConfig": {
+            "task": {
+              "enabled": true
+            }
+          }
+        }
+      ],
+      "dev": [
+        {
+          "id": "specs",
+          "agentMode": "multi",
+          "toolCustomConfig": {
+            "task": {
+              "enabled": true
+            }
+          },
+          "subagentConfig": {
+            "disabledBuiltinSubagents": [
+              "Explore",
+              "critic"
+            ],
+            "customSubagentFiles": [
+              "agents/explore.md",
+              "agents/critic.md"
+            ]
+          }
+        },
+        {
+          "id": "design",
+          "agentMode": "multi",
+          "toolCustomConfig": {
+            "task": {
+              "enabled": true
+            }
+          },
+          "subagentConfig": {
+            "disabledBuiltinSubagents": [
+              "Explore",
+              "critic"
+            ],
+            "customSubagentFiles": [
+              "agents/explore.md",
+              "agents/critic_autodev_design_zh.md"
+            ]
+          }
+        },
+        {
+          "id": "plan",
+          "agentMode": "multi",
+          "toolCustomConfig": {
+            "task": {
+              "enabled": true
+            }
+          },
+          "subagentConfig": {
+            "disabledBuiltinSubagents": [
+              "Explore",
+              "critic"
+            ],
+            "customSubagentFiles": [
+              "agents/explore.md",
+              "agents/critic_autodev_plan_zh.md"
+            ]
+          }
+        },
+        {
+          "id": "code",
+          "agentMode": "workflow",
+          "toolCustomConfig": {
+            "task": {
+              "enabled": true
+            }
+          },
+          "subagentConfig": {
+            "disabledBuiltinSubagents": [
+              "verification"
+            ],
+            "customSubagentFiles": [
+              "agents/verification.md"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "knowledgeAssembly": {
+    "script": "runtime/knowledge/render_collected_session_context.py",
+    "timeoutSec": 30
+  }
+}

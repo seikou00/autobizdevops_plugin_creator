@@ -1,5 +1,5 @@
 {
-  "$schema": "../../../schemas/modules/board.schema.json",
+  "$schema": "../../../../schemas/modules/board.schema.json",
   "display": {
     "workflowLabel": "标准",
     "workflowDescription": "完整主干流程（Biz→Dev→Ops）。",

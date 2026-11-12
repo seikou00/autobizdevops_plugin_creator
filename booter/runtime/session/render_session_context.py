@@ -140,9 +140,15 @@ def assemble_knowledge(args, project, feature, units, flow, config, messages):
 
     unit_ids = [unit["deployUnitId"] for unit in units if isinstance(unit.get("deployUnitId"), str)]
     knowledge_path = str(choose_knowledge_dir(args.knowledge_path, args.knowledge_path_platform, unit_ids))
+    project_meta_dir = ""
+    if project is not None:
+        try:
+            project_meta_dir = str(query.metadata_dir(project))
+        except query.BoardError as error:
+            messages.append(str(error))
     request = {"schema": REQUEST_SCHEMA, "platform": args.platform, "pluginRoot": str(ROOT),
                "pluginWorkspace": args.plugin_workspace or "", "project": args.project or "", "feature": feature or "",
-               "featureDir": flow["featureDir"], "selectedDeployUnits": units,
+               "featureDir": flow["featureDir"], "projectMetaDir": project_meta_dir, "selectedDeployUnits": units,
                "sessionWorkspacePath": args.session_workspace_path or "",
                "knowledgePath": str(Path(knowledge_path).resolve()) if knowledge_path else "",
                "flow": flow, "agentConfig": config}

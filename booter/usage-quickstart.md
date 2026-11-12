@@ -4,6 +4,16 @@
 
 准备：Python 3.9+。以下命令都在 `booter/` 下执行，Windows 上把 `python3` 换成 `python`。示例假设各仓库都在 `~/Documents/GitHub/` 下，换成你自己的路径即可。
 
+## 使用模型引导（推荐）
+
+将 `booter/` 作为技能交给 agent（入口 [SKILL.md](SKILL.md)）。可以直接说明任务，也可以启动技能后从以下三个入口中选择：
+
+- 从头搭建：模型逐步梳理用途、节点和产物，起草配置供确认。
+- 有现成技能：提供技能目录，模型分析节点与辅助能力，只追问缺口。
+- 修改已有插件：提供插件目录和改动目标，模型展示关联影响与差异后修改、检查。
+
+默认模型起草、用户确认，也支持自行填写。以下是直接使用 CLI 的方式，终端向导仍按字段收集输入。
+
 ## 1. 进入脚手架目录
 
 ```bash
@@ -12,7 +22,7 @@ cd ~/Documents/GitHub/autobizdevops_plugin_creator/booter
 
 ## 2. 用向导新建插件
 
-**先想好流程。** 从你的技能目录里挑出主流程上要依次执行的技能，每个技能对应看板上的一个节点。评审、回滚这类辅助技能不用挑，导入时会一起带上。比如：
+**先想好流程。** 从你的技能目录里挑出主流程上要依次执行的技能，每个技能对应看板上的一个节点。只作为辅助调用的技能不用挑，导入时会一起带上；评审是否独立成节点取决于实际流程。比如：
 
 | 顺序 | 节点 | 技能（技能目录的名字） | 产出的文件 |
 |---|---|---|---|
@@ -40,8 +50,8 @@ python3 -m scaffold new ~/Documents/GitHub/my-plugin
 | 最后一个节点是终态节点吗？ | 回车（选 N）；只有最后一步是「归档」这种收尾动作时才选 Y |
 | 已有技能目录的路径 | 留空回车，下一步统一导入 |
 | 要启用哪些可选模块？ | 向导会先介绍各模块，再逐个询问是否启用。回车选 `N` |
-| 知识从哪来、谁组装？ | 启用知识后选择 Git 仓库、随插件打包或 DevClaw 提供，再选插件或 DevClaw 组装 |
-| 要不要自定义运行策略？ | 回车沿用 `multi`。选 `Y` 可以更改全局默认策略或覆盖单个节点 |
+| 要不要按发布单元带入知识？ | 选 `Y` 后，选择 Git 仓库、随插件打包或 DevClaw 提供，再选插件或 DevClaw 组装 |
+| 要不要自定义节点的 Agent 运行模式？ | 回车沿用 `multi`。选 `Y` 可从 `multi`、`solo`、`agent_team`（team）和 `workflow` 中设置全局默认模式，也可以按节点覆盖 |
 
 - 目标目录必须不存在或为空；
 - 不想回答向导、想自己填配置：见下文[想自己填配置时](#想自己填配置时)。
@@ -88,7 +98,7 @@ python3 -m scaffold new ~/Documents/GitHub/my-plugin --skeleton
 python3 -m scaffold module list
 ```
 
-各模块的字段怎么填，见模块包里的说明文件：[知识](scaffold/modules/knowledge/guide.md)、[产物同步](scaffold/modules/artifact_sync/guide.md)、[看板](scaffold/modules/board/guide.md)、[会话与运行策略](scaffold/modules/session/guide.md)。
+各模块的字段说明见[发布单元知识](scaffold/modules/knowledge/guide.md)、[产物同步](scaffold/modules/artifact_sync/guide.md)、[看板](scaffold/modules/board/guide.md)和[运行策略](scaffold/modules/session/guide.md)。
 
 照着说明把 `[TODO: …]` 填好。插件 ID 和名称已预填 `AutoBizDevOps_` 前缀，保留前缀并填写后缀，然后检查还缺什么：
 
