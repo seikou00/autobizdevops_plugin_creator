@@ -1,7 +1,8 @@
 """new：以问答或 --answers 生成核心配置，再执行 doctor（interfaces.md §1.4，D56）。
 
-不加 --yes 时进入初始化向导（scaffold/wizard.py）；加 --yes 时不提问，回答取自 --answers。
+交互模式先选择全引导或自行配置；加 --yes 时不提问，回答取自 --answers。
 --skeleton 只写出带 [TODO: …] 占位的核心配置骨架，不执行 doctor，由开发者填完后再 doctor、package（D63）。
+--manual 默认同时生成全部公开模块的配置骨架和一个空白 SKILL.md。
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from scaffold.build.load import PUBLIC_MODULE_KEYS
 from scaffold.commands import CommandResult
 from scaffold.commands.doctor import doctor
 from scaffold.commands.edit import import_agents, import_skill
-from scaffold.lib import derive, fsio, jsonedit
+from scaffold.lib import derive, fsio, jsonedit, skillmd
 from scaffold.lib.issues import UsageError
 from scaffold.lib.tree import Tree
 
@@ -113,14 +114,19 @@ def new(target: Path, *, answers: dict | None = None, yes: bool = False, prompte
     if target.exists() and (not target.is_dir() or any(target.iterdir())):
         raise UsageError(f"目标目录 {target} 必须不存在或为空")
     if not yes:
-        from scaffold.wizard import TerminalPrompter
+        from scaffold import wizard
 
         if answers is not None:
             raise UsageError("--answers 要与 --yes 一起使用")
+        prompter = prompter or wizard.TerminalPrompter()
         try:
-            answers = interactive(target, prompter or TerminalPrompter())
+            manual = wizard.ask_manual_configuration(prompter)
+            if not manual:
+                answers = interactive(target, prompter)
         except (EOFError, KeyboardInterrupt):
             raise UsageError("问答被中断，没有写入任何文件") from None
+        if manual:
+            return skeleton(target, [], with_skill=True)
     if answers is None or "nodes" not in answers or "plugin" not in answers:
         raise UsageError("--yes 时 --answers 必须给出 plugin 和 nodes")
     files, skills = apply_answers(answers)
@@ -163,8 +169,8 @@ SKELETON_MODULES = {
 }
 
 
-def skeleton_files(modules: list) -> dict:
-    """入口文件、workflow.json、所选模块的配置骨架，以及 IDE 补全用的 .scaffold/ Schema。"""
+def skeleton_files(modules: list, *, with_skill: bool = False) -> dict:
+    """生成配置骨架、Schema 和可选的空白节点技能。"""
     from scaffold.build.framework import SCHEMA_FILES
 
     entry = {"$schema": schema_ref("plugin.scaffold.json"), "scaffoldVersion": 1,
@@ -172,11 +178,24 @@ def skeleton_files(modules: list) -> dict:
                         "name": f"{derive.PLUGIN_PREFIX}[TODO: 插件名后缀]",
                         "version": "0.1.0", "description": "[TODO: 一句话描述]"},
              "workflow": "./workflow.json"}
-    if modules:
-        entry["modules"] = {key: f"./modules/{key}.json" for key in modules}
-    workflow = {"$schema": schema_ref("workflow.json"),
-                "nodes": {"biz": [skeleton_node(1)], "dev": [skeleton_node(2)]}}
-    files = {"plugin.scaffold.json": dump_config(entry), "workflow.json": dump_config(workflow)}
+    referenced_modules = modules
+    if with_skill and not modules:
+        modules = list(PUBLIC_MODULE_KEYS)
+        referenced_modules = [key for key in modules if key != "artifactSync"]
+    if referenced_modules:
+        entry["modules"] = {key: f"./modules/{key}.json" for key in referenced_modules}
+    files = {"plugin.scaffold.json": dump_config(entry)}
+    first_node = skeleton_node(1)
+    nodes = {"biz": [first_node]}
+    if with_skill:
+        skill = "my-skill"
+        first_node["skill"] = skill
+        files[f"skills/{skill}/SKILL.md"] = (
+            f'---\nname: {skill}\ndescription: "{skillmd.TODO_DESCRIPTION}"\n---\n\n'.encode("utf-8")
+        )
+    else:
+        nodes["dev"] = [skeleton_node(2)]
+    files["workflow.json"] = dump_config({"$schema": schema_ref("workflow.json"), "nodes": nodes})
     for key in modules:
         rel = f"modules/{key}.json"
         files[rel] = dump_config({"$schema": schema_ref(rel), **SKELETON_MODULES[key]})
@@ -185,7 +204,7 @@ def skeleton_files(modules: list) -> dict:
     return files
 
 
-def skeleton(target: Path, modules: list) -> CommandResult:
+def skeleton(target: Path, modules: list, *, with_skill: bool = False) -> CommandResult:
     from scaffold.lib.issues import Report
 
     unknown = [key for key in modules if key not in PUBLIC_MODULE_KEYS]
@@ -195,16 +214,30 @@ def skeleton(target: Path, modules: list) -> CommandResult:
     target = Path(target)
     if target.exists() and (not target.is_dir() or any(target.iterdir())):
         raise UsageError(f"目标目录 {target} 必须不存在或为空")
-    files = skeleton_files(modules)
+    files = skeleton_files(modules, with_skill=with_skill)
     for rel, data in sorted(files.items()):
         fsio.atomic_write(target / rel, data)
     (target / "hooks").mkdir(exist_ok=True)
     written = sorted(files)
-    configs = [rel for rel in written if not rel.startswith(".scaffold/")]
+    source_files = [rel for rel in written if not rel.startswith(".scaffold/")]
+    heading = "已写出配置骨架和空白技能" if with_skill else "已写出核心配置骨架"
+    fill_skill = (
+        " 填写 SKILL.md 的 description 和正文。改技能名时，同步改目录名、name 和节点的 skill。"
+        if with_skill else ""
+    )
+    remove_modules = (
+        "  先删除不需要的模块配置，同时删掉 plugin.scaffold.json 的 modules 中对应的引用。\n"
+        if with_skill else ""
+    )
+    if with_skill and not modules:
+        remove_modules += (
+            '  产物同步默认关闭。要启用时，填好 modules/artifactSync.json，'
+            '再向 modules 添加 "artifactSync": "./modules/artifactSync.json"。\n'
+        )
     text = "\n".join([
-        "已写出核心配置骨架：" + "、".join(configs),
-        "下一步：",
-        "  1. 把各文件中的 [TODO: …] 按说明填好（workflow.json 中的节点按需增删，ops 组可以自己加）；",
+        f"{heading}：" + "、".join(source_files),
+        "下一步：\n" + remove_modules
+        + "  1. 填写核心配置和已引用模块中的 [TODO: …]，按需增删 workflow.json 中的节点。" + fill_skill,
         f"  2. autobiz-plugin -C {target} lint      # 逐项列出还没填的字段",
         f"  3. autobiz-plugin -C {target} doctor    # 生成插件（还有没填的字段时不生成）",
         f"  4. autobiz-plugin -C {target} package   # 打包",

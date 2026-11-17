@@ -10,7 +10,7 @@
 | `runtime/` | 运行框架模板：随生成的插件发布的 `query`/`engine` 内部库、宿主入口、会话入口和状态变更入口 |
 | `schemas/` | 核心配置的 JSON Schema（拷进插件的 `.scaffold/` 供 IDE 补全），以及宿主命令输出结构 `host/outputs.schema.json` |
 | `examples/` | `minimal/`、`fullstack-skills/`，各自提供 `input/` 和生成结果 `output/` |
-| `SKILL.md` | 引导技能：支持从头搭建、现成技能组装和已有插件节点修改；默认模型起草、用户确认，也支持自行填写。整个 `booter/` 目录就是这个技能，不打成插件包 |
+| `SKILL.md` | 引导技能入口。先选全引导对话或自行配置，再进入对应流程。整个 `booter/` 目录就是引导技能 |
 | `__main__.py` | 让 `booter/` 目录本身可以运行：`python3 <booter 目录> <命令>` 直接从源码执行 CLI，技能就这样调用，不需要 `.pyz` |
 | `tools/make_pyz.py` | 发布：打出单文件的 `dist/autobiz-plugin.pyz`，用于把 CLI 单独拷给别人 |
 | `tests/` | 金样、参考插件基线、运行框架契约、CLI 端到端和单元测试；部分测试用到仓库根目录 `fixtures/` 下的样例，不在时跳过 |
@@ -23,6 +23,7 @@
 ```bash
 python3 tools/make_pyz.py                                  # 打出 dist/autobiz-plugin.pyz
 python3 dist/autobiz-plugin.pyz new ../../my-plugin        # 初始化向导；--yes --answers a.json 由回答文件生成、不提问
+python3 dist/autobiz-plugin.pyz new ../../my-plugin --manual  # 生成核心配置、全部模块的骨架和空白 SKILL.md
 python3 dist/autobiz-plugin.pyz new ../../my-plugin --skeleton --module board  # 只写出带 [TODO: …] 的配置骨架，填完再 lint、doctor、package
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin add skills --from ../../my-skills --agents ../../my-agents  # 一次导入技能集合和 agents
 python3 dist/autobiz-plugin.pyz -C ../../my-plugin add skill doc-review --from ../../other-skills/doc-review  # 单独导入一个技能

@@ -6,13 +6,13 @@
 
 ## 使用模型引导（推荐）
 
-将 `booter/` 作为技能交给 agent（入口 [SKILL.md](SKILL.md)）。可以直接说明任务，也可以启动技能后从以下三个入口中选择：
+将 `booter/` 作为技能交给 agent（入口 [SKILL.md](SKILL.md)）。启动后先选 **全引导对话** 或 **自行配置**。选自行配置时，提供保存位置即可拿到核心配置、全部模块的骨架和空白 `SKILL.md`。选全引导对话时，可以直接说明任务，也可以从以下三个入口中选择。
 
 - 从头搭建：模型逐步梳理用途、节点和产物，起草配置供确认。
 - 有现成技能：提供技能目录，模型分析节点与辅助能力，只追问缺口。
 - 修改已有插件：提供插件目录和改动目标，模型展示关联影响与差异后修改、检查。
 
-默认模型起草、用户确认，也支持自行填写。以下是直接使用 CLI 的方式，终端向导仍按字段收集输入。
+下面是使用 CLI 的方式，终端向导的全引导对话按字段收集输入。
 
 ## 1. 进入脚手架目录
 
@@ -35,7 +35,7 @@ cd ~/Documents/GitHub/autobizdevops_plugin_creator/booter
 python3 -m scaffold new ~/Documents/GitHub/my-plugin
 ```
 
-按下表回答。提示中有默认值的问题可以直接回车：
+先选 `1` 全引导对话或 `2` 自行配置。选 `2` 时，直接跳到[想自己填配置时](#想自己填配置时)。选 `1` 后按下表回答，提示中有默认值的问题可以直接回车。
 
 | 向导问题 | 怎么填 |
 |---|---|
@@ -86,13 +86,13 @@ python3 -m scaffold -C ~/Documents/GitHub/my-plugin package
 
 ## 想自己填配置时
 
-不想回答向导，可以让脚手架只写出配置的骨架，要填的地方都标成 `[TODO: 说明]`：
+终端选择 `2` 后会直接生成骨架。也可以运行以下命令跳过提问。
 
 ```bash
-python3 -m scaffold new ~/Documents/GitHub/my-plugin --skeleton
+python3 -m scaffold new ~/Documents/GitHub/my-plugin --manual
 ```
 
-要启用可选模块，就再加 `--module knowledge` 或 `--module artifactSync`。自定义看板或运行策略时，分别加 `--module board` 或 `--module session`。可以先看每个模块的说明：
+骨架会生成 `board`、`session`、`knowledge`、`artifactSync` 四份模块配置。产物同步默认关闭，可以把 `modules/artifactSync.json` 留作备用。需要启用时，填好该文件，再在 `plugin.scaffold.json` 的 `modules` 里添加 `"artifactSync": "./modules/artifactSync.json"`。删除其他不需要的模块文件时，一并删除对应的入口引用。可以先看每个模块的说明。
 
 ```bash
 python3 -m scaffold module list
@@ -100,7 +100,7 @@ python3 -m scaffold module list
 
 各模块的字段说明见[发布单元知识](scaffold/modules/knowledge/guide.md)、[产物同步](scaffold/modules/artifact_sync/guide.md)、[看板](scaffold/modules/board/guide.md)和[运行策略](scaffold/modules/session/guide.md)。
 
-照着说明把 `[TODO: …]` 填好。插件 ID 和名称已预填 `AutoBizDevOps_` 前缀，保留前缀并填写后缀，然后检查还缺什么：
+把 `plugin.scaffold.json` 和 `workflow.json` 中的 `[TODO: …]` 填好。插件 ID 和名称已预填 `AutoBizDevOps_` 前缀，保留前缀并填写后缀。填写 `skills/my-skill/SKILL.md` 的 `description` 和正文。如果改技能名，同步更新目录名、frontmatter 的 `name` 和节点的 `skill`。填完后检查配置。
 
 ```bash
 python3 -m scaffold -C ~/Documents/GitHub/my-plugin lint

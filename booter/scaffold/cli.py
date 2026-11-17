@@ -33,14 +33,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"autobiz-plugin {SCAFFOLD_VERSION}")
     commands = parser.add_subparsers(dest="command", parser_class=Parser)
 
-    new = commands.add_parser("new", parents=[common], help="以问答或回答文件新建插件，随后执行 doctor")
+    new = commands.add_parser("new", parents=[common], help="通过向导、回答文件或配置骨架新建插件")
     new.add_argument("target", help="插件目录，必须不存在或为空")
     new.add_argument("--answers", help="回答的 JSON 文件，- 表示从 stdin 读取")
     new.add_argument("--yes", action="store_true", help="不提问，回答取自 --answers")
-    new.add_argument("--skeleton", action="store_true",
-                     help="只写出带 [TODO: …] 占位的核心配置骨架，不生成插件；填完后执行 doctor")
+    style = new.add_mutually_exclusive_group()
+    style.add_argument("--skeleton", action="store_true",
+                       help="只写出带 [TODO: …] 占位的核心配置骨架；填完后执行 doctor")
+    style.add_argument("--manual", action="store_true",
+                       help="写出核心配置、全部模块的骨架和空白 SKILL.md，产物同步默认关闭")
     new.add_argument("--module", dest="modules", action="append", default=[], metavar="MODULE",
-                     help="--skeleton 时一并写出这个模块的配置骨架，可以重复：board、session，以及可选模块 knowledge、artifactSync")
+                     help="--skeleton 或 --manual 时指定要生成的模块，可重复：board、session、knowledge、artifactSync")
 
     add = commands.add_parser("add", parents=[common], help="添加节点或技能")
     targets = add.add_subparsers(dest="target", parser_class=Parser)
@@ -100,12 +103,13 @@ def run(args) -> object:
     if args.command == "new":
         from scaffold.commands.new import load_answers, new, skeleton
 
-        if args.skeleton:
+        if args.skeleton or args.manual:
             if args.answers or args.yes:
-                raise UsageError("--skeleton 不能与 --answers、--yes 一起使用")
-            return skeleton(Path(args.target), args.modules)
+                option = "--manual" if args.manual else "--skeleton"
+                raise UsageError(f"{option} 不能与 --answers、--yes 一起使用")
+            return skeleton(Path(args.target), args.modules, with_skill=args.manual)
         if args.modules:
-            raise UsageError("--module 只能与 --skeleton 一起使用")
+            raise UsageError("--module 只能与 --skeleton 或 --manual 一起使用")
 
         return new(Path(args.target), answers=load_answers(args.answers), yes=args.yes)
     if args.command == "add":

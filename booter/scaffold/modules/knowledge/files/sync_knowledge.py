@@ -5,6 +5,7 @@
 """
 
 import sys
+from contextlib import redirect_stderr
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -26,8 +27,8 @@ from urllib.parse import urlsplit, urlunsplit  # noqa: E402
 import inspect_deploy_units as manifest_lib  # noqa: E402
 
 SCHEMA_VERSION = "autobizdevops.agents.sync.v1"
-HTTPS_CLONE_TIMEOUT = 20
-KILL_REAP_SECONDS = 5
+GIT_COMMAND_TIMEOUT_SECONDS = 10
+KILL_REAP_SECONDS = 1
 GIT_ENV = {"GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never"}
 GIT_CONFIG = ["-c", "http.lowSpeedLimit=1", "-c", "http.lowSpeedTime=15"]
 
@@ -61,8 +62,11 @@ def kill_tree(process: subprocess.Popen) -> None:
     """Windows 的 git.exe 外壳之下还有继承输出管道的子进程，要整棵结束。"""
     if os.name == "nt":
         try:
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True, check=False,
-                           timeout=10)
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                check=False, timeout=KILL_REAP_SECONDS,
+            )
         except (OSError, subprocess.TimeoutExpired):
             pass
     else:
@@ -76,11 +80,12 @@ def kill_tree(process: subprocess.Popen) -> None:
         pass
 
 
-def run_git(args: List[str], *, cwd: Optional[Path] = None, timeout: Optional[float] = None):
+def run_git(args: List[str], *, cwd: Optional[Path] = None, timeout: float = GIT_COMMAND_TIMEOUT_SECONDS):
     described = " ".join(mask_url(arg) if "://" in arg else arg for arg in args)
     log(f"git {described}")
     process = subprocess.Popen(["git", *GIT_CONFIG, *args], cwd=str(cwd) if cwd else None,
-                               env={**os.environ, **GIT_ENV}, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               env={**os.environ, **GIT_ENV}, stdin=subprocess.DEVNULL,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                encoding="utf-8", errors="replace", start_new_session=os.name != "nt")
     try:
         stdout, stderr = process.communicate(timeout=timeout)
@@ -115,7 +120,7 @@ def rmtree(path: Path) -> None:
         shutil.rmtree(path, onerror=clear_readonly)
 
 
-def clone(url: str, ref: str, dest: Path, timeout: Optional[float]) -> str:
+def clone(url: str, ref: str, dest: Path, timeout: float = GIT_COMMAND_TIMEOUT_SECONDS) -> str:
     if dest.exists():
         rmtree(dest)
     try:
@@ -131,24 +136,30 @@ def clone(url: str, ref: str, dest: Path, timeout: Optional[float]) -> str:
             raise CloneUnavailable(f"克隆超时（{timeout:g} 秒）") from None
         if fallback.returncode != 0:
             raise CloneUnavailable(git_error(fallback, "克隆"))
-        checkout = run_git(["checkout", ref], cwd=dest)
+        try:
+            checkout = run_git(["checkout", ref], cwd=dest, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"切换到 {ref} 超时（{timeout:g} 秒）") from None
         if checkout.returncode != 0:
             raise RuntimeError(git_error(checkout, f"切换到 {ref}"))
-    revision = run_git(["rev-parse", "HEAD"], cwd=dest)
+    try:
+        revision = run_git(["rev-parse", "HEAD"], cwd=dest, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"读取提交号超时（{timeout:g} 秒）") from None
     return revision.stdout.strip() if revision.returncode == 0 else ""
 
 
 def fetch(url: str, ref: str, dest: Path, ssh_url: str) -> dict:
     https = url.strip().lower().startswith("https://")
     try:
-        return {"commit": clone(url, ref, dest, HTTPS_CLONE_TIMEOUT if https else None),
+        return {"commit": clone(url, ref, dest),
                 "transport": "https" if https else "other"}
     except CloneUnavailable as https_error:
         if not https or not ssh_url:
             raise
         log(f"HTTPS 克隆失败，改用 SSH: {https_error}")
         try:
-            return {"commit": clone(ssh_url, ref, dest, None), "transport": "ssh"}
+            return {"commit": clone(ssh_url, ref, dest), "transport": "ssh"}
         except RuntimeError as ssh_error:
             raise RuntimeError(f"HTTPS 克隆失败: {https_error}\nSSH 兜底失败: {ssh_error}") from ssh_error
 
@@ -214,4 +225,8 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # DevClaw uses the JSON result. Enable diagnostics explicitly for manual runs.
+    if os.environ.get("AUTOBIZ_KNOWLEDGE_SYNC_DEBUG") == "1":
+        raise SystemExit(main())
+    with open(os.devnull, "w", encoding="utf-8") as sink, redirect_stderr(sink):
+        raise SystemExit(main())

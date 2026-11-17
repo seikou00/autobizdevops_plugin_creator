@@ -13,7 +13,7 @@ from scaffold.commands.new import new
 from scaffold.lib import jsonedit
 from scaffold.wizard import ScriptedPrompter
 
-WIZARD_BASE = ["Doc Review", "Doc-Review-Kanban", None, "文档起草与评审",
+WIZARD_BASE = [None, "Doc Review", "Doc-Review-Kanban", None, "文档起草与评审",
                "draft", "起草", "biz", None, "doc-draft", "DRAFT.md", "Y",
                "review", "评审", "biz", None, "doc-review", "REVIEW.md", "N",
                None, None, None]
@@ -32,6 +32,17 @@ def set_manifest(root, **values):
 
 
 class WizardTest(unittest.TestCase):
+    def test_manual_choice_stops_after_style_question(self):
+        root = temp_dir(self) / "p"
+        result = new(root, prompter=ScriptedPrompter(["2"]))
+        self.assertFalse(result.report.failed(), result.report.to_text())
+        self.assertIn("skills/my-skill/SKILL.md", result.written)
+        self.assertEqual({path.name for path in (root / "modules").iterdir()},
+                         {"board.json", "session.json", "knowledge.json", "artifactSync.json"})
+        entry = json.loads((root / "plugin.scaffold.json").read_text("utf-8"))
+        self.assertNotIn("artifactSync", entry["modules"])
+        self.assertFalse((root / "plugin.json").exists())
+
     def test_scripted_session_creates_plugin(self):
         root = temp_dir(self) / "p"
         prompter = ScriptedPrompter(WIZARD)
@@ -73,7 +84,7 @@ class WizardTest(unittest.TestCase):
 
     def test_conflicting_answers_are_asked_again(self):
         answers = list(WIZARD)
-        answers[11:11] = ["draft"]                    # 第二个节点先给出重复的 id
+        answers[12:12] = ["draft"]                    # 第二个节点先给出重复的 id
         prompter = ScriptedPrompter(answers)
         self.assertFalse(new(temp_dir(self) / "p", prompter=prompter).report.failed())
         self.assertIn("  节点 id draft 已经用过了", prompter.lines)

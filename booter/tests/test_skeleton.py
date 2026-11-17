@@ -6,6 +6,7 @@ import json
 import unittest
 from pathlib import Path
 
+from scaffold.lib import skillmd
 from tests.helpers import cli, temp_dir
 
 
@@ -87,6 +88,44 @@ class SkeletonTest(unittest.TestCase):
         self.assertTrue((root / "skills/autobiz/my-prd/SKILL.md").is_file())
         self.assertNotIn("TODO_FIELD", [issue["code"] for issue in payload["issues"]])
 
+    def test_manual_skeleton_can_be_filled_and_packaged(self):
+        root = temp_dir(self) / "plugin"
+        code, payload = cli("new", str(root), "--manual")
+        self.assertEqual(code, 0, payload)
+        modules = {key: f"./modules/{key}.json" for key in ("board", "session", "knowledge", "artifactSync")}
+        source_files = [rel for rel in payload["written"] if not rel.startswith(".scaffold/")]
+        self.assertEqual(source_files, sorted([ref[2:] for ref in modules.values()]
+                                              + ["plugin.scaffold.json", "skills/my-skill/SKILL.md", "workflow.json"]))
+        entry = json.loads((root / "plugin.scaffold.json").read_text("utf-8"))
+        artifact_sync = root / modules.pop("artifactSync")
+        draft = artifact_sync.read_bytes()
+        self.assertEqual(entry["modules"], modules)
+        self.assertFalse((root / "plugin.json").exists())
+        skill = root / "skills/my-skill/SKILL.md"
+        frontmatter = skillmd.parse_frontmatter(skill.read_text("utf-8"))
+        self.assertEqual(frontmatter.fields["name"], "my-skill")
+        self.assertTrue(skillmd.is_placeholder(frontmatter.fields["description"]))
+        self.assertFalse(skillmd.has_state(skill.read_text("utf-8")))
+
+        for path in modules.values():
+            (root / path).unlink()
+        edit(root, "plugin.scaffold.json", lambda d: d.pop("modules"))
+        edit(root, "plugin.scaffold.json", lambda d: d["plugin"].update(
+            id="AutoBizDevOps_test", name="AutoBizDevOps_测试", description="审阅文档"))
+        edit(root, "workflow.json", lambda d: d["nodes"]["biz"][0].update(
+            id="review", name="评审", outputs=["REVIEW.md"]))
+        body = "检查文档，记录发现并保存到 REVIEW.md。"
+        skill.write_text(f"---\nname: my-skill\ndescription: 审阅文档时使用\n---\n\n{body}\n", "utf-8")
+        for command in ("lint", "doctor", "package"):
+            code, payload = cli("-C", str(root), command)
+            self.assertEqual(code, 0, payload)
+        self.assertEqual(artifact_sync.read_bytes(), draft)
+        board_modules = json.loads((root / "board_core/modules.json").read_text("utf-8"))["modules"]
+        self.assertEqual(board_modules["artifactSync"], {"enabled": False})
+        built_skill = (root / "skills/autobiz/my-skill/SKILL.md").read_text("utf-8")
+        self.assertTrue(skillmd.has_state(built_skill))
+        self.assertIn(body, built_skill)
+
     def test_artifact_descriptions_may_stay_until_package(self):
         root = self.skeleton("artifactSync")
         fill(root)
@@ -104,10 +143,13 @@ class SkeletonTest(unittest.TestCase):
         target = temp_dir(self) / "plugin"
         self.assertEqual(cli("new", str(target), "--skeleton", "--yes")[0], 2)
         self.assertEqual(cli("new", str(target), "--skeleton", "--module", "nope")[0], 2)
+        self.assertEqual(cli("new", str(target), "--manual", "--skeleton")[0], 2)
+        self.assertEqual(cli("new", str(target), "--manual", "--yes")[0], 2)
         self.assertEqual(cli("new", str(target), "--yes", "--module", "board")[0], 2)
         self.assertFalse(target.exists())
         root = self.skeleton()
         self.assertEqual(cli("new", str(root), "--skeleton")[0], 2)
+        self.assertEqual(cli("new", str(root), "--manual")[0], 2)
 
 
 if __name__ == "__main__":

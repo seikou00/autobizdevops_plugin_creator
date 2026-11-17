@@ -79,6 +79,12 @@ def yes(prompter: Prompter, question: str, default: bool) -> bool:
     return prompter.ask(question, default="Y" if default else "N", choices=("Y", "N", "y", "n")) in YES
 
 
+def ask_manual_configuration(prompter: Prompter) -> bool:
+    prompter.say("  1 全引导对话：逐步回答问题，由向导生成插件。")
+    prompter.say("  2 自行配置：生成全部模块的配置骨架和空白 SKILL.md，由你填写和取舍。")
+    return prompter.ask("你希望用哪种方式配置插件？", default="1", choices=("1", "2")) == "2"
+
+
 def ask_plugin(prompter: Prompter) -> dict:
     prompter.say("── 1 插件基础信息 ──")
     while True:

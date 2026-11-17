@@ -19,8 +19,9 @@
 
 | 命令 | 作用 |
 |---|---|
-| `autobiz-plugin new <dir> [--answers <file\|->] [--yes]` | 初始化向导：按 §1.4 的七类输入问答，生成入口文件 `plugin.scaffold.json`、`workflow.json`、需要的 `modules/*.json` 和工程目录，随后执行 doctor。`<dir>` 必须不存在或为空；`--answers` 给出回答（§1.4），`--yes` 不提问，此时 `--answers` 必须给出 `plugin` 和 `nodes`。脚手架不带样例种子，没有 `--from` |
+| `autobiz-plugin new <dir> [--answers <file\|->] [--yes]` | 初始化向导。先选全引导对话或自行配置，全引导对话按 §1.4 收集回答并执行 doctor，自行配置等同于 `--manual`。`<dir>` 必须不存在或为空。`--yes` 跳过问答，`--answers` 必须给出 `plugin` 和 `nodes`（§1.4） |
 | `autobiz-plugin new <dir> --skeleton [--module <id> …]` | 只写出带 `[TODO: …]` 占位的核心配置骨架（入口文件、`workflow.json`、`--module` 选中的模块配置）和 `.scaffold/` Schema，不执行 doctor；开发者填完后执行 `lint` 查看还缺什么，再 `doctor`、`package`（§1.4.1，D63）。不能与 `--answers`、`--yes` 一起使用 |
+| `autobiz-plugin new <dir> --manual [--module <id> …]` | 生成核心配置、模块配置骨架、`.scaffold/` Schema 和空白 `skills/my-skill/SKILL.md`。默认生成四份模块配置，入口引用 `board`、`session`、`knowledge`，`artifactSync` 留作备用。也可以用 `--module` 显式指定要生成并引用的模块。流程里有一个绑定该技能的占位节点。不能与 `--skeleton`、`--answers`、`--yes` 一起使用 |
 | `autobiz-plugin add node <id> --name <name> --skill <skill> --stage biz\|dev\|ops --seq <n> [--output <path> …] [--optional-output <path> …] [--terminal]` | 在 `workflow.json` 的 `nodes.<stage>` 中添加节点，按 `seq` 插到组内对应位置，不改其他节点的 `seq`。`--output` 是必需输出，`--optional-output` 是可选输出（写成 `{path, optional: true}`），两者按命令行上的顺序追加到 `outputs`；含 glob 的路径要加引号，避免被 shell 展开。`--terminal` 表示终态节点，不能带输出。写完后执行 doctor（技能不存在时生成空白 `SKILL.md`） |
 | `autobiz-plugin add skill <skill> [--from <dir>]` | 导入已有技能资源（正文、模板、脚本、校验器）到 `skills/<skill>/`；不带 `--from` 时创建空白 `SKILL.md`（只有 frontmatter 和状态维护片段，技能已绑定节点时才有片段）。导入时 frontmatter 的 `name` 改为 `<skill>`，顶层 `version`、`author` 迁到 `metadata`；正文中的旧状态命令（`LEGACY_ENTRY_REF`）等技能内容问题报 warning，照样导入，check 和 package 时报 error（input-config.md §7.3）。目标目录已存在，或其他分组下有同名技能时拒绝导入（D56） |
 | `autobiz-plugin add skills --from <skills-dir> [--agents <agents-dir>]` | 把 `<skills-dir>` 当作插件的 `skills/` 导入，保留一层分组：一级子目录含 `SKILL.md`、且它的子目录都不含 `SKILL.md` 时是技能，导入到 `skills/<skill>/`；一级子目录下有含 `SKILL.md` 的子目录时是分组，这些子目录是分组下的技能，导入到 `skills/<分组>/<skill>/`（与 build 查找技能的两层一致，input-config.md §7.3）。`<skills-dir>` 自己含 `SKILL.md`、有技能子目录且没有带 `SKILL.md` 的分组子目录时，它本身就是一个分组（例如 `skills/autodev`），按 `skills/<目录名>/<skill>/` 导入。技能以目录名作为技能名，技能目录内部更深层的 `SKILL.md` 是技能自己的资源。其余内容（集合根目录和分组目录自己的 `SKILL.md`、`references/`、`hooks/` 等）是共享资源，按原路径拷到 `skills/` 下：不存在时写入，内容相同时跳过，内容不同时拒绝导入；其中的 `SKILL.md` 同样迁移 frontmatter。上次构建登记为脚手架生成的技能（例如产物同步模块的 `autobizdevops-artifact-sync`）跳过不导入。同名技能在集合中出现两次时拒绝导入。build 生成的空白 `skills/<skill>/SKILL.md` 会被分组下的同名技能替换（删除空白文件）。每个技能沿用 `add skill --from` 的迁移、冲突检查和 warning 规则。整批先在内存中完成导入与一次 doctor，任一 error 均不写文件；成功时 JSON 输出增加 `importedSkills` 技能名数组。`agents/` 不属于技能集合，不会自动查找或创建：给了 `--agents` 时把该目录原样拷到插件的 `agents/`，与技能同批写入；已有同名文件内容相同时跳过，内容不同时拒绝导入 |
@@ -87,9 +88,12 @@ CLI 不提供单独的 `build` 命令：build 是内部流水线的名字，由 
 
 ### 1.4 初始化向导（new）
 
-向导按 input-config.md §1.1 的七类输入依次问答。有默认值的问题可以直接回车：
+向导先问配置方式。选择 `2` 自行配置会直接生成骨架。选择 `1` 全引导对话后，按 input-config.md §1.1 的七类输入依次问答。有默认值的问题可以直接回车。
 
 ```text
+  1 全引导对话：逐步回答问题，由向导生成插件。
+  2 自行配置：生成全部模块的配置骨架和空白 SKILL.md，由你填写和取舍。
+? 你希望用哪种方式配置插件？           › 1
 ── 1 插件基础信息 ──
 ? 插件 ID（slug，发布后不可修改）      › doc-review
 ? 插件名                                › Doc-Review-Kanban
@@ -227,12 +231,14 @@ booter/
 
 SKILL.md 中的命令写作 `python "<booter>" <命令> --json`，`<booter>` 是 SKILL.md 所在目录的绝对路径。入口文件与 workflow 的填写指南在 `references/config-guide.md`。模块简介取自 `module list` 的 `description`，填写指南取自 `guide` 指向的文件，新增模块时随模块包提供。检查细节以 CLI 的 Issue（`code`、`pointer`、`hint`）和插件目录 `.scaffold/` 下的 Schema 为准。需要用户决定时用 `request_user_input` 出选择题（D65）。
 
-流程（SKILL.md 正文）：
+第一轮选择全引导对话或自行配置。自行配置只需确定目标目录，执行 `new --manual` 生成核心配置、全部模块的骨架和空白技能，用户自行填写并删除不需要的模块文件和入口引用。全引导对话先确定从想法搭建、用现成技能组装或修改已有插件，再按对应场景处理。
+
+全引导对话的 CLI 操作（新建场景）：
 
 | 步骤 | agent 做什么 | 调用 |
 |---|---|---|
 | 1. 目录和模块 | 单独问目录，再介绍可选模块并逐个问要不要。选了发布单元知识再问来源和组装方。单独给出「沿用默认」（各节点用 `multi`）和「自定义运行模式」（可全局设置和按节点覆盖）两个选项。按回答生成骨架并写入对应字段 | `module list`、`new --skeleton` |
-| 2. 讲解后停下 | 读取所选模块的指南，展示启用后多出什么、什么时候需要、要先准备什么、最少要填哪些字段。开发者自己填写，也可以先描述流程，由 agent 整理成表格回显，确认后写入 | — |
+| 2. 起草配置 | 依据确认的流程和模块设置起草并写入配置 | — |
 | 3. 检查配置 | 转述 `TODO_FIELD` 和其他 error 的位置与 `hint`，开发者改完后再检查，直到没有 error | `lint` |
 | 4. 技能 | 导入已有技能集合；没有技能时生成空白 `SKILL.md`，引导开发者填写 `description` 和正文 | `add skills --from`，或 `doctor` |
 | 5. 打包 | 重新生成后打包；报 `TODO_PLACEHOLDER`、`LEGACY_ENTRY_REF` 时转述位置，改完从 `doctor` 重来 | `doctor`、`package` |
