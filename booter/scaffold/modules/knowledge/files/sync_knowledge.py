@@ -120,46 +120,53 @@ def rmtree(path: Path) -> None:
         shutil.rmtree(path, onerror=clear_readonly)
 
 
-def clone(url: str, ref: str, dest: Path, timeout: float = GIT_COMMAND_TIMEOUT_SECONDS) -> str:
+def clone(url: str, ref: str, dest: Path, deadline: float) -> str:
+    def run_with_budget(args: List[str], *, cwd: Optional[Path] = None):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(args, 0)
+        return run_git(args, cwd=cwd, timeout=remaining)
+
     if dest.exists():
         rmtree(dest)
     try:
-        completed = run_git(["clone", "--depth", "1", "--branch", ref, url, str(dest)], timeout=timeout)
+        completed = run_with_budget(["clone", "--depth", "1", "--branch", ref, url, str(dest)])
     except subprocess.TimeoutExpired:
-        raise CloneUnavailable(f"克隆超时（{timeout:g} 秒）") from None
+        raise CloneUnavailable(f"克隆超时（{GIT_COMMAND_TIMEOUT_SECONDS:g} 秒）") from None
     if completed.returncode != 0:
         if dest.exists():
             rmtree(dest)
         try:
-            fallback = run_git(["clone", "--depth", "1", url, str(dest)], timeout=timeout)
+            fallback = run_with_budget(["clone", "--depth", "1", url, str(dest)])
         except subprocess.TimeoutExpired:
-            raise CloneUnavailable(f"克隆超时（{timeout:g} 秒）") from None
+            raise CloneUnavailable(f"克隆超时（{GIT_COMMAND_TIMEOUT_SECONDS:g} 秒）") from None
         if fallback.returncode != 0:
             raise CloneUnavailable(git_error(fallback, "克隆"))
         try:
-            checkout = run_git(["checkout", ref], cwd=dest, timeout=timeout)
+            checkout = run_with_budget(["checkout", ref], cwd=dest)
         except subprocess.TimeoutExpired:
-            raise RuntimeError(f"切换到 {ref} 超时（{timeout:g} 秒）") from None
+            raise RuntimeError(f"切换到 {ref} 超时（{GIT_COMMAND_TIMEOUT_SECONDS:g} 秒）") from None
         if checkout.returncode != 0:
             raise RuntimeError(git_error(checkout, f"切换到 {ref}"))
     try:
-        revision = run_git(["rev-parse", "HEAD"], cwd=dest, timeout=timeout)
+        revision = run_with_budget(["rev-parse", "HEAD"], cwd=dest)
     except subprocess.TimeoutExpired:
-        raise RuntimeError(f"读取提交号超时（{timeout:g} 秒）") from None
+        raise RuntimeError(f"读取提交号超时（{GIT_COMMAND_TIMEOUT_SECONDS:g} 秒）") from None
     return revision.stdout.strip() if revision.returncode == 0 else ""
 
 
 def fetch(url: str, ref: str, dest: Path, ssh_url: str) -> dict:
+    deadline = time.monotonic() + GIT_COMMAND_TIMEOUT_SECONDS
     https = url.strip().lower().startswith("https://")
     try:
-        return {"commit": clone(url, ref, dest),
+        return {"commit": clone(url, ref, dest, deadline),
                 "transport": "https" if https else "other"}
     except CloneUnavailable as https_error:
-        if not https or not ssh_url:
+        if not https or not ssh_url or time.monotonic() >= deadline:
             raise
         log(f"HTTPS 克隆失败，改用 SSH: {https_error}")
         try:
-            return {"commit": clone(ssh_url, ref, dest), "transport": "ssh"}
+            return {"commit": clone(ssh_url, ref, dest, deadline), "transport": "ssh"}
         except RuntimeError as ssh_error:
             raise RuntimeError(f"HTTPS 克隆失败: {https_error}\nSSH 兜底失败: {ssh_error}") from ssh_error
 
